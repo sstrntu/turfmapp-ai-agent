@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - Dashboard</title>
+    <meta name="description" content="TURFMAPP dashboard - Your central hub for turf management">
+    <link rel="stylesheet" href="styles/home.css">
+</head>
+<body>
+    <!-- Main application container -->
+    <div class="app-container">
+        <div class="app-background">
+            
+            <!-- Application Header -->
+            <header class="app-header" role="banner">
+                <div class="header-container">
+                    <div class="brand-section">
+                        <h1 class="app-title">TURFMAPP</h1>
+                        <p class="app-tagline">Dashboard</p>
+                    </div>
+                    
+                    <!-- User profile section -->
+                    <div class="user-section">
+                        <span class="user-greeting" id="user-greeting">Welcome back!</span>
+                        <!-- TODO: Add user profile dropdown -->
+                        <!-- <div class="user-profile-dropdown">
+                            <button class="profile-button" aria-expanded="false">
+                                <span class="user-avatar" id="user-avatar"></span>
+                                <span class="user-name" id="user-name"></span>
+                            </button>
+                            <div class="dropdown-menu">
+                                <a href="#profile" class="dropdown-item">Profile</a>
+                                <a href="#preferences" class="dropdown-item">Preferences</a>
+                                <hr class="dropdown-divider">
+                                <button class="dropdown-item logout-btn">Logout</button>
+                            </div>
+                        </div> -->
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Main Navigation -->
+            <nav class="main-navigation" role="navigation" aria-label="Main Navigation">
+                <div class="nav-container">
+                    <!-- TODO: Implement actual navigation when pages are ready -->
+                    <!-- <a href="dashboard.html" class="nav-link active" aria-current="page">
+                        <span class="nav-icon dashboard-icon" aria-hidden="true"></span>
+                        <span class="nav-text">Dashboard</span>
+                    </a>
+                    <a href="analytics.html" class="nav-link">
+                        <span class="nav-icon analytics-icon" aria-hidden="true"></span>
+                        <span class="nav-text">Analytics</span>
+                    </a>
+                    <a href="settings.html" class="nav-link">
+                        <span class="nav-icon settings-icon" aria-hidden="true"></span>
+                        <span class="nav-text">Settings</span>
+                    </a> -->
+                    
+                    <!-- Temporary navigation for testing -->
+                    <a href="#dashboard" class="nav-link active" aria-current="page">Dashboard</a>
+                    <a href="#analytics" class="nav-link">Analytics</a>
+                    <a href="#settings" class="nav-link">Settings</a>
+                    <a href="#" class="nav-link logout-link" onclick="return AuthActions.handleLogout()">Logout</a>
+                </div>
+            </nav>
+            
+            <!-- Main Content Area -->
+            <main class="main-content" role="main">
+                <div class="content-container">
+                    
+                    <!-- Welcome Section -->
+                    <section class="welcome-section" aria-labelledby="welcome-title">
+                        <div class="welcome-card">
+                            <header class="welcome-header">
+                                <h2 id="welcome-title" class="welcome-title">Welcome Back!</h2>
+                                <p class="welcome-message">You have successfully logged in to TURFMAPP.</p>
+                            </header>
+                            
+                            <!-- Action buttons -->
+                            <div class="action-section">
+                                <button class="primary-action-btn" onclick="DashboardController.handleGetStarted()">
+                                    <span class="btn-text">Get Started</span>
+                                    <span class="btn-icon" aria-hidden="true">→</span>
+                                </button>
+                                
+                                <!-- TODO: Add more action buttons when features are ready -->
+                                <!-- <button class="secondary-action-btn">View Analytics</button>
+                                <button class="secondary-action-btn">Manage Settings</button> -->
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- Dashboard Content Placeholder -->
+                    <section class="dashboard-content" aria-labelledby="dashboard-content-title">
+                        <h2 id="dashboard-content-title" class="section-title visually-hidden">Dashboard Content</h2>
+                        
+                        <!-- TODO: Add actual dashboard widgets when ready -->
+                        <!-- <div class="widget-grid">
+                            <div class="widget-card" id="stats-widget">
+                                <h3 class="widget-title">Statistics</h3>
+                                <div class="widget-content"></div>
+                            </div>
+                            <div class="widget-card" id="recent-activity-widget">
+                                <h3 class="widget-title">Recent Activity</h3>
+                                <div class="widget-content"></div>
+                            </div>
+                            <div class="widget-card" id="quick-actions-widget">
+                                <h3 class="widget-title">Quick Actions</h3>
+                                <div class="widget-content"></div>
+                            </div>
+                        </div> -->
+                        
+                        <!-- Placeholder content for testing -->
+                        <div class="placeholder-content">
+                            <p class="placeholder-text">Dashboard widgets will be implemented here.</p>
+                        </div>
+                    </section>
+                </div>
+            </main>
+            
+            <!-- Footer -->
+            <footer class="app-footer" role="contentinfo">
+                <div class="footer-container">
+                    <p class="footer-text">© 2024 TURFMAPP. All rights reserved.</p>
+                    <!-- TODO: Add footer links when pages are ready -->
+                    <!-- <nav class="footer-nav" aria-label="Footer Navigation">
+                        <a href="help.html" class="footer-link">Help</a>
+                        <a href="privacy.html" class="footer-link">Privacy</a>
+                        <a href="terms.html" class="footer-link">Terms</a>
+                    </nav> -->
+                </div>
+            </footer>
+        </div>
+    </div>
+    
+    <!-- JavaScript modules -->
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/auth.js"></script>
+    <script src="scripts/dashboard.js"></script>
+</body>
+</html>
