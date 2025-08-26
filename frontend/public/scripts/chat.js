@@ -595,6 +595,325 @@
             return tools;
         }
 
+        // FAL Tools System
+        const falToolMode = {
+            active: false,
+            currentTool: null,
+            step: 0,
+            parameters: {},
+            parameterConfig: []
+        };
+
+        let availableTools = {};
+
+        // Load available tools from backend
+        async function loadAvailableTools() {
+            try {
+                const response = await fetch('/api/fal-tools/available');
+                if (response.ok) {
+                    availableTools = await response.json();
+                    console.log('Loaded available tools:', availableTools);
+                } else {
+                    console.error('Failed to load available tools');
+                }
+            } catch (error) {
+                console.error('Error loading available tools:', error);
+            }
+        }
+
+        // Initialize tool buttons
+        function initializeFALTools() {
+            const toolButtons = document.querySelectorAll('.fal-tool');
+            toolButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const toolId = this.dataset.tool;
+                    if (toolId && availableTools[toolId]) {
+                        activateFALTool(toolId);
+                    }
+                });
+            });
+        }
+
+        // Activate a FAL tool
+        function activateFALTool(toolId) {
+            const tool = availableTools[toolId];
+            if (!tool) return;
+
+            falToolMode.active = true;
+            falToolMode.currentTool = toolId;
+            falToolMode.step = 0;
+            falToolMode.parameters = {};
+            falToolMode.parameterConfig = tool.parameters;
+
+            // Update button states
+            updateToolButtonStates(toolId);
+
+            // Start parameter collection
+            startParameterCollection();
+        }
+
+        // Deactivate FAL tool
+        function deactivateFALTool() {
+            falToolMode.active = false;
+            falToolMode.currentTool = null;
+            falToolMode.step = 0;
+            falToolMode.parameters = {};
+            falToolMode.parameterConfig = [];
+
+            // Reset button states
+            updateToolButtonStates(null);
+        }
+
+        // Update tool button visual states
+        function updateToolButtonStates(activeToolId) {
+            const toolButtons = document.querySelectorAll('.fal-tool');
+            toolButtons.forEach(button => {
+                const toolId = button.dataset.tool;
+                const isActive = toolId === activeToolId;
+                button.setAttribute('aria-pressed', isActive);
+                button.classList.toggle('active', isActive);
+            });
+        }
+
+        // Start collecting parameters from user
+        function startParameterCollection() {
+            const tool = availableTools[falToolMode.currentTool];
+            if (!tool) return;
+
+            // Show first parameter prompt
+            showNextParameterPrompt();
+        }
+
+        // Show the next parameter prompt
+        function showNextParameterPrompt() {
+            const config = falToolMode.parameterConfig[falToolMode.step];
+            if (!config) {
+                // All parameters collected, execute the tool
+                executeFALTool();
+                return;
+            }
+
+            // Create assistant message asking for parameter
+            appendMessage('assistant', config.prompt + (config.placeholder ? `\n\nExample: ${config.placeholder}` : ''));
+        }
+
+        // Process user input for FAL tool parameters
+        function processFALToolInput(userInput) {
+            if (!falToolMode.active || !falToolMode.parameterConfig[falToolMode.step]) {
+                return false;
+            }
+
+            const config = falToolMode.parameterConfig[falToolMode.step];
+            const paramName = config.name;
+
+            // Validate and process input based on parameter type
+            let processedValue;
+            let isValid = true;
+            let errorMessage = '';
+
+            try {
+                switch (config.type) {
+                    case 'string':
+                        processedValue = userInput.trim();
+                        if (config.required && !processedValue) {
+                            isValid = false;
+                            errorMessage = 'This field is required.';
+                        }
+                        break;
+
+                    case 'integer':
+                        processedValue = parseInt(userInput.trim());
+                        if (isNaN(processedValue)) {
+                            isValid = false;
+                            errorMessage = 'Please enter a valid number.';
+                        } else if (config.min !== undefined && processedValue < config.min) {
+                            isValid = false;
+                            errorMessage = `Value must be at least ${config.min}.`;
+                        } else if (config.max !== undefined && processedValue > config.max) {
+                            isValid = false;
+                            errorMessage = `Value must be at most ${config.max}.`;
+                        }
+                        break;
+
+                    case 'float':
+                        processedValue = parseFloat(userInput.trim());
+                        if (isNaN(processedValue)) {
+                            isValid = false;
+                            errorMessage = 'Please enter a valid number.';
+                        }
+                        break;
+
+                    case 'boolean':
+                        const lowerInput = userInput.trim().toLowerCase();
+                        if (['true', 'yes', '1', 'on'].includes(lowerInput)) {
+                            processedValue = true;
+                        } else if (['false', 'no', '0', 'off'].includes(lowerInput)) {
+                            processedValue = false;
+                        } else {
+                            isValid = false;
+                            errorMessage = 'Please enter true/false or yes/no.';
+                        }
+                        break;
+
+                    default:
+                        processedValue = userInput.trim();
+                }
+            } catch (error) {
+                isValid = false;
+                errorMessage = 'Invalid input format.';
+            }
+
+            if (!isValid) {
+                appendMessage('assistant', `❌ ${errorMessage}\n\n${config.prompt}`);
+                return true; // Still handled by FAL tool system
+            }
+
+            // Store the parameter
+            falToolMode.parameters[paramName] = processedValue;
+            falToolMode.step++;
+
+            // Show confirmation and continue
+            appendMessage('assistant', `✅ ${config.name}: ${processedValue}`);
+
+            // Move to next parameter or execute
+            showNextParameterPrompt();
+
+            return true; // Input was handled by FAL tool system
+        }
+
+        // Execute the FAL tool with collected parameters
+        async function executeFALTool() {
+            const toolId = falToolMode.currentTool;
+            const tool = availableTools[toolId];
+
+            if (!tool) {
+                appendMessage('assistant', '❌ Tool configuration not found.');
+                deactivateFALTool();
+                return;
+            }
+
+            // Show execution message
+            // Show a compact status message (not a full assistant bubble yet)
+            appendMessage('assistant', `🔧 Generating ${tool.name.toLowerCase()}...`);
+
+            try {
+                // Make API call to backend
+                const response = await fetch(`/api/fal-tools/${toolId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(falToolMode.parameters)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Display results
+                    displayFALToolResult(result, tool);
+                } else {
+                    appendMessage('assistant', `❌ Error: ${result.error || 'Unknown error occurred'}`);
+                }
+
+            } catch (error) {
+                console.error('FAL Tool execution error:', error);
+                appendMessage('assistant', `❌ Failed to execute tool: ${error.message}`);
+            }
+
+            // Deactivate tool mode
+            deactivateFALTool();
+        }
+
+        // Display FAL tool results in chat
+        function displayFALToolResult(result, tool) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'chat-bubble assistant message-appear fal-result';
+
+            let content = `✅ ${tool.name} completed!\n\n`;
+
+            if (result.processing_time) {
+                content += `⏱️ Processing time: ${result.processing_time}s\n\n`;
+            }
+
+            // Handle different result types
+            if (result.result) {
+                const data = result.result;
+
+                switch (tool.output_type) {
+                    case 'audio':
+                        if (data.audio_file) {
+                            content += '🎵 Generated audio:\n';
+                            
+                            // Create audio player
+                            const audioContainer = document.createElement('div');
+                            audioContainer.className = 'media-container audio-container';
+                            
+                            const audio = document.createElement('audio');
+                            audio.controls = true;
+                            audio.src = data.audio_file;
+                            
+                            const downloadBtn = document.createElement('a');
+                            downloadBtn.href = data.audio_file;
+                            downloadBtn.download = data.filename || 'generated-audio.wav';
+                            downloadBtn.className = 'download-btn';
+                            downloadBtn.textContent = '⬇️ Download';
+                            
+                            audioContainer.appendChild(audio);
+                            audioContainer.appendChild(downloadBtn);
+                            
+                            resultDiv.innerHTML = content;
+                            resultDiv.appendChild(audioContainer);
+                        }
+                        break;
+
+                    case 'image':
+                        if (data.image_url) {
+                            content += '🖼️ Generated image:\n';
+                            
+                            const imageContainer = document.createElement('div');
+                            imageContainer.className = 'media-container image-container';
+                            
+                            const img = document.createElement('img');
+                            img.src = data.image_url;
+                            img.alt = 'Generated image';
+                            img.className = 'generated-image';
+                            
+                            const downloadBtn = document.createElement('a');
+                            downloadBtn.href = data.image_url;
+                            downloadBtn.download = data.filename || 'generated-image.png';
+                            downloadBtn.className = 'download-btn';
+                            downloadBtn.textContent = '⬇️ Download';
+                            
+                            imageContainer.appendChild(img);
+                            imageContainer.appendChild(downloadBtn);
+                            
+                            resultDiv.innerHTML = content;
+                            resultDiv.appendChild(imageContainer);
+                        }
+                        break;
+
+                    default:
+                        // Text or other result
+                        content += JSON.stringify(data, null, 2);
+                        resultDiv.textContent = content;
+                }
+            } else {
+                resultDiv.textContent = content + 'Result generated successfully.';
+            }
+
+            list.appendChild(resultDiv);
+            scrollToBottom();
+        }
+
+        // Initialize FAL tools on page load
+        loadAvailableTools().then(() => {
+            initializeFALTools();
+        });
+
         // Auto-resize textarea functionality
         function autoResizeTextarea(textarea) {
             textarea.style.height = 'auto';
@@ -622,6 +941,17 @@
             e.preventDefault();
             const value = input.value.trim();
             if (!value) return;
+
+            // Check if FAL tool mode is active and handle parameter collection
+            if (falToolMode.active && falToolMode.parameterConfig[falToolMode.step]) {
+                // Show the user's input first
+                appendMessage('user', value);
+                input.value = '';
+                autoResizeTextarea(input);
+                // Then process the parameter so confirmations/prompts appear after
+                setTimeout(function(){ processFALToolInput(value); }, 0);
+                return;
+            }
 
             // Check for special tool modes
             const imageGenBtn = document.getElementById('image-gen-btn');
@@ -709,4 +1039,74 @@
             }
         });
     }
+
+    // Left panel toggle
+    const lpToggle = document.getElementById('left-panel-toggle');
+    const lp = document.getElementById('left-panel');
+    const lpClose = document.getElementById('left-panel-close');
+    if (lpToggle && lp) {
+        function setLeftPanel(open) {
+            lp.classList.toggle('open', open);
+            lp.setAttribute('aria-hidden', open ? 'false' : 'true');
+            lpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            // Toggle body class to shift main content like ChatGPT
+            document.body.classList.toggle('panel-open', open);
+        }
+        lpToggle.addEventListener('click', function(){ setLeftPanel(!lp.classList.contains('open')); });
+        lpClose?.addEventListener('click', function(){ setLeftPanel(false); });
+        document.addEventListener('keydown', function(e){ if (e.key === 'Escape') setLeftPanel(false); });
+    }
+
+    // Panel actions: New chat + history (current session only)
+    (function(){
+        const newBtn = document.getElementById('btn-new-chat');
+        const histList = document.getElementById('history-list');
+        // Track only the current session title (first user prompt)
+        let sessionTitle = '';
+        if (newBtn) {
+            newBtn.addEventListener('click', function(){
+                // Clear chat list and close panel
+                const chatList = document.getElementById('chat-list');
+                if (chatList) chatList.innerHTML = '';
+                const textarea = document.getElementById('chat-input');
+                if (textarea) textarea.value = '';
+                if (lp) { lp.classList.remove('open'); lp.setAttribute('aria-hidden','true'); lpToggle?.setAttribute('aria-expanded','false'); document.body.classList.remove('panel-open'); }
+            });
+        }
+        function renderHistory(){
+            if (!histList) return;
+            histList.innerHTML = '';
+            if (sessionTitle) {
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = sessionTitle;
+                const use = document.createElement('button');
+                use.className = 'panel-btn small';
+                use.textContent = 'Use';
+                use.addEventListener('click', function(){
+                    const textarea = document.getElementById('chat-input');
+                    if (textarea) { textarea.value = sessionTitle; textarea.focus(); }
+                });
+                li.appendChild(span); li.appendChild(use);
+                histList.appendChild(li);
+            }
+        }
+        // Hook into form submit to capture history
+        const chatForm = document.getElementById('chat-form');
+        if (chatForm) {
+            chatForm.addEventListener('submit', function(){
+                const textarea = document.getElementById('chat-input');
+                const v = (textarea && textarea.value || '').trim();
+                if (v && !sessionTitle) { sessionTitle = v; setTimeout(renderHistory, 50); }
+            }, { capture: true });
+        }
+        // Clear history on New chat
+        if (newBtn) {
+            newBtn.addEventListener('click', function(){
+                sessionTitle = '';
+                renderHistory();
+            });
+        }
+        renderHistory();
+    })();
 })();

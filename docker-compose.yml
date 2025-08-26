@@ -16,6 +16,7 @@ services:
       - FRONTEND_URL=http://localhost:3005
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL}
+      - FAL_KEY=${FAL_KEY}
     volumes:
       - ./backend:/app
     depends_on:

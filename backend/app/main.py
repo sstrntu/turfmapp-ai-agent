@@ -11,6 +11,7 @@ from .routes.auth import router as auth_router
 from .routes.admin import router as admin_router
 from .routes.chat import router as chat_router
 from .routes.upload import router as upload_router
+from .routes.fal_tools import router as fal_tools_router
 from .database import Base, engine
 
 
@@ -44,6 +45,7 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
 app.include_router(chat_router, prefix="/chat", tags=["chat"])
 app.include_router(upload_router, prefix="/uploads", tags=["uploads"])
+app.include_router(fal_tools_router, prefix="/fal-tools", tags=["fal-tools"])
 
 
 @app.on_event("startup")

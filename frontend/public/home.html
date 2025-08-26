@@ -16,21 +16,17 @@
             <header class="app-header" role="banner">
                 <div class="header-container">
                     <div class="brand-section">
+                        <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="left-panel">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
                         <h1 class="app-title">TURFMAPP</h1>
                         <p class="app-tagline">AI</p>
                     </div>
                     
-                    <!-- Top right actions: profile + hamburger menu -->
+                    <!-- Empty top actions area -->
                     <div class="top-actions">
-                        <div class="profile-avatar" id="profile-avatar" title="Profile"></div>
-                        <button class="hamburger-btn" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="top-menu">
-                            <span></span><span></span><span></span>
-                        </button>
-                        <div class="menu-panel" id="top-menu" role="menu" aria-hidden="true">
-                            <a href="/profile.html" class="menu-item" role="menuitem">Profile</a>
-                            <a href="/admin.html" class="menu-item" role="menuitem">Admin</a>
-                            <button class="menu-item danger" role="menuitem" onclick="return AuthActions.handleLogout()">Logout</button>
-                        </div>
                     </div>
                 </div>
             </header>
@@ -52,7 +48,12 @@
                                     </div>
                                     <div class="input-actions input-actions-below">
                                         <button type="button" class="tool-btn" id="attach-file-btn" title="Attach file" aria-label="Attach">+</button>
-                                        <button type="button" class="tool-btn" id="web-search-btn" title="Web search" aria-pressed="false" aria-label="Web search"><img src="/icons/websearch.png" alt="Web search" class="icon-img" width="22" height="22"></button>
+                                        <button type="button" class="tool-btn" id="web-search-btn" title="Web search" aria-pressed="false" aria-label="Web search">
+                                            <img src="/icons/websearchicon.png" alt="Web search" class="icon-img" width="22" height="22">
+                                        </button>
+                                        <button type="button" class="tool-btn fal-tool" id="sound-effects-btn" title="Sound Effects Generator" aria-pressed="false" aria-label="Generate sound effects" data-tool="sound-effects">
+                                            <img src="/icons/soundeffecticon.png" alt="Sound effects" class="icon-img" width="22" height="22">
+                                        </button>
                                     </div>
                                     <input type="file" id="file-input" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.json,.csv" style="display: none;">
                                 </div>
@@ -61,6 +62,54 @@
                     </section>
                 </div>
             </main>
+            
+            <!-- ChatGPT-style left sidebar -->
+            <aside id="left-panel" class="left-panel" aria-hidden="true">
+                <div class="left-panel-inner">
+                    <div class="left-panel-header">
+                        <button id="btn-new-chat" class="new-chat-btn" type="button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            New chat
+                        </button>
+                        <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="left-panel-content">
+                        <!-- History Section -->
+                        <div class="panel-group">
+                            <div class="panel-subtitle">Recent</div>
+                            <ul id="history-list" class="chat-history" aria-live="polite"></ul>
+                        </div>
+                        
+                        <!-- Bottom Menu Section -->
+                        <div class="panel-bottom-menu">
+                            <a href="/profile.html" class="menu-item profile-item">
+                                <span class="profile-thumb" aria-hidden="true"></span>
+                                <span>Profile</span>
+                            </a>
+                            <a href="/admin.html" class="menu-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                                <span>Admin</span>
+                            </a>
+                            <button class="menu-item danger logout-btn" onclick="return AuthActions.handleLogout()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <span>Log out</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
             
             
         </div>
