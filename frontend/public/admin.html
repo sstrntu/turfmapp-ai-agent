@@ -144,15 +144,13 @@
                         
                         <div class="form-row" style="align-items: start;">
                             <div class="label">Developer Instructions</div>
-                            <textarea id="developer-instructions" class="textarea-input">Tone: To the point with easy to understand language.
-Tool Usage: If need to use tools that is not available, ask the user for tool or data access.
-Response Style: Make sure you have all the available information first before answering. If user ask a question and you do not have good background or context to come up with a good answer, always ask the user back first.</textarea>
+                            <textarea id="developer-instructions" class="textarea-input" placeholder="(leave blank)"></textarea>
                             <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Developer role instructions (input_text)</div>
                         </div>
                         
                         <div class="form-row" style="align-items: start;">
                             <div class="label">Assistant Context</div>
-                            <textarea id="assistant-context" class="textarea-input">You are an assistant to Turfmapp agency employees. Turfmapp is a sports media marketing and strategy agency. We do a lot of graphics, analytics, technical, and also run businesses such as the coffee shop, space rental, game room, gym, streetwear sports clothing store, etc. Majority of the employees are Thai. They can read/write English but they are more comfortable in Thai.</textarea>
+                            <textarea id="assistant-context" class="textarea-input" placeholder="(leave blank)"></textarea>
                             <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Assistant role context (output_text)</div>
                         </div>
                         
@@ -276,8 +274,8 @@ Response Style: Make sure you have all the available information first before an
             try {
                 // Load basic settings
                 var model = localStorage.getItem('tm_model');
-                var devInstructions = localStorage.getItem('tm_developer_instructions');
-                var assistantContext = localStorage.getItem('tm_assistant_context');
+                var devInstructions = '';
+                var assistantContext = '';
                 
                 // Load text and reasoning settings
                 var textFormat = localStorage.getItem('tm_text_format') || 'text';
@@ -299,11 +297,11 @@ Response Style: Make sure you have all the available information first before an
                 if (model && document.getElementById('chat-model')) {
                     document.getElementById('chat-model').value = model;
                 }
-                if (devInstructions && document.getElementById('developer-instructions')) {
-                    document.getElementById('developer-instructions').value = devInstructions;
+                if (document.getElementById('developer-instructions')) {
+                    document.getElementById('developer-instructions').value = '';
                 }
-                if (assistantContext && document.getElementById('assistant-context')) {
-                    document.getElementById('assistant-context').value = assistantContext;
+                if (document.getElementById('assistant-context')) {
+                    document.getElementById('assistant-context').value = '';
                 }
                 
                 // Set text and reasoning settings
@@ -356,8 +354,8 @@ Response Style: Make sure you have all the available information first before an
             try {
                 // Get basic settings
                 var model = document.getElementById('chat-model')?.value || '';
-                var devInstructions = document.getElementById('developer-instructions')?.value || '';
-                var assistantContext = document.getElementById('assistant-context')?.value || '';
+                var devInstructions = '';
+                var assistantContext = '';
                 
                 // Get text and reasoning settings
                 var textFormat = document.getElementById('text-format')?.value || 'text';
@@ -377,8 +375,9 @@ Response Style: Make sure you have all the available information first before an
                 
                 // Save all settings
                 if (model) localStorage.setItem('tm_model', model);
-                if (devInstructions) localStorage.setItem('tm_developer_instructions', devInstructions);
-                if (assistantContext) localStorage.setItem('tm_assistant_context', assistantContext);
+                // Always clear stored dev/assistant context
+                localStorage.removeItem('tm_developer_instructions');
+                localStorage.removeItem('tm_assistant_context');
                 
                 localStorage.setItem('tm_text_format', textFormat);
                 localStorage.setItem('tm_text_verbosity', textVerbosity);
@@ -410,10 +409,10 @@ Response Style: Make sure you have all the available information first before an
                 // Reset form values to defaults
                 if (document.getElementById('chat-model')) document.getElementById('chat-model').value = 'gpt-5-mini';
                 if (document.getElementById('developer-instructions')) {
-                    document.getElementById('developer-instructions').value = 'Tone: To the point with easy to understand language.\nTool Usage: If need to use tools that is not available, ask the user for tool or data access.\nResponse Style: Make sure you have all the available information first before answering. If user ask a question and you do not have good background or context to come up with a good answer, always ask the user back first.';
+                    document.getElementById('developer-instructions').value = '';
                 }
                 if (document.getElementById('assistant-context')) {
-                    document.getElementById('assistant-context').value = 'You are an assistant to Turfmapp agency employees. Turfmapp is a sports media marketing and strategy agency. We do a lot of graphics, analytics, technical, and also run businesses such as the coffee shop, space rental, game room, gym, streetwear sports clothing store, etc. Majority of the employees are Thai. They can read/write English but they are more comfortable in Thai.';
+                    document.getElementById('assistant-context').value = '';
                 }
                 if (document.getElementById('text-format')) document.getElementById('text-format').value = 'text';
                 if (document.getElementById('text-verbosity')) document.getElementById('text-verbosity').value = 'medium';

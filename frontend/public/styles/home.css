@@ -1,3 +1,39 @@
+.structured-answer a { text-decoration: none; color: inherit; }
+.structured-answer a:hover { text-decoration: underline; }
+.icon-cloud {
+    display: inline-block;
+    width: 22px;
+    height: 14px;
+    position: relative;
+    box-sizing: content-box;
+    border: 2px solid currentColor;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+    border-bottom: none;
+}
+.icon-cloud::before,
+.icon-cloud::after {
+    content: "";
+    position: absolute;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+}
+.icon-cloud::before {
+    width: 14px;
+    height: 14px;
+    left: -6px;
+    top: -6px;
+    background: transparent;
+}
+.icon-cloud::after {
+    width: 14px;
+    height: 14px;
+    right: -6px;
+    top: -8px;
+    background: transparent;
+}
 /**
  * TURFMAPP Dashboard/Home Page Styles
  * 
@@ -432,6 +468,10 @@ body {
     margin: 0 auto;
     box-shadow: var(--shadow-card);
     transition: var(--transition-medium), box-shadow var(--transition-medium), transform var(--transition-medium), border-color var(--transition-medium);
+    display: flex;            /* Ensure internal scroll works */
+    flex-direction: column;   /* Stack list above form */
+    max-height: 78vh;         /* Prevent card from growing beyond viewport */
+    overflow: hidden;         /* Contain internal scrolling to the list */
 }
 
 .chat-title {
@@ -446,9 +486,10 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: 70vh;
-    overflow-y: auto;
+    overflow-y: auto;         /* internal scroll */
     padding-right: 4px;
+    flex: 1;            /* fill remaining height */
+    min-height: 0;      /* allow child to shrink for overflow */
 }
 
 .chat-card:hover {
@@ -483,6 +524,23 @@ body {
     position: relative;
 }
 
+/* Full-width assistant response like ChatGPT */
+.assistant-message {
+    width: 100%;
+    align-self: stretch;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    font-family: 'JUST Sans', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Keep typing indicator small inside assistant full-width panel */
+.assistant-message .typing-indicator { gap: 4px; }
+.assistant-message .typing-dot { width: 6px; height: 6px; }
+
 /* Hover effects for chat bubbles */
 .chat-bubble:hover {
     transform: translateY(-1px);
@@ -516,6 +574,15 @@ body {
     align-items: center;
     min-height: 20px;
     padding: 14px 16px;
+}
+
+/* Compact typing indicator bubble (not full width) */
+.typing-bubble {
+    align-self: flex-start;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    max-width: max-content;
 }
 
 .typing-indicator {
@@ -647,35 +714,78 @@ body {
     align-items: center;
 }
 
+/* Actions row below input, like ChatGPT */
+.input-actions-below {
+    justify-content: flex-start;
+    padding-left: 6px;
+    margin-top: 6px;
+}
+
 .tool-btn {
     width: 36px;
     height: 36px;
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid var(--color-border);
+    background: transparent;
+    border: 1px solid transparent;
     border-radius: 8px;
-    color: var(--color-primary);
+    color: #8a8a8a; /* gray like ChatGPT icons */
     cursor: pointer;
     transition: all var(--transition-medium);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    backdrop-filter: blur(10px);
+    font-size: 18px;
 }
 
 .tool-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--color-border-hover);
-    transform: translateY(-1px);
+    color: #bfbfbf;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--color-border);
 }
 
-.tool-btn:active {
-    transform: translateY(0);
-}
+.tool-btn:active { transform: translateY(0); }
 
 .tool-btn.active {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: var(--color-border-hover);
+    color: #e6e6e6;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--color-border);
+}
+
+.icon-img {
+    display: block;
+    width: 22px;
+    height: 22px;
+    filter: grayscale(100%) brightness(80%);
+}
+.tool-btn:hover .icon-img,
+.tool-btn.active .icon-img { filter: grayscale(0%) brightness(100%); }
+
+/* Globe icon (svg-like via css) */
+.icon-globe {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+    position: relative;
+}
+.icon-globe::before,
+.icon-globe::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: currentColor;
+}
+.icon-globe::before {
+    width: 2px;
+    height: 12px;
+    border-radius: 1px;
+}
+.icon-globe::after {
+    width: 12px;
+    height: 2px;
+    border-radius: 1px;
 }
 
 .chat-input {
@@ -855,6 +965,47 @@ body {
     margin: 8px 0;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
+/* Sources toggle + popover */
+.sources-toggle-wrap { margin-top: 10px; position: relative; display: inline-block; }
+.sources-toggle {
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.08);
+    color: var(--color-primary);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.favicon-stack { position: relative; display: inline-flex; }
+.favicon-stack img {
+    width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6);
+    background: #fff; margin-left: -6px;
+}
+.favicon-stack img:first-child { margin-left: 0; }
+.sources-toggle:hover { background: rgba(255,255,255,0.14); }
+.sources-popover {
+    /* switched to fixed in JS; these act as fallbacks */
+    position: fixed;
+    left: 0;
+    bottom: auto;
+    background: rgba(20,20,20,0.95);
+    color: var(--color-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 10px;
+    min-width: 280px;
+    box-shadow: var(--shadow-card);
+    z-index: 1002;
+}
+.sources-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
+.sources-list li { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 8px; border-radius: 8px; }
+.sources-list li:hover { background: rgba(255,255,255,0.06); }
+.sources-list a { color: var(--color-primary); text-decoration: none; font-weight: 600; }
+.source-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; }
 
 /* ========================================================================
    PROFILE PLACEHOLDER STYLES

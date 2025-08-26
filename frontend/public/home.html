@@ -47,19 +47,12 @@
                                 <div class="input-container">
                                     <div class="attachment-area" id="attachment-area"></div>
                                     <div class="input-row">
-                                        <div class="input-actions">
-                                            <button type="button" class="tool-btn" id="attach-file-btn" title="Attach file">
-                                                📎
-                                            </button>
-                                            <button type="button" class="tool-btn" id="image-gen-btn" title="Generate image">
-                                                🎨
-                                            </button>
-                                            <button type="button" class="tool-btn" id="web-search-btn" title="Web search">
-                                                🔍
-                                            </button>
-                                        </div>
                                         <textarea id="chat-input" class="chat-input" placeholder="Type your message…" aria-label="Message" required rows="1"></textarea>
                                         <button type="submit" class="chat-send-btn" aria-label="Send">➤</button>
+                                    </div>
+                                    <div class="input-actions input-actions-below">
+                                        <button type="button" class="tool-btn" id="attach-file-btn" title="Attach file" aria-label="Attach">+</button>
+                                        <button type="button" class="tool-btn" id="web-search-btn" title="Web search" aria-pressed="false" aria-label="Web search"><img src="/icons/websearch.png" alt="Web search" class="icon-img" width="22" height="22"></button>
                                     </div>
                                     <input type="file" id="file-input" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.json,.csv" style="display: none;">
                                 </div>

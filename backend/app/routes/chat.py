@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import os
+import asyncio
+import json
+import re
 from typing import List, Literal, Optional
+from urllib.parse import urlparse, urljoin
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -9,6 +13,35 @@ from pydantic import BaseModel, Field
 
 
 router = APIRouter()
+
+
+def _stringify_text(value) -> str:
+    """Best-effort conversion of Responses API text payloads to a plain string."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        # Common shapes: {"text": "..."} or {"text": {"value": "..."}} or {"value": "..."}
+        text_field = value.get("text")
+        if isinstance(text_field, str):
+            return text_field
+        if isinstance(text_field, dict):
+            inner_val = text_field.get("value")
+            if isinstance(inner_val, str):
+                return inner_val
+        value_field = value.get("value")
+        if isinstance(value_field, str):
+            return value_field
+        # Fallthrough: serialize the dict
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, list):
+        parts: List[str] = []
+        for item in value:
+            parts.append(_stringify_text(item))
+        return "".join(parts)
+    # Fallback: JSON-serialize
+    return json.dumps(value, ensure_ascii=False)
 
 
 Role = Literal["system", "user", "assistant"]
@@ -38,6 +71,7 @@ class ChatReply(BaseModel):
     ok: bool
     message: str
     reasoning: Optional[str] = None
+    sources: Optional[List[dict]] = None
 
 
 @router.post("/", response_model=ChatReply)
@@ -90,6 +124,19 @@ async def chat(req: ChatRequest) -> ChatReply:
         # Add tools if provided
         if req.tools:
             payload["tools"] = req.tools
+            # Let the model decide when to call tools per Responses API guidance
+            payload["tool_choice"] = "auto"
+
+        # Add instructions (system-like context) when provided
+        system_instructions = ""
+        if req.developer_instructions:
+            system_instructions += req.developer_instructions
+        if req.assistant_context:
+            if system_instructions:
+                system_instructions += "\n\n"
+            system_instructions += req.assistant_context
+        if system_instructions:
+            payload["instructions"] = system_instructions
             
         url = "https://api.openai.com/v1/responses"
     else:
@@ -115,8 +162,35 @@ async def chat(req: ChatRequest) -> ChatReply:
         print(f"Making request to: {url}")
         print(f"Payload: {payload}")
         
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(url, json=payload, headers=headers)
+        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
+            # Initial request with timeout handling
+            try:
+                resp = await client.post(url, json=payload, headers=headers)
+            except (httpx.ReadTimeout, httpx.TimeoutException):
+                # Fall back to Chat Completions if Responses API timed out
+                if use_responses_api and url.endswith("/responses"):
+                    print("Responses API timed out, falling back to Chat Completions API")
+                    fallback_messages = []
+                    system_content = ""
+                    if req.developer_instructions:
+                        system_content += req.developer_instructions + "\n\n"
+                    if req.assistant_context:
+                        system_content += req.assistant_context
+                    if system_content:
+                        fallback_messages.append({"role": "system", "content": system_content})
+                    fallback_messages.extend([m.model_dump() for m in req.messages])
+                    fallback_payload = {
+                        "model": model,
+                        "messages": fallback_messages,
+                        "temperature": 0.7,
+                    }
+                    resp = await client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        json=fallback_payload,
+                        headers=headers,
+                    )
+                else:
+                    raise HTTPException(status_code=504, detail="Upstream timeout from OpenAI")
 
             # If the selected model is not available or request invalid, retry once with
             # a safe default model via chat completions.
@@ -199,6 +273,7 @@ async def chat(req: ChatRequest) -> ChatReply:
                         .get("message", {})
                         .get("content", "")
                     ) or ""
+                    reasoning = None
                     
                     return ChatReply(ok=True, message=content, reasoning=reasoning)
                 else:
@@ -208,21 +283,69 @@ async def chat(req: ChatRequest) -> ChatReply:
 
             content = ""
             reasoning: Optional[str] = None
+            sources: Optional[List[dict]] = None
 
             if use_responses_api and url.endswith("/responses"):
-                # Parse Responses API format - expecting direct output_text field
-                content = data.get("output_text", "")
-                
-                # Extract reasoning if available  
+                # For Responses API, poll until the run is completed if needed
+                status = data.get("status")
+                response_id = data.get("id")
+                try:
+                    attempts_remaining = 12  # ~4.8s at 0.4s intervals
+                    while status in {"in_progress", "queued"} and attempts_remaining > 0 and response_id:
+                        await asyncio.sleep(0.4)
+                        poll = await client.get(f"https://api.openai.com/v1/responses/{response_id}", headers=headers)
+                        if poll.status_code != 200:
+                            break
+                        data = poll.json()
+                        status = data.get("status")
+                        attempts_remaining -= 1
+                except Exception:
+                    # If polling fails, continue with whatever we have
+                    pass
+
+                # Parse Responses API output - do NOT use top-level "text" (it's config)
+                content = _stringify_text(data.get("output_text") or "")
+
+                if not content:
+                    # Aggregate from structured output if needed
+                    output_items = data.get("output", [])
+                    if isinstance(output_items, list):
+                        parts: List[str] = []
+                        for item in output_items:
+                            if not isinstance(item, dict):
+                                continue
+                            item_type = item.get("type")
+                            # Direct output_text item
+                            if item_type == "output_text":
+                                parts.append(_stringify_text(item.get("text")))
+                                continue
+                            # Message container with content blocks
+                            if item_type == "message":
+                                for block in item.get("content", []) or []:
+                                    if not isinstance(block, dict):
+                                        continue
+                                    block_type = block.get("type")
+                                    if block_type == "output_text":
+                                        parts.append(_stringify_text(block.get("text")))
+                        content = "".join(parts)
+
+                # Extract reasoning if available
                 if req.include_reasoning or req.reasoning_summary != "never":
                     reasoning_data = data.get("reasoning", {})
                     if isinstance(reasoning_data, dict):
                         reasoning = reasoning_data.get("summary", "")
-                
-                # If no output_text, log the response structure for debugging
+
+                # If still nothing, log the structure
                 if not content:
-                    print(f"No output_text found. Response structure: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
-                    content = "I received your message but couldn't generate a proper response. Please try again."
+                    print(
+                        f"No output_text/text found. Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}"
+                    )
+                    content = (
+                        "I received your message but couldn't generate a proper response. Please try again."
+                    )
+                else:
+                    # Ensure final value is a plain string
+                    content = _stringify_text(content)
             else:
                 # Chat Completions API
                 content = (
@@ -242,7 +365,69 @@ async def chat(req: ChatRequest) -> ChatReply:
                     except Exception:
                         pass
 
-            return ChatReply(ok=True, message=content, reasoning=reasoning)
+            # Extract sources from content (URLs)
+            try:
+                sources = []
+                if isinstance(content, str) and content:
+                    # Find URLs and clean trailing punctuation
+                    raw_urls = re.findall(r"https?://[^\s)]+", content)
+                    seen = set()
+                    for u in raw_urls:
+                        cleaned = u.rstrip('.,);]')
+                        if cleaned in seen:
+                            continue
+                        seen.add(cleaned)
+                        try:
+                            parsed = urlparse(cleaned)
+                            if parsed.scheme in {"http", "https"} and parsed.netloc:
+                                sources.append({
+                                    "url": cleaned,
+                                    "site": parsed.netloc,
+                                    "favicon": f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64",
+                                })
+                        except Exception:
+                            continue
+                    if sources:
+                        sources = sources[:8]
+                    else:
+                        sources = None
+            except Exception:
+                sources = None
+
+            # Try to enrich sources with thumbnails (Open Graph images)
+            if sources:
+                try:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(2.0, connect=1.0)) as _client:
+                        sem = asyncio.Semaphore(3)
+                        async def enrich(s: dict) -> None:
+                            try:
+                                async with sem:
+                                    r = await _client.get(s["url"], follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
+                                if r.status_code >= 200 and r.status_code < 400:
+                                    html = r.text[:120000]
+                                    import re as _re
+                                    t = _re.search(r"<title[^>]*>([\s\S]*?)</title>", html, _re.IGNORECASE)
+                                    if t:
+                                        title_val = _re.sub(r"\s+", " ", t.group(1).strip())
+                                        s["title"] = title_val
+                                    m = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+                                    if not m:
+                                        m = re.search(r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+                                    if m:
+                                        img_url = m.group(1)
+                                        if img_url:
+                                            if img_url.startswith('//'):
+                                                img_url = f"https:{img_url}"
+                                            elif img_url.startswith('/'):
+                                                img_url = urljoin(s["url"], img_url)
+                                            s["thumbnail"] = img_url
+                            except Exception:
+                                return
+                        await asyncio.gather(*(enrich(s) for s in sources[:3]))
+                except Exception:
+                    pass
+
+            return ChatReply(ok=True, message=content, reasoning=reasoning, sources=sources)
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
