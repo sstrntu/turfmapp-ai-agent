@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - Profile</title>
+    <meta name="description" content="Profile background view">
+    <link rel="preload" as="image" href="/ProfileBackground.jpg">
+    <link rel="stylesheet" href="/styles/home.css">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            margin: 0;
+            background: url('/ProfileBackground.jpg') center center/cover no-repeat fixed;
+            font-family: 'DANSON', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-header" role="banner">
+        <div class="header-container">
+            <div class="brand-section">
+                <h1 class="app-title">TURFMAPP</h1>
+                <p class="app-tagline">Profile</p>
+            </div>
+            <div class="top-actions">
+                <div class="profile-avatar" id="profile-avatar" title="Profile"></div>
+                <button class="hamburger-btn" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="top-menu">
+                    <span></span><span></span><span></span>
+                </button>
+                <div class="menu-panel" id="top-menu" role="menu" aria-hidden="true">
+                    <a href="/home.html" class="menu-item" role="menuitem">Home</a>
+                    <a href="/admin" class="menu-item" role="menuitem">Admin</a>
+                    <button class="menu-item danger" role="menuitem" onclick="return AuthActions.handleLogout()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <script src="/scripts/config.js"></script>
+    <script src="/scripts/utils.js"></script>
+    <script src="/scripts/auth.js"></script>
+    <script src="/scripts/chat.js"></script>
+    
+    <main class="main-content" role="main">
+        <div class="content-container">
+            <section class="profile-section" aria-labelledby="profile-title">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar-lg" aria-hidden="true"></div>
+                        <div>
+                            <h2 id="profile-title" class="profile-title">Your Profile</h2>
+                            <p class="profile-subtitle">Basic information (placeholder)</p>
+                        </div>
+                    </div>
+
+                    <div class="profile-grid">
+                        <div class="profile-row">
+                            <div class="profile-label">Name</div>
+                            <div class="profile-value">Test User</div>
+                        </div>
+                        <div class="profile-row">
+                            <div class="profile-label">Email</div>
+                            <div class="profile-value">test@example.com</div>
+                        </div>
+                        <div class="profile-row">
+                            <div class="profile-label">Role</div>
+                            <div class="profile-value">User</div>
+                        </div>
+                        <div class="profile-row">
+                            <div class="profile-label">Member Since</div>
+                            <div class="profile-value">2024</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button class="primary-action-btn" disabled title="Coming soon">Save</button>
+                        <button class="outline-action-btn" disabled title="Coming soon">Cancel</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>

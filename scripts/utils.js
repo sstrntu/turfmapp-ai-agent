@@ -128,8 +128,8 @@ const ValidationUtils = {
         if (!password || password.length === 0) {
             return { isValid: false, message: 'Password is required' };
         }
-        
-        if (password.length < rules.MIN_LENGTH) {
+        // In testing mode allow short passwords to support temporary creds
+        if (!isFeatureEnabled('TESTING_MODE') && password.length < rules.MIN_LENGTH) {
             return { isValid: false, message: `Password must be at least ${rules.MIN_LENGTH} characters` };
         }
         

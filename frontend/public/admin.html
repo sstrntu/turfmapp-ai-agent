@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - Admin</title>
+    <meta name="description" content="Admin configuration">
+    <link rel="preload" as="image" href="/AdminBackground.jpg">
+    <link rel="stylesheet" href="/styles/home.css">
+    <style>
+        html, body { 
+            min-height: 100vh; 
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        body {
+            margin: 0;
+            background: url('/AdminBackground.jpg') center center/cover no-repeat fixed;
+            font-family: 'DANSON', sans-serif;
+        }
+        .admin-note { color: var(--color-secondary); font-size: 0.95rem; }
+        .form-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px 16px; align-items: center; }
+        .form-row .label { color: var(--color-tertiary); }
+        .text-input {
+            width: 100%;
+            background: rgba(0,0,0,0.35);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            outline: none;
+        }
+        .save-btn {
+            background: rgba(255,255,255,0.14);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .save-btn:hover {
+            background: rgba(255,255,255,0.22);
+            border-color: var(--color-border-hover);
+            transform: translateY(-1px);
+        }
+        
+        /* Tool Checkboxes */
+        .tool-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--color-primary);
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .tool-checkbox:hover {
+            color: var(--color-border-hover);
+        }
+        .tool-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .tool-checkbox input[type="checkbox"]:checked {
+            background: rgba(255,255,255,0.2);
+            border-color: var(--color-border-hover);
+        }
+        .tool-checkbox input[type="checkbox"]:checked::after {
+            content: "✓";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--color-primary);
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header class="app-header" role="banner">
+        <div class="header-container">
+            <div class="brand-section">
+                <h1 class="app-title">TURFMAPP</h1>
+                <p class="app-tagline">Admin</p>
+            </div>
+            <div class="top-actions">
+                <div class="profile-avatar" title="Profile"></div>
+                <button class="hamburger-btn" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="top-menu">
+                    <span></span><span></span><span></span>
+                </button>
+                <div class="menu-panel" id="top-menu" role="menu" aria-hidden="true">
+                    <a href="/home.html" class="menu-item" role="menuitem">Home</a>
+                    <a href="/profile.html" class="menu-item" role="menuitem">Profile</a>
+                    <button class="menu-item danger" role="menuitem" onclick="return AuthActions.handleLogout()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content" role="main">
+        <div class="content-container">
+            <section class="profile-section" aria-labelledby="admin-title">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar-lg" aria-hidden="true"></div>
+                        <div>
+                            <h2 id="admin-title" class="profile-title">Administration</h2>
+                            <p class="admin-note">Manage roles and configuration (placeholders).</p>
+                        </div>
+                    </div>
+
+                    <div class="profile-grid" style="row-gap: 18px;">
+                        <div class="form-row">
+                            <div class="label">LLM Configuration</div>
+                            <div class="admin-note">Configure OpenAI Responses API settings for chat functionality</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">API Settings</div>
+                            <div class="admin-note">OpenAI API key is loaded from .env (OPENAI_API_KEY). No key entry here.</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Model</div>
+                            <select id="chat-model" class="select-input">
+                                <option value="gpt-5-mini">gpt-5-mini (Latest, Fast)</option>
+                                <option value="gpt-4o-mini">gpt-4o-mini (Fast, Cost-effective)</option>
+                                <option value="gpt-4o">gpt-4o (Balanced)</option>
+                                <option value="gpt-4-turbo">gpt-4-turbo (Advanced)</option>
+                                <option value="gpt-4">gpt-4 (Legacy)</option>
+                                <option value="gpt-3.5-turbo">gpt-3.5-turbo (Basic)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-row" style="align-items: start;">
+                            <div class="label">Developer Instructions</div>
+                            <textarea id="developer-instructions" class="textarea-input">Tone: To the point with easy to understand language.
+Tool Usage: If need to use tools that is not available, ask the user for tool or data access.
+Response Style: Make sure you have all the available information first before answering. If user ask a question and you do not have good background or context to come up with a good answer, always ask the user back first.</textarea>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Developer role instructions (input_text)</div>
+                        </div>
+                        
+                        <div class="form-row" style="align-items: start;">
+                            <div class="label">Assistant Context</div>
+                            <textarea id="assistant-context" class="textarea-input">You are an assistant to Turfmapp agency employees. Turfmapp is a sports media marketing and strategy agency. We do a lot of graphics, analytics, technical, and also run businesses such as the coffee shop, space rental, game room, gym, streetwear sports clothing store, etc. Majority of the employees are Thai. They can read/write English but they are more comfortable in Thai.</textarea>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Assistant role context (output_text)</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Text Format</div>
+                            <select id="text-format" class="select-input">
+                                <option value="text">Text</option>
+                                <option value="markdown">Markdown</option>
+                                <option value="json">JSON</option>
+                            </select>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Response format type</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Text Verbosity</div>
+                            <select id="text-verbosity" class="select-input">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Response detail level</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Reasoning Effort</div>
+                            <select id="reasoning-effort" class="select-input">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">AI reasoning complexity</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Reasoning Summary</div>
+                            <select id="reasoning-summary" class="select-input">
+                                <option value="auto">Auto</option>
+                                <option value="always">Always</option>
+                                <option value="never">Never</option>
+                            </select>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">When to provide reasoning summary</div>
+                        </div>
+                        
+                        <div class="form-row" style="align-items: start;">
+                            <div class="label">Tools Configuration</div>
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <div class="tool-section">
+                                    <label class="tool-checkbox">
+                                        <input type="checkbox" id="tool-web-search" checked>
+                                        <span>Web Search Preview</span>
+                                    </label>
+                                    <div class="tool-config" style="margin-left: 24px; margin-top: 4px;">
+                                        <label style="font-size: 0.8rem; color: var(--color-tertiary);">
+                                            Search Context:
+                                            <select id="web-search-context" class="select-input" style="font-size: 0.8rem; margin-left: 8px;">
+                                                <option value="small">Small</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="large">Large</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="tool-section">
+                                    <label class="tool-checkbox">
+                                        <input type="checkbox" id="tool-image-generation">
+                                        <span>Image Generation</span>
+                                    </label>
+                                    <div class="tool-config" style="margin-left: 24px; margin-top: 4px;">
+                                        <label style="font-size: 0.8rem; color: var(--color-tertiary);">
+                                            Quality:
+                                            <select id="image-quality" class="select-input" style="font-size: 0.8rem; margin-left: 8px;">
+                                                <option value="auto">Auto</option>
+                                                <option value="standard">Standard</option>
+                                                <option value="hd">HD</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="tool-section">
+                                    <label class="tool-checkbox">
+                                        <input type="checkbox" id="tool-mcp">
+                                        <span>MCP Integration</span>
+                                    </label>
+                                    <div class="tool-config" style="margin-left: 24px; margin-top: 4px;">
+                                        <input type="text" id="mcp-server-label" class="text-input" placeholder="Server Label (e.g., googledrive)" style="font-size: 0.8rem; margin-bottom: 4px;">
+                                        <input type="text" id="mcp-connector-id" class="text-input" placeholder="Connector ID" style="font-size: 0.8rem;">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Configure available tools and their settings</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Store Responses</div>
+                            <label class="tool-checkbox">
+                                <input type="checkbox" id="store-responses" checked>
+                                <span>Enable</span>
+                            </label>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Store responses for training and improvement</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button class="save-btn" id="save-chat-settings" title="Save Responses API settings to this browser">Save LLM Settings</button>
+                        <button class="outline-action-btn" id="reset-form" title="Reset all settings to defaults">Reset to Defaults</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="/scripts/config.js"></script>
+    <script src="/scripts/utils.js"></script>
+    <script src="/scripts/auth.js"></script>
+    <script src="/scripts/chat.js"></script>
+    <script>
+        // Load existing local settings
+        (function(){
+            try {
+                // Load basic settings
+                var model = localStorage.getItem('tm_model');
+                var devInstructions = localStorage.getItem('tm_developer_instructions');
+                var assistantContext = localStorage.getItem('tm_assistant_context');
+                
+                // Load text and reasoning settings
+                var textFormat = localStorage.getItem('tm_text_format') || 'text';
+                var textVerbosity = localStorage.getItem('tm_text_verbosity') || 'medium';
+                var reasoningEffort = localStorage.getItem('tm_reasoning_effort') || 'medium';
+                var reasoningSummary = localStorage.getItem('tm_reasoning_summary') || 'auto';
+                
+                // Load tool settings
+                var toolWebSearch = localStorage.getItem('tm_tool_web_search') || 'true';
+                var webSearchContext = localStorage.getItem('tm_web_search_context') || 'medium';
+                var toolImageGen = localStorage.getItem('tm_tool_image_generation') || 'false';
+                var imageQuality = localStorage.getItem('tm_image_quality') || 'auto';
+                var toolMcp = localStorage.getItem('tm_tool_mcp') || 'false';
+                var mcpServerLabel = localStorage.getItem('tm_mcp_server_label') || '';
+                var mcpConnectorId = localStorage.getItem('tm_mcp_connector_id') || '';
+                var storeResponses = localStorage.getItem('tm_store_responses') || 'true';
+                
+                // Set basic settings
+                if (model && document.getElementById('chat-model')) {
+                    document.getElementById('chat-model').value = model;
+                }
+                if (devInstructions && document.getElementById('developer-instructions')) {
+                    document.getElementById('developer-instructions').value = devInstructions;
+                }
+                if (assistantContext && document.getElementById('assistant-context')) {
+                    document.getElementById('assistant-context').value = assistantContext;
+                }
+                
+                // Set text and reasoning settings
+                if (document.getElementById('text-format')) {
+                    document.getElementById('text-format').value = textFormat;
+                }
+                if (document.getElementById('text-verbosity')) {
+                    document.getElementById('text-verbosity').value = textVerbosity;
+                }
+                if (document.getElementById('reasoning-effort')) {
+                    document.getElementById('reasoning-effort').value = reasoningEffort;
+                }
+                if (document.getElementById('reasoning-summary')) {
+                    document.getElementById('reasoning-summary').value = reasoningSummary;
+                }
+                
+                // Set tool settings
+                if (document.getElementById('tool-web-search')) {
+                    document.getElementById('tool-web-search').checked = toolWebSearch === 'true';
+                }
+                if (document.getElementById('web-search-context')) {
+                    document.getElementById('web-search-context').value = webSearchContext;
+                }
+                if (document.getElementById('tool-image-generation')) {
+                    document.getElementById('tool-image-generation').checked = toolImageGen === 'true';
+                }
+                if (document.getElementById('image-quality')) {
+                    document.getElementById('image-quality').value = imageQuality;
+                }
+                if (document.getElementById('tool-mcp')) {
+                    document.getElementById('tool-mcp').checked = toolMcp === 'true';
+                }
+                if (document.getElementById('mcp-server-label')) {
+                    document.getElementById('mcp-server-label').value = mcpServerLabel;
+                }
+                if (document.getElementById('mcp-connector-id')) {
+                    document.getElementById('mcp-connector-id').value = mcpConnectorId;
+                }
+                if (document.getElementById('store-responses')) {
+                    document.getElementById('store-responses').checked = storeResponses === 'true';
+                }
+                
+            } catch (e) {
+                console.error('Error loading settings:', e);
+            }
+        })();
+
+        // Save all Responses API settings to localStorage (browser)
+        document.getElementById('save-chat-settings')?.addEventListener('click', function () {
+            try {
+                // Get basic settings
+                var model = document.getElementById('chat-model')?.value || '';
+                var devInstructions = document.getElementById('developer-instructions')?.value || '';
+                var assistantContext = document.getElementById('assistant-context')?.value || '';
+                
+                // Get text and reasoning settings
+                var textFormat = document.getElementById('text-format')?.value || 'text';
+                var textVerbosity = document.getElementById('text-verbosity')?.value || 'medium';
+                var reasoningEffort = document.getElementById('reasoning-effort')?.value || 'medium';
+                var reasoningSummary = document.getElementById('reasoning-summary')?.value || 'auto';
+                
+                // Get tool settings
+                var toolWebSearch = document.getElementById('tool-web-search')?.checked || false;
+                var webSearchContext = document.getElementById('web-search-context')?.value || 'medium';
+                var toolImageGen = document.getElementById('tool-image-generation')?.checked || false;
+                var imageQuality = document.getElementById('image-quality')?.value || 'auto';
+                var toolMcp = document.getElementById('tool-mcp')?.checked || false;
+                var mcpServerLabel = document.getElementById('mcp-server-label')?.value || '';
+                var mcpConnectorId = document.getElementById('mcp-connector-id')?.value || '';
+                var storeResponses = document.getElementById('store-responses')?.checked || false;
+                
+                // Save all settings
+                if (model) localStorage.setItem('tm_model', model);
+                if (devInstructions) localStorage.setItem('tm_developer_instructions', devInstructions);
+                if (assistantContext) localStorage.setItem('tm_assistant_context', assistantContext);
+                
+                localStorage.setItem('tm_text_format', textFormat);
+                localStorage.setItem('tm_text_verbosity', textVerbosity);
+                localStorage.setItem('tm_reasoning_effort', reasoningEffort);
+                localStorage.setItem('tm_reasoning_summary', reasoningSummary);
+                
+                localStorage.setItem('tm_tool_web_search', toolWebSearch.toString());
+                localStorage.setItem('tm_web_search_context', webSearchContext);
+                localStorage.setItem('tm_tool_image_generation', toolImageGen.toString());
+                localStorage.setItem('tm_image_quality', imageQuality);
+                localStorage.setItem('tm_tool_mcp', toolMcp.toString());
+                localStorage.setItem('tm_mcp_server_label', mcpServerLabel);
+                localStorage.setItem('tm_mcp_connector_id', mcpConnectorId);
+                localStorage.setItem('tm_store_responses', storeResponses.toString());
+                
+                alert('Responses API settings saved locally.');
+            } catch (e) {
+                alert('Unable to save settings: ' + (e && e.message ? e.message : 'unknown error'));
+            }
+        });
+
+        // Reset form to defaults
+        document.getElementById('reset-form')?.addEventListener('click', function () {
+            if (confirm('Are you sure you want to reset all settings to defaults? This will clear all saved configurations.')) {
+                // Clear localStorage
+                const keys = Object.keys(localStorage).filter(key => key.startsWith('tm_'));
+                keys.forEach(key => localStorage.removeItem(key));
+                
+                // Reset form values to defaults
+                if (document.getElementById('chat-model')) document.getElementById('chat-model').value = 'gpt-5-mini';
+                if (document.getElementById('developer-instructions')) {
+                    document.getElementById('developer-instructions').value = 'Tone: To the point with easy to understand language.\nTool Usage: If need to use tools that is not available, ask the user for tool or data access.\nResponse Style: Make sure you have all the available information first before answering. If user ask a question and you do not have good background or context to come up with a good answer, always ask the user back first.';
+                }
+                if (document.getElementById('assistant-context')) {
+                    document.getElementById('assistant-context').value = 'You are an assistant to Turfmapp agency employees. Turfmapp is a sports media marketing and strategy agency. We do a lot of graphics, analytics, technical, and also run businesses such as the coffee shop, space rental, game room, gym, streetwear sports clothing store, etc. Majority of the employees are Thai. They can read/write English but they are more comfortable in Thai.';
+                }
+                if (document.getElementById('text-format')) document.getElementById('text-format').value = 'text';
+                if (document.getElementById('text-verbosity')) document.getElementById('text-verbosity').value = 'medium';
+                if (document.getElementById('reasoning-effort')) document.getElementById('reasoning-effort').value = 'medium';
+                if (document.getElementById('reasoning-summary')) document.getElementById('reasoning-summary').value = 'auto';
+                if (document.getElementById('tool-web-search')) document.getElementById('tool-web-search').checked = true;
+                if (document.getElementById('web-search-context')) document.getElementById('web-search-context').value = 'medium';
+                if (document.getElementById('tool-image-generation')) document.getElementById('tool-image-generation').checked = false;
+                if (document.getElementById('image-quality')) document.getElementById('image-quality').value = 'auto';
+                if (document.getElementById('tool-mcp')) document.getElementById('tool-mcp').checked = false;
+                if (document.getElementById('mcp-server-label')) document.getElementById('mcp-server-label').value = '';
+                if (document.getElementById('mcp-connector-id')) document.getElementById('mcp-connector-id').value = '';
+                if (document.getElementById('store-responses')) document.getElementById('store-responses').checked = true;
+                
+                alert('All settings have been reset to defaults.');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -76,18 +76,26 @@ const AuthService = {
      */
     async _handleTestingLogin(credentials) {
         // Simulate network delay
-        await AnimationUtils.wait(500);
-        
+        await AnimationUtils.wait(300);
+
+        const providedUsername = (credentials.username || '').trim();
+        const providedPassword = credentials.password || '';
+
+        // Enforce temporary credentials in testing mode
+        if (providedUsername !== 'test' || providedPassword !== '123') {
+            return this._handleFailedLogin('Invalid credentials');
+        }
+
         // Create mock user session
         const mockUser = {
             id: 'test-user-123',
-            username: credentials.username,
-            email: `${credentials.username}@test.com`,
+            username: providedUsername,
+            email: `${providedUsername}@test.com`,
             role: 'user',
             loginTime: new Date().toISOString(),
             sessionId: this._generateSessionId()
         };
-        
+
         return this._handleSuccessfulLogin(mockUser);
     },
 

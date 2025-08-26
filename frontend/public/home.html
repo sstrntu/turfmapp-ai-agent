@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - AI</title>
+    <meta name="description" content="TURFMAPP minimal AI interface">
+    <link rel="stylesheet" href="styles/home.css">
+</head>
+<body>
+    <!-- Main application container -->
+    <div class="app-container">
+        <div class="app-background">
+            
+            <!-- Application Header -->
+            <header class="app-header" role="banner">
+                <div class="header-container">
+                    <div class="brand-section">
+                        <h1 class="app-title">TURFMAPP</h1>
+                        <p class="app-tagline">AI</p>
+                    </div>
+                    
+                    <!-- Top right actions: profile + hamburger menu -->
+                    <div class="top-actions">
+                        <div class="profile-avatar" id="profile-avatar" title="Profile"></div>
+                        <button class="hamburger-btn" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="top-menu">
+                            <span></span><span></span><span></span>
+                        </button>
+                        <div class="menu-panel" id="top-menu" role="menu" aria-hidden="true">
+                            <a href="/profile.html" class="menu-item" role="menuitem">Profile</a>
+                            <a href="/admin.html" class="menu-item" role="menuitem">Admin</a>
+                            <button class="menu-item danger" role="menuitem" onclick="return AuthActions.handleLogout()">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Main Content Area -->
+            <main class="main-content" role="main">
+                <div class="content-container">
+                    
+                    <!-- Minimal Chat Section -->
+                    <section class="chat-section" aria-label="Messages">
+                        <div class="chat-card">
+                            <div id="chat-list" class="chat-list" role="log" aria-live="polite"></div>
+                            <form id="chat-form" class="chat-form" autocomplete="off">
+                                <div class="input-container">
+                                    <div class="attachment-area" id="attachment-area"></div>
+                                    <div class="input-row">
+                                        <div class="input-actions">
+                                            <button type="button" class="tool-btn" id="attach-file-btn" title="Attach file">
+                                                📎
+                                            </button>
+                                            <button type="button" class="tool-btn" id="image-gen-btn" title="Generate image">
+                                                🎨
+                                            </button>
+                                            <button type="button" class="tool-btn" id="web-search-btn" title="Web search">
+                                                🔍
+                                            </button>
+                                        </div>
+                                        <textarea id="chat-input" class="chat-input" placeholder="Type your message…" aria-label="Message" required rows="1"></textarea>
+                                        <button type="submit" class="chat-send-btn" aria-label="Send">➤</button>
+                                    </div>
+                                    <input type="file" id="file-input" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.json,.csv" style="display: none;">
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+                </div>
+            </main>
+            
+            
+        </div>
+    </div>
+    
+    <!-- JavaScript modules -->
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/auth.js"></script>
+    <script src="scripts/chat.js"></script>
+</body>
+</html>
