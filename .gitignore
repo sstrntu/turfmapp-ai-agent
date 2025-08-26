@@ -1,0 +1,64 @@
+# --- Environment secrets ---
+.env
+.env.*
+!.env.example
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Python backend ---
+__pycache__/
+*.py[cod]
+*.$py.class
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+*.log
+
+# Databases (SQLite, etc.)
+app.db
+backend/app.db
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+instance/
+
+# Test/coverage
+.coverage
+coverage/
+coverage.xml
+htmlcov/
+
+# --- Frontend (Vite/Node) ---
+node_modules/
+dist/
+build/
+.cache/
+.vite/
+.npm/
+.pnpm-store/
+
+# --- Uploads / generated media ---
+uploads/
+backend/uploads/
+frontend/uploads/
+*.tmp
+tmp/
+
+# --- Docker/local volumes ---
+docker-data/
+volumes/
+*.pid
+
+
