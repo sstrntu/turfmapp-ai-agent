@@ -329,8 +329,10 @@
 
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
+    <script src="scripts/announcement.js"></script>
     <script src="scripts/supabase-client.js"></script>
     <script src="scripts/google-auth.js"></script>
+    <script src="scripts/ui.js"></script>
     <script src="scripts/chat.js"></script>
     <script>
         // Load existing local settings
@@ -609,28 +611,8 @@
             }
             
             // Load and display announcement in header
-            function loadAnnouncementDisplay() {
-                const announcement = localStorage.getItem('announcement');
-                const announcementDisplay = document.getElementById('announcement-display');
-                const announcementTextDisplay = document.getElementById('announcement-text-display');
-                
-                if (announcement && announcement.trim() !== '') {
-                    announcementTextDisplay.textContent = announcement;
-                    announcementDisplay.style.display = 'flex';
-                } else {
-                    announcementDisplay.style.display = 'none';
-                }
-            }
-            
-            // Load announcement display when page loads
-            loadAnnouncementDisplay();
-            
-            // Listen for storage changes (when announcement is updated from this page)
-            window.addEventListener('storage', function(e) {
-                if (e.key === 'announcement') {
-                    loadAnnouncementDisplay();
-                }
-            });
+            // Initialize shared announcement header
+            Announcement.initHeader('announcement-display', 'announcement-text-display');
             
         });
     </script>

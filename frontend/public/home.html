@@ -131,8 +131,10 @@
     <!-- JavaScript modules -->
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
+    <script src="scripts/announcement.js"></script>
     <script src="scripts/supabase-client.js"></script>
     <script src="scripts/google-auth.js"></script>
+    <script src="scripts/ui.js"></script>
     <script src="scripts/chat.js"></script>
     <script>
         // Single-pass authentication guard for home page
@@ -158,29 +160,7 @@
         });
     </script>
     <script>
-        // Load and display announcement
-        function loadAnnouncement() {
-            const announcement = localStorage.getItem('announcement');
-            const announcementDisplay = document.getElementById('announcement-display');
-            const announcementText = document.getElementById('announcement-text');
-            
-            if (announcement && announcement.trim() !== '') {
-                announcementText.textContent = announcement;
-                announcementDisplay.style.display = 'flex';
-            } else {
-                announcementDisplay.style.display = 'none';
-            }
-        }
-        
-        // Load announcement when page loads
-        document.addEventListener('DOMContentLoaded', loadAnnouncement);
-        
-        // Listen for storage changes (when announcement is updated from admin page)
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'announcement') {
-                loadAnnouncement();
-            }
-        });
+        Announcement.initHeader('announcement-display', 'announcement-text');
     </script>
 </body>
 </html>

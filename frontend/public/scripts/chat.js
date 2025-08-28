@@ -321,27 +321,7 @@
                     });
                     pop.appendChild(listEl);
 
-                    function positionPopover() {
-                        // Use fixed positioning to escape scroll container clipping
-                        pop.style.position = 'fixed';
-                        // Temporarily show to measure
-                        pop.style.visibility = 'hidden';
-                        pop.style.display = 'block';
-                        const rect = toggle.getBoundingClientRect();
-                        const spacing = 8;
-                        let left = rect.left;
-                        let top = rect.top - pop.offsetHeight - spacing; // place above by default
-                        // If off top, place below
-                        if (top < 8) top = rect.bottom + spacing;
-                        // Constrain horizontally
-                        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                        const maxLeft = vw - pop.offsetWidth - 8;
-                        if (left > maxLeft) left = Math.max(8, maxLeft);
-                        if (left < 8) left = 8;
-                        pop.style.left = left + 'px';
-                        pop.style.top = top + 'px';
-                        pop.style.visibility = 'visible';
-                    }
+                    function positionPopover() { window.UI?.positionPopover(toggle, pop, 8); }
 
                     function closeOnOutside(event) {
                         if (!pop.contains(event.target) && !toggle.contains(event.target)) {
@@ -628,7 +608,6 @@
                 const response = await fetch('/api/fal-tools/available');
                 if (response.ok) {
                     availableTools = await response.json();
-                    console.log('Loaded available tools:', availableTools);
                 } else {
                     console.error('Failed to load available tools');
                 }
@@ -990,13 +969,7 @@
 
             // Build tools array based on settings and active modes
             const tools = buildToolsArray(settings, isImageGen, isWebSearch);
-            console.log('Tools array built:', tools);
-            console.log('Settings:', { 
-                toolWebSearch: settings.toolWebSearch, 
-                isWebSearch: isWebSearch,
-                model: settings.model 
-            });
-
+            
             // Build request payload for v1 API
             const requestBody = {
                 message: value,
@@ -1010,24 +983,12 @@
                 })) : null
             };
             
-            console.log('Sending request:', requestBody);
-
             // Get auth token for API request
             const session = window.supabase?.getSession();
-            console.log('Checking authentication...', {
-                supabaseClient: !!window.supabase,
-                isSessionValid: window.supabase?.isSessionValid(),
-                user: window.supabase?.getUser(),
-                session: session,
-                sessionExpiresAt: session?.expires_at,
-                currentTime: Date.now(),
-                timeUntilExpiry: session?.expires_at ? (session.expires_at - Date.now()) / 1000 / 60 : 'N/A'
-            });
             
             // Check if session is valid first
             if (!window.supabase || !window.supabase.isSessionValid()) {
                 console.error('Session invalid or expired');
-                console.log('Session debug - would redirect to login');
                 placeholder.error();
                 return;
             }
@@ -1035,13 +996,10 @@
             const authToken = window.supabase.getAccessToken();
             if (!authToken) {
                 console.error('No authentication token available');
-                console.log('Redirecting to login...');
                 window.location.href = '/portal.html';
                 return;
             }
             
-            console.log('Valid session and auth token available, proceeding with request...');
-
             fetch('/api/v1/chat/send', {
                 method: 'POST',
                 headers: { 
@@ -1057,12 +1015,10 @@
                     return r.json(); 
                 })
                 .then(function (res) {
-                    console.log('Chat response:', res);
                     if (res && res.assistant_message) {
                         // Update conversation ID from response
                         if (res.conversation_id) {
                             currentConversationId = res.conversation_id;
-                            console.log('Updated conversation ID:', currentConversationId);
                             
                             // Refresh conversation history in sidebar
                             if (window.refreshConversationHistory) {
@@ -1165,7 +1121,6 @@
                     lpToggle?.setAttribute('aria-expanded','false'); 
                     document.body.classList.remove('panel-open'); 
                 }
-                console.log('Started new conversation');
             });
         }
         
@@ -1176,11 +1131,9 @@
             // Prevent re-entrant or overly-frequent calls
             const now = Date.now();
             if (historyLoadState.inProgress) {
-                console.log('🔧 Skipping history load: already in progress');
                 return;
             }
             if (now - historyLoadState.lastAt < 5000) { // 5s minimum interval
-                console.log('🔧 Skipping history load: called too frequently');
                 return;
             }
             historyLoadState.inProgress = true;
@@ -1188,27 +1141,18 @@
             if (!histList) return;
             
             try {
-                console.log('🔄 Loading conversation history...', {
-                    supabaseClient: !!window.supabase,
-                    sessionValid: window.supabase?.isSessionValid(),
-                    user: window.supabase?.getUser()
-                });
                 
                 // Check if session is valid first
                 if (!window.supabase || !window.supabase.isSessionValid()) {
-                    console.log('⚠️ No valid session for loading conversation history');
                     histList.innerHTML = '<li class="empty">Please log in to see recent conversations</li>';
                     return;
                 }
                 
                 const token = window.supabase.getAccessToken();
                 if (!token) {
-                    console.log('⚠️ No access token available for loading conversation history');
                     histList.innerHTML = '<li class="empty">Authentication required</li>';
                     return;
                 }
-                
-                console.log('✅ Valid session and token found, fetching conversations...');
                 
                 const response = await fetch('/api/v1/chat/conversations', {
                     headers: {
@@ -1224,10 +1168,7 @@
                 }
                 
                 const data = await response.json();
-                console.log('📋 Received conversation data:', data);
-                console.log('🔧 About to call renderHistory...');
                 renderHistory(data.conversations || []);
-                console.log('🔧 renderHistory completed successfully');
             } catch (error) {
                 console.error('Error loading conversation history:', error);
                 histList.innerHTML = '<li class="error">Failed to load history</li>';
@@ -1237,22 +1178,16 @@
         }
         
         function renderHistory(conversations) {
-            console.log('🔧 renderHistory called with conversations:', conversations.length);
             if (!histList) {
-                console.log('🔧 No histList element found');
                 return;
             }
             
-            console.log('🔧 Clearing histList innerHTML...');
             histList.innerHTML = '';
             
             if (!conversations.length) {
-                console.log('🔧 No conversations, showing empty message');
                 histList.innerHTML = '<li class="empty">No recent conversations</li>';
                 return;
             }
-            
-            console.log('🔧 About to render', conversations.length, 'conversations...');
             
             conversations.forEach(conv => {
                 const li = document.createElement('li');
@@ -1305,9 +1240,7 @@
                 li.appendChild(header);
                 li.appendChild(timeSpan);
                 histList.appendChild(li);
-                console.log('🔧 Added conversation to DOM:', conv.title);
             });
-            console.log('🔧 renderHistory completed successfully - all conversations rendered');
         }
         
         async function loadConversation(conversationId) {
@@ -1331,7 +1264,6 @@
                 
                 // Set current conversation ID
                 currentConversationId = conversationId;
-                console.log('Loaded conversation:', conversationId);
                 
                 // Clear current chat
                 const chatList = document.getElementById('chat-list');
@@ -1373,14 +1305,11 @@
                     return;
                 }
                 
-                console.log('Conversation deleted:', conversationId);
-                
                 // If the deleted conversation is currently active, clear the chat
                 if (currentConversationId === conversationId) {
                     currentConversationId = null;
                     const chatList = document.getElementById('chat-list');
                     if (chatList) chatList.innerHTML = '';
-                    console.log('Cleared active conversation');
                 }
                 
                 // Do not auto-refresh history to avoid background polling loops
@@ -1398,12 +1327,7 @@
         }
         
         // DISABLED - Refresh history after sending messages
-        function refreshHistoryAfterMessage() {
-            console.log('🔧 History refresh DISABLED to stop refresh loop');
-            // setTimeout(() => {
-            //     loadConversationHistory();
-            // }, 1000); // Small delay to ensure backend has processed the message
-        }
+        function refreshHistoryAfterMessage() {}
         
         // Export functions so they can be called from other scripts
         window.refreshConversationHistory = refreshHistoryAfterMessage;

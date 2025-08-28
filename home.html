@@ -40,82 +40,15 @@
                 </div>
             </header>
             
-            <!-- Main Navigation -->
-            <nav class="main-navigation" role="navigation" aria-label="Main Navigation">
-                <div class="nav-container">
-                    <!-- TODO: Implement actual navigation when pages are ready -->
-                    <!-- <a href="dashboard.html" class="nav-link active" aria-current="page">
-                        <span class="nav-icon dashboard-icon" aria-hidden="true"></span>
-                        <span class="nav-text">Dashboard</span>
-                    </a>
-                    <a href="analytics.html" class="nav-link">
-                        <span class="nav-icon analytics-icon" aria-hidden="true"></span>
-                        <span class="nav-text">Analytics</span>
-                    </a>
-                    <a href="settings.html" class="nav-link">
-                        <span class="nav-icon settings-icon" aria-hidden="true"></span>
-                        <span class="nav-text">Settings</span>
-                    </a> -->
-                    
-                    <!-- Temporary navigation for testing -->
-                    <a href="#dashboard" class="nav-link active" aria-current="page">Dashboard</a>
-                    <a href="#analytics" class="nav-link">Analytics</a>
-                    <a href="#settings" class="nav-link">Settings</a>
-                    <a href="#" class="nav-link logout-link" onclick="return AuthActions.handleLogout()">Logout</a>
-                </div>
-            </nav>
+            <!-- Navigation removed (unused demo) -->
             
             <!-- Main Content Area -->
             <main class="main-content" role="main">
                 <div class="content-container">
                     
-                    <!-- Welcome Section -->
-                    <section class="welcome-section" aria-labelledby="welcome-title">
-                        <div class="welcome-card">
-                            <header class="welcome-header">
-                                <h2 id="welcome-title" class="welcome-title">Welcome Back!</h2>
-                                <p class="welcome-message">You have successfully logged in to TURFMAPP.</p>
-                            </header>
-                            
-                            <!-- Action buttons -->
-                            <div class="action-section">
-                                <button class="primary-action-btn" onclick="DashboardController.handleGetStarted()">
-                                    <span class="btn-text">Get Started</span>
-                                    <span class="btn-icon" aria-hidden="true">→</span>
-                                </button>
-                                
-                                <!-- TODO: Add more action buttons when features are ready -->
-                                <!-- <button class="secondary-action-btn">View Analytics</button>
-                                <button class="secondary-action-btn">Manage Settings</button> -->
-                            </div>
-                        </div>
-                    </section>
+                    <!-- Removed unused welcome/demo section -->
                     
-                    <!-- Dashboard Content Placeholder -->
-                    <section class="dashboard-content" aria-labelledby="dashboard-content-title">
-                        <h2 id="dashboard-content-title" class="section-title visually-hidden">Dashboard Content</h2>
-                        
-                        <!-- TODO: Add actual dashboard widgets when ready -->
-                        <!-- <div class="widget-grid">
-                            <div class="widget-card" id="stats-widget">
-                                <h3 class="widget-title">Statistics</h3>
-                                <div class="widget-content"></div>
-                            </div>
-                            <div class="widget-card" id="recent-activity-widget">
-                                <h3 class="widget-title">Recent Activity</h3>
-                                <div class="widget-content"></div>
-                            </div>
-                            <div class="widget-card" id="quick-actions-widget">
-                                <h3 class="widget-title">Quick Actions</h3>
-                                <div class="widget-content"></div>
-                            </div>
-                        </div> -->
-                        
-                        <!-- Placeholder content for testing -->
-                        <div class="placeholder-content">
-                            <p class="placeholder-text">Dashboard widgets will be implemented here.</p>
-                        </div>
-                    </section>
+                    <!-- Removed unused dashboard demo content -->
                 </div>
             </main>
             
@@ -137,7 +70,5 @@
     <!-- JavaScript modules -->
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
-    <script src="scripts/auth.js"></script>
-    <script src="scripts/dashboard.js"></script>
 </body>
 </html>

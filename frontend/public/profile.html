@@ -290,8 +290,10 @@
 
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
+    <script src="scripts/announcement.js"></script>
     <script src="scripts/supabase-client.js"></script>
     <script src="scripts/google-auth.js"></script>
+    <script src="scripts/ui.js"></script>
     <script src="scripts/chat.js"></script>
     <script>
         // Profile page initialization
@@ -302,35 +304,8 @@
                 // Left panel functionality is handled by chat.js - no need to duplicate
                 console.log('Profile page initialized - left panel handled by chat.js');
             
-                // Load and display announcement
-                function loadAnnouncement() {
-                    const announcement = localStorage.getItem('announcement');
-                    const announcementDisplay = document.getElementById('announcement-display');
-                    const announcementText = document.getElementById('announcement-text');
-                    
-                    // Check if announcement elements exist (they may not be present on all pages)
-                    if (!announcementDisplay || !announcementText) {
-                        console.log('Announcement elements not found on this page, skipping...');
-                        return;
-                    }
-                    
-                    if (announcement && announcement.trim() !== '') {
-                        announcementText.textContent = announcement;
-                        announcementDisplay.style.display = 'flex';
-                    } else {
-                        announcementDisplay.style.display = 'none';
-                    }
-                }
-                
-                // Load announcement when page loads
-                loadAnnouncement();
-                
-                // Listen for storage changes (when announcement is updated from admin page)
-                window.addEventListener('storage', function(e) {
-                    if (e.key === 'announcement') {
-                        loadAnnouncement();
-                    }
-                });
+                // Initialize shared announcement header
+                Announcement.initHeader('announcement-display', 'announcement-text');
                 
                 // Load user profile data
                 async function loadUserProfile() {
