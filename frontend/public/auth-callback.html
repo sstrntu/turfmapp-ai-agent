@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - Authentication</title>
+    <style>
+        body {
+            font-family: 'DANSON', sans-serif;
+            background: url('HomeBackground.jpg') center center/cover no-repeat fixed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+        }
+        .auth-container {
+            text-align: center;
+            padding: 2rem;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: #ff6b6b;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="spinner"></div>
+        <h2>Authenticating...</h2>
+        <p>Please wait while we complete your sign in.</p>
+        <div id="error-message" class="error" style="display: none;"></div>
+    </div>
+
+    <script src="scripts/supabase-client.js"></script>
+    <script>
+        async function handleAuthCallback() {
+            try {
+                console.log('Starting OAuth callback handling...');
+                
+                // Handle the OAuth callback
+                const session = await window.supabase.handleAuthCallback();
+                
+                if (session && session.user) {
+                    console.log('Authentication successful:', {
+                        user: session.user.email,
+                        expires_at: session.expires_at
+                    });
+                    
+                    // Get the return URL that was stored before auth
+                    const returnUrl = '/home.html';
+                    localStorage.removeItem('auth-return-url'); // Clean up
+                    
+                    console.log('Redirecting to:', returnUrl);
+                    
+                    // Use replace to avoid showing intermediate pages/history entry
+                    window.location.replace(returnUrl);
+                } else {
+                    throw new Error('No session or user received from OAuth callback');
+                }
+            } catch (error) {
+                console.error('Authentication error:', error);
+                
+                // Show error message
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.textContent = `Authentication failed: ${error.message}`;
+                errorDiv.style.display = 'block';
+                
+                // Hide spinner
+                document.querySelector('.spinner').style.display = 'none';
+                
+                // Redirect to login after delay
+                setTimeout(() => {
+                    window.location.href = '/portal.html';
+                }, 3000);
+            }
+        }
+
+        // Start authentication process when page loads
+        document.addEventListener('DOMContentLoaded', handleAuthCallback);
+    </script>
+</body>
+</html>

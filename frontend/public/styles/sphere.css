@@ -1,0 +1,194 @@
+/**
+ * TURFMAPP 3D Sphere Animation
+ * 
+ * Shared sphere styling for all pages - 20% smaller than original
+ * Positioned in bottom right corner
+ */
+
+/* Background glow effect */
+.app-background::before,
+.login-background::before {
+    content: "";
+    position: fixed;
+    bottom: 120px;
+    right: 160px;
+    width: 213.12px;
+    height: 213.12px;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 0 53.12px rgba(255,255,255,0.15), inset 0 0 53.12px rgba(255,255,255,0.08);
+    z-index: 0;
+}
+
+/* 3D Sphere structure */
+.sphere {
+    position: fixed;
+    bottom: 120px;
+    right: 120px;
+    animation: rot 16s linear infinite reverse;
+    width: 213.12px;
+    height: 213.12px;
+    border-radius: 50%;
+    transform-style: preserve-3d;
+    transform-origin: center center;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.sphere i {
+    position: absolute;
+    width: 213.12px;
+    height: 213.12px;
+    line-height: 213.12px;
+    transform-style: preserve-3d;
+    border-radius: 50%;
+    backface-visibility: visible;
+    box-shadow: 0 0 53.28px 0 rgba(255, 255, 255, 0.1), inset 0 0 53.28px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* 32 rings - exact rotation values */
+.sphere i:nth-child(1) {
+    transform: rotateY(11.25deg);
+}
+
+.sphere i:nth-child(2) {
+    transform: rotateY(22.5deg);
+}
+
+.sphere i:nth-child(3) {
+    transform: rotateY(33.75deg);
+}
+
+.sphere i:nth-child(4) {
+    transform: rotateY(45deg);
+}
+
+.sphere i:nth-child(5) {
+    transform: rotateY(56.25deg);
+}
+
+.sphere i:nth-child(6) {
+    transform: rotateY(67.5deg);
+}
+
+.sphere i:nth-child(7) {
+    transform: rotateY(78.75deg);
+}
+
+.sphere i:nth-child(8) {
+    transform: rotateY(90deg);
+}
+
+.sphere i:nth-child(9) {
+    transform: rotateY(101.25deg);
+}
+
+.sphere i:nth-child(10) {
+    transform: rotateY(112.5deg);
+}
+
+.sphere i:nth-child(11) {
+    transform: rotateY(123.75deg);
+}
+
+.sphere i:nth-child(12) {
+    transform: rotateY(135deg);
+}
+
+.sphere i:nth-child(13) {
+    transform: rotateY(146.25deg);
+}
+
+.sphere i:nth-child(14) {
+    transform: rotateY(157.5deg);
+}
+
+.sphere i:nth-child(15) {
+    transform: rotateY(168.75deg);
+}
+
+.sphere i:nth-child(16) {
+    transform: rotateX(180deg);
+}
+
+.sphere i:nth-child(17) {
+    transform: rotateX(191.25deg);
+}
+
+.sphere i:nth-child(18) {
+    transform: rotateX(202.5deg);
+}
+
+.sphere i:nth-child(19) {
+    transform: rotateX(213.75deg);
+}
+
+.sphere i:nth-child(20) {
+    transform: rotateX(225deg);
+}
+
+.sphere i:nth-child(21) {
+    transform: rotateX(236.25deg);
+}
+
+.sphere i:nth-child(22) {
+    transform: rotateX(247.5deg);
+}
+
+.sphere i:nth-child(23) {
+    transform: rotateX(258.75deg);
+}
+
+.sphere i:nth-child(24) {
+    transform: rotateX(270deg);
+}
+
+.sphere i:nth-child(25) {
+    transform: rotateX(281.25deg);
+}
+
+.sphere i:nth-child(26) {
+    transform: rotateX(292.5deg);
+}
+
+.sphere i:nth-child(27) {
+    transform: rotateX(303.75deg);
+}
+
+.sphere i:nth-child(28) {
+    transform: rotateX(315deg);
+}
+
+.sphere i:nth-child(29) {
+    transform: rotateX(326.25deg);
+}
+
+.sphere i:nth-child(30) {
+    transform: rotateX(337.5deg);
+}
+
+.sphere i:nth-child(31) {
+    transform: rotateX(348.75deg);
+}
+
+.sphere i:nth-child(32) {
+    transform: rotateX(360deg);
+}
+
+/* Animation keyframe */
+@keyframes rot {
+    to {
+        transform: rotateY(360deg) rotateZ(360deg);
+    }
+}
+
+/* Full-viewport background container that sits behind all content */
+.app-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+}

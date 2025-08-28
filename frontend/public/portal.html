@@ -6,11 +6,20 @@
     <title>TURFMAPP - Login Portal</title>
     <meta name="description" content="TURFMAPP secure access portal">
     <link rel="stylesheet" href="styles/login.css">
+    <link rel="stylesheet" href="styles/sphere.css">
 </head>
 <body>
     <!-- Main login container -->
     <main class="login-page">
         <div class="login-background">
+            <div class="app-background">
+                <div class="sphere" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                </div>
+            </div>
             <!-- Login portal component -->
             <section class="login-portal" role="main" aria-label="Login Portal">
                 <div class="login-container">
@@ -21,67 +30,22 @@
                         <p class="portal-subtitle">TURFMAPP</p>
                     </header>
                     
-                    <!-- Login form -->
-                    <form class="login-form" onsubmit="return LoginController.handleSubmit(event)" novalidate>
-                        <!-- Username field -->
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <input 
-                                    type="text" 
-                                    id="username" 
-                                    name="username"
-                                    class="form-input" 
-                                    required 
-                                    autocomplete="username"
-                                    aria-describedby="username-error">
-                                <label for="username" class="form-label">USERNAME</label>
-                                <div class="input-glow" aria-hidden="true"></div>
-                            </div>
-                            <!-- Error message placeholder -->
-                            <div id="username-error" class="error-message" aria-live="polite"></div>
-                        </div>
-                        
-                        <!-- Password field -->
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <input 
-                                    type="password" 
-                                    id="password" 
-                                    name="password"
-                                    class="form-input" 
-                                    required 
-                                    autocomplete="current-password"
-                                    aria-describedby="password-error">
-                                <label for="password" class="form-label">PASSWORD</label>
-                                <div class="input-glow" aria-hidden="true"></div>
-                            </div>
-                            <!-- Error message placeholder -->
-                            <div id="password-error" class="error-message" aria-live="polite"></div>
-                        </div>
-                        
-                        <!-- Submit button -->
-                        <button type="submit" class="login-button" aria-describedby="login-status">
-                            <span class="button-text">LOGIN</span>
-                            <div class="button-scanner" aria-hidden="true"></div>
+                    <!-- Google OAuth Login -->
+                    <div class="login-form">
+                        <!-- Google Sign In Button -->
+                        <button type="button" id="google-signin" class="google-signin-button" onclick="GoogleAuth.signIn()">
+                            <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                                <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34a853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#fbbc05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path fill="#ea4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            <span class="button-text">Sign in with Google</span>
                         </button>
                         
                         <!-- Status message -->
                         <div id="login-status" class="status-message" aria-live="polite"></div>
-                        
-                        <!-- Footer links -->
-                        <footer class="login-footer">
-                            <!-- TODO: Implement forgot password functionality -->
-                            <!-- <a href="#" class="footer-link" onclick="return AuthActions.forgotPassword()">Forgot Password</a> -->
-                            <!-- <span class="separator" aria-hidden="true">|</span> -->
-                            <!-- TODO: Implement user registration -->
-                            <!-- <a href="#" class="footer-link" onclick="return AuthActions.register()">REGISTER</a> -->
-                            
-                            <!-- Temporary testing links -->
-                            <a href="#" class="footer-link">Forgot Password</a>
-                            <span class="separator" aria-hidden="true">|</span>
-                            <a href="#" class="footer-link">REGISTER</a>
-                        </footer>
-                    </form>
+                    </div>
                 </div>
             </section>
         </div>
@@ -90,7 +54,7 @@
     <!-- JavaScript modules -->
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
-    <script src="scripts/auth.js"></script>
-    <script src="scripts/login.js"></script>
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-auth.js"></script>
 </body>
 </html>

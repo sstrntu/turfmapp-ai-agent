@@ -44,24 +44,68 @@
     font-display: swap;
 }
 
+/* Additional text font for body content */
+@font-face {
+    font-family: 'JUST Sans';
+    src: url('../fonts/Text/JUST Sans Regular.woff2') format('woff2'),
+         url('../fonts/Text/JUST Sans Regular.woff') format('woff');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JUST Sans';
+    src: url('../fonts/Text/JUST Sans Medium.woff2') format('woff2'),
+         url('../fonts/Text/JUST Sans Medium.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JUST Sans';
+    src: url('../fonts/Text/JUST Sans SemiBold.woff2') format('woff2'),
+         url('../fonts/Text/JUST Sans SemiBold.woff') format('woff');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* ========================================================================
    CSS CUSTOM PROPERTIES (Variables)
    ======================================================================== */
 
 :root {
-    /* Colors */
-    --color-primary: #ffffff;
-    --color-secondary: rgba(255, 255, 255, 0.7);
-    --color-tertiary: rgba(255, 255, 255, 0.5);
+    /* Modern Color Palette */
+    --dark-bg: #0a0a0a;
+    --card-bg: #1a1a1a;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent-primary: #3b82f6;
+    --accent-secondary: #8b5cf6;
+    --success: #10b981;
+    --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    --gradient-card: linear-gradient(145deg, rgba(26, 26, 26, 0.8), rgba(15, 15, 15, 0.9));
+    --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+    
+    /* Legacy color mappings for compatibility */
+    --color-primary: var(--text-primary);
+    --color-secondary: var(--text-secondary);
+    --color-tertiary: var(--text-muted);
     --color-background-primary: rgba(20, 20, 20, 0.9);
     --color-background-secondary: rgba(10, 10, 10, 0.6);
     --color-background-hover: rgba(15, 15, 15, 0.8);
-    --color-border: rgba(255, 255, 255, 0.2);
+    --color-border: var(--border-color);
     --color-border-hover: rgba(255, 255, 255, 0.4);
     --color-border-focus: var(--color-primary);
     
     /* Typography */
     --font-family-primary: 'DANSON', sans-serif;
+    --font-family-secondary: 'JUST Sans', system-ui, -apple-system, sans-serif;
     --font-weight-regular: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
@@ -103,13 +147,46 @@ html {
 }
 
 body {
-    font-family: var(--font-family-primary);
+    font-family: var(--font-family-secondary);
     font-weight: var(--font-weight-regular);
     overflow: hidden;
-    background: #0a0a0a;
+    background: var(--dark-bg);
     height: 100vh;
     line-height: 1.5;
-    color: var(--color-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Modern Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Enhanced typography */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-primary);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+}
+
+p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
 }
 
 /* ========================================================================
@@ -134,31 +211,36 @@ body {
     align-items: center;
 }
 
+/* 3D Sphere animation now handled by shared sphere.css */
+
+
 .login-portal {
     position: relative;
     z-index: 10;
 }
 
 .login-container {
-    background: var(--color-background-primary);
-    backdrop-filter: blur(25px);
-    border: 1px solid var(--color-border);
-    padding: var(--spacing-xxl) var(--spacing-xl);
-    width: 420px;
-    min-height: 500px;
+    background: rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(22px) saturate(120%);
+    -webkit-backdrop-filter: blur(22px) saturate(120%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    padding: 28px 24px 22px;
+    width: 360px;
+    min-height: 380px;
     position: relative;
     transition: var(--transition-slow);
     border-radius: 10px;
-    box-shadow: var(--shadow-elevation);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
 }
 
 .login-container:hover {
     border-color: var(--color-primary);
     box-shadow: 
-        0 0 50px rgba(255, 255, 255, 0.3),
-        0 0 100px rgba(255, 255, 255, 0.15),
-        inset 0 0 30px rgba(255, 255, 255, 0.05);
-    transform: translateY(-8px) scale(1.02);
+        0 0 40px rgba(255, 255, 255, 0.18),
+        0 0 80px rgba(255, 255, 255, 0.08),
+        0 25px 50px rgba(0, 0, 0, 0.35);
+    transform: translateY(-6px) scale(1.01);
 }
 
 /* ========================================================================
@@ -205,7 +287,7 @@ body {
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 35px;
+    gap: 22px;
 }
 
 .input-group {
@@ -287,7 +369,7 @@ body {
     cursor: pointer;
     position: relative;
     overflow: hidden;
-    margin-top: 25px;
+    margin-top: 8px;
     transition: var(--transition-medium);
 }
 
@@ -330,7 +412,7 @@ body {
    ======================================================================== */
 
 .login-footer {
-    margin-top: 35px;
+    margin-top: 20px;
     text-align: center;
     display: flex;
     justify-content: center;
@@ -395,9 +477,107 @@ body {
     transform: translateY(0);
 }
 
-.status-message.success {
-    color: #51cf66;
+.status-message.info {
+    color: var(--color-secondary);
 }
+
+.status-message.success {
+    color: #4caf50;
+}
+
+.status-message.error {
+    color: #ff6b6b;
+}
+
+/* ========================================================================
+   GOOGLE SIGN-IN BUTTON
+   ======================================================================== */
+
+.google-signin-button {
+    width: 100%;
+    background: #ffffff;
+    color: #757575;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: 'Roboto', var(--font-family-primary);
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: var(--spacing-md);
+}
+
+.google-signin-button:hover {
+    background: #f8f9fa;
+    border-color: #c1c1c1;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.google-signin-button:active {
+    background: #eeeeee;
+}
+
+.google-signin-button:focus {
+    outline: 2px solid #4285f4;
+    outline-offset: 2px;
+}
+
+.google-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* ========================================================================
+   DEVELOPMENT MODE BUTTON
+   ======================================================================== */
+
+.dev-login-button {
+    width: 100%;
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-family: var(--font-family-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.dev-login-button:hover {
+    background: rgba(255, 193, 7, 0.2);
+    border-color: rgba(255, 193, 7, 0.5);
+}
+
+.dev-login-button:focus {
+    outline: 2px solid #ffc107;
+    outline-offset: 2px;
+}
+
+/* ========================================================================
+   LOGIN INFO MESSAGE
+   ======================================================================== */
+
+.login-info {
+    text-align: center;
+    margin: var(--spacing-md) 0;
+}
+
+.login-info p {
+    color: var(--color-tertiary);
+    font-size: 0.8rem;
+    margin: 0;
+}
+
 
 .status-message.error {
     color: #ff6b6b;

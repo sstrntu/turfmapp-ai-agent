@@ -37,15 +37,47 @@
 /**
  * TURFMAPP Dashboard/Home Page Styles
  * 
- * Organized according to code.md standards:
- * - Modular CSS structure with clear separation
- * - Consistent naming conventions
- * - Accessibility-first design
- * - Responsive layout system
+ * Neo-vision design system with DANSON typography
+ * - Modern dark theme with glass morphism
+ * - DANSON font for headings, JUST Sans for body text
+ * - Clean spacing and subtle effects
  */
 
-/* Import shared font definitions */
-@import url('./login.css') layer(fonts);
+/* ========================================================================
+   FONT DEFINITIONS
+   ======================================================================== */
+
+@font-face {
+    font-family: 'DANSON';
+    src: url('../fonts/DANSON REGULAR.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'DANSON';
+    src: url('../fonts/DANSON MEDIUM.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'DANSON';
+    src: url('../fonts/DANSON SEMI BOLD.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'DANSON';
+    src: url('../fonts/DANSON BOLD.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* Additional text font for chat content */
 @font-face {
@@ -82,21 +114,37 @@
     --header-height: 80px;
     --nav-height: 60px;
     --footer-height: 50px;
-    --sidebar-width: 250px;
+    --sidebar-width: 280px;
     
-    /* Colors - Dashboard specific */
-    --color-primary: #ffffff;
-    --color-secondary: rgba(255, 255, 255, 0.8);
-    --color-tertiary: rgba(255, 255, 255, 0.6);
-    --color-accent: rgba(255, 255, 255, 0.1);
+    /* Modern Color Palette */
+    --dark-bg: #0a0a0a;
+    --card-bg: #1a1a1a;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+    --accent-primary: #3b82f6;
+    --accent-secondary: #8b5cf6;
+    --success: #10b981;
+    --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    --gradient-card: linear-gradient(145deg, rgba(26, 26, 26, 0.8), rgba(15, 15, 15, 0.9));
+    --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+    
+    /* Legacy color mappings for compatibility */
+    --color-primary: var(--text-primary);
+    --color-secondary: var(--text-secondary);
+    --color-tertiary: var(--text-muted);
+    --color-accent: var(--border-color);
     --color-accent-hover: rgba(255, 255, 255, 0.2);
     --color-background-overlay: rgba(0, 0, 0, 0.4);
-    --color-background-card: rgba(0, 0, 0, 0.3);
-    --color-border: rgba(255, 255, 255, 0.2);
+    --color-background-card: var(--card-bg);
+    --color-border: var(--border-color);
     --color-border-hover: rgba(255, 255, 255, 0.4);
     
     /* Typography */
     --font-family-primary: 'DANSON', sans-serif;
+    --font-family-secondary: 'JUST Sans', system-ui, -apple-system, sans-serif;
     --font-weight-regular: 400;
     --font-weight-medium: 500;
     --font-weight-semibold: 600;
@@ -145,12 +193,56 @@ html {
 }
 
 body {
-    font-family: var(--font-family-primary);
+    font-family: var(--font-family-secondary);
     font-weight: var(--font-weight-regular);
-    background: #0a0a0a;
-    color: var(--color-primary);
+    background: var(--dark-bg);
+    color: var(--text-primary);
     line-height: 1.6;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Modern Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Enhanced typography */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-primary);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+}
+
+h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+h2 {
+    font-size: 2.5rem;
+    line-height: 1.2;
+}
+
+p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
 }
 
 /* Accessibility utility classes */
@@ -179,10 +271,44 @@ body {
 .app-background {
     flex: 1;
     background: url('../HomeBackground.jpg') center center/cover no-repeat;
-    background-attachment: fixed;
+    background-attachment: scroll;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    position: relative;
+    /* Remove 3D perspective to prevent sphere distortion */
+    perspective: none;
+    transform-style: flat;
+}
+
+
+
+/* ========================================================================
+   ANNOUNCEMENT COMPONENT
+   ======================================================================== */
+
+.announcement-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.announcement-label {
+    color: var(--color-primary);
+    font-size: 0.85rem;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.announcement-text {
+    color: var(--color-secondary);
+    font-size: 0.9rem;
+    font-weight: var(--font-weight-medium);
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ========================================================================
@@ -191,38 +317,44 @@ body {
 
 .app-header {
     height: var(--header-height);
-    background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border-bottom: none;
-    box-shadow: 
-        0 1px 0 rgba(255, 255, 255, 0.05),
-        0 4px 20px rgba(0,0,0,0.15),
-        0 8px 40px rgba(0,0,0,0.08);
     position: sticky;
     top: 0;
     z-index: var(--z-header);
     overflow: visible;
 }
 
-.app-header::after {
-    content: "";
+/* Liquid glass bend layer for header */
+.app-header::before {
+    content: '';
     position: absolute;
     top: 0;
-    left: -30%;
-    width: 30%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent);
-    transform: skewX(-20deg);
-    animation: headerSheen 6s ease-in-out infinite;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.06);
+    z-index: 0;
     pointer-events: none;
 }
 
-@keyframes headerSheen {
-    0% { left: -30%; }
-    55% { left: 130%; }
-    100% { left: 130%; }
+/* Liquid glass face layer for header */
+.app-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: 
+        0 4px 4px rgba(0, 0, 0, 0.15), 
+        0 0 12px rgba(0, 0, 0, 0.08),
+        /* Subtle inner highlights for edge effect */
+        inset 1px 1px 2px 0 rgba(255, 255, 255, 0.12),
+        inset -1px -1px 2px 0 rgba(255, 255, 255, 0.12);
+    z-index: 1;
+    pointer-events: none;
 }
+
+/* Removed old sheen animation - replaced with liquid glass effect */
 
 .header-container {
     /* Stretch header content full-width so the hamburger can sit far left */
@@ -234,6 +366,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
+    z-index: 2;         /* Above glass layers */
 }
 
 .brand-section {
@@ -259,7 +393,7 @@ body {
 .left-toggle-btn.small { width: 28px; height: 28px; font-size: 14px; }
 .left-toggle-btn:hover { background: var(--color-accent); border-color: var(--color-border-hover); }
 
-/* ChatGPT-style left panel */
+/* Liquid glass left panel */
 .left-panel {
     position: fixed;
     top: 0;
@@ -269,25 +403,52 @@ body {
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: var(--z-nav);
-    background: rgba(255, 255, 255, 0.015); /* more transparent */
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
-    border-right: none;
-    box-shadow: 
-        0 0 0 1px rgba(255, 255, 255, 0.02),
-        0 8px 32px rgba(0, 0, 0, 0.12),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03),
-        inset -1px 0 0 rgba(255, 255, 255, 0.01);
     pointer-events: none; /* hidden by default */
 }
-.left-panel.open { transform: translateX(0); pointer-events: auto; }
 
+/* Liquid glass bend layer - backdrop blur effect */
+.left-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.06);
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Liquid glass face layer - main shadow and depth */
+.left-panel::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: 
+        0 4px 4px rgba(0, 0, 0, 0.15), 
+        0 0 12px rgba(0, 0, 0, 0.08);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Liquid glass edge layer - inner highlights */
 .left-panel-inner {
     height: 100%;
+    position: relative;
+    z-index: 3;
     display: flex;
     flex-direction: column;
     padding: 12px;
+    box-shadow: 
+        inset 1px 1px 2px 0 rgba(255, 255, 255, 0.15),
+        inset -1px -1px 2px 0 rgba(255, 255, 255, 0.15);
 }
+.left-panel.open { transform: translateX(0); pointer-events: auto; }
+
+/* Remove duplicate - already defined above with liquid glass edge layer styles */
 
 .left-panel-header { 
     display: flex; 
@@ -302,7 +463,8 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
+    height: 32px;
+    padding: 0 12px;
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -409,6 +571,83 @@ body {
     background: rgba(255, 255, 255, 0.3);
 }
 
+/* Conversation item styles */
+.conversation-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.conversation-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.conversation-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-primary);
+    cursor: pointer;
+    text-align: left;
+    padding: 8px 0 4px 0;
+    font-size: 14px;
+    line-height: 1.2;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+}
+
+.conversation-btn:hover {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.conversation-delete-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    opacity: 0;
+    transform: scale(0.8);
+}
+
+.conversation-item:hover .conversation-delete-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.conversation-delete-btn:hover {
+    color: #ff9aa2;
+    background: rgba(255, 154, 162, 0.1);
+}
+
+.conversation-date {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-left: 0;
+}
+
+.chat-history .empty,
+.chat-history .error {
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+    padding: 8px 0;
+    text-align: center;
+}
+
+.chat-history .error {
+    color: #ff9aa2;
+}
+
 /* Bottom menu section */
 .panel-bottom-menu {
     margin-top: auto;
@@ -475,11 +714,12 @@ body {
 .panel-remove { background: transparent; border: none; color: #ff9aa2; cursor: pointer; }
 
 .app-title {
+    font-family: var(--font-family-primary);
     font-size: 2rem;
     font-weight: var(--font-weight-bold);
-    color: var(--color-primary);
+    color: var(--neo-text-primary);
     letter-spacing: 3px;
-    text-shadow: var(--shadow-glow);
+    text-shadow: var(--neo-shadow-glow);
 }
 
 .app-tagline {
@@ -697,19 +937,52 @@ body {
 }
 
 .chat-card {
-    background: var(--color-background-card);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--color-border);
     border-radius: 14px;
     padding: 0 var(--spacing-md) var(--spacing-md);
     max-width: 960px;
     margin: 0 auto;
-    box-shadow: var(--shadow-card);
     transition: var(--transition-medium), box-shadow var(--transition-medium), transform var(--transition-medium), border-color var(--transition-medium);
     display: flex;            /* Ensure internal scroll works */
     flex-direction: column;   /* Stack list above form */
     max-height: 78vh;         /* Prevent card from growing beyond viewport */
     overflow: hidden;         /* Contain internal scrolling to the list */
+    position: relative;
+    background: transparent;                /* match profile/admin panels */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--color-border);
+}
+
+/* Liquid glass bend layer for chat card */
+.chat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.06);        /* match profile/admin bend layer */
+    border-radius: inherit;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Liquid glass face layer for chat card */
+.chat-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: 
+        0 4px 4px rgba(0, 0, 0, 0.15), 
+        0 0 12px rgba(0, 0, 0, 0.08),
+        inset 1px 1px 2px 0 rgba(255, 255, 255, 0.12),
+        inset -1px -1px 2px 0 rgba(255, 255, 255, 0.12);
+    border-radius: inherit;
+    z-index: 1;
+    pointer-events: none;
 }
 
 .chat-title {
@@ -728,14 +1001,13 @@ body {
     padding-right: 4px;
     flex: 1;            /* fill remaining height */
     min-height: 0;      /* allow child to shrink for overflow */
+    position: relative;
+    z-index: 2;         /* Above glass layers */
 }
 
 .chat-card:hover {
-    border-color: var(--color-border-hover);
-    box-shadow:
-        0 0 40px rgba(255, 255, 255, 0.18),
-        0 0 80px rgba(255, 255, 255, 0.08),
-        var(--shadow-hover);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-hover);
     transform: translateY(-3px);
 }
 
@@ -916,6 +1188,8 @@ body {
 
 .chat-form {
     margin-top: var(--spacing-md);
+    position: relative;
+    z-index: 2;         /* Above glass layers */
 }
 
 .input-container {
@@ -965,7 +1239,7 @@ body {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 8px;
-    color: #8a8a8a; /* gray like ChatGPT icons */
+    color: #ffffff; /* white instead of gray */
     cursor: pointer;
     transition: all var(--transition-medium);
     display: flex;
@@ -975,16 +1249,16 @@ body {
 }
 
 .tool-btn:hover {
-    color: #bfbfbf;
-    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
     border-color: var(--color-border);
 }
 
 .tool-btn:active { transform: translateY(0); }
 
 .tool-btn.active {
-    color: #e6e6e6;
-    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.2);
     border-color: var(--color-border);
 }
 
@@ -1028,9 +1302,9 @@ body {
 
 .chat-input {
     flex: 1;
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(255, 255, 255, 0.08);
     color: var(--color-primary);
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     border-radius: 12px;
     padding: 12px 16px;
     outline: none;
@@ -1040,14 +1314,18 @@ body {
     resize: none;
     min-height: 20px;
     max-height: 120px;
-    overflow-y: auto;
+    overflow-y: hidden;               /* hide scrollbar */
     transition: all var(--transition-medium);
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(12px);
 }
+
+/* Hide scrollbars across browsers for chat input */
+.chat-input::-webkit-scrollbar { display: none; }
+.chat-input { scrollbar-width: none; }
 
 .chat-input:focus {
     border-color: var(--color-border-hover);
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(255, 255, 255, 0.10);
     box-shadow: 
         0 0 0 2px rgba(255, 255, 255, 0.1),
         0 4px 12px rgba(0, 0, 0, 0.3);
@@ -1056,12 +1334,12 @@ body {
 
 .chat-input:hover:not(:focus) {
     border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(255, 255, 255, 0.10);
 }
 
 .chat-input::placeholder {
-    color: var(--color-tertiary);
-    opacity: 0.8;
+    color: rgba(255, 255, 255, 0.88); /* brighter for better readability */
+    opacity: 1;
 }
 
 .select-input {
@@ -1251,24 +1529,31 @@ body {
 
 .profile-section {
     margin-top: var(--spacing-xxl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg); /* consistent space between profile cards */
 }
 
 .profile-card {
-    background: var(--color-background-card);
+    background: transparent;               /* allow liquid glass layers to show */
     border: 1px solid var(--color-border);
     border-radius: 16px;
     padding: var(--spacing-xl);
     backdrop-filter: blur(20px);
     box-shadow: var(--shadow-card);
-    max-width: 900px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: 960px;            /* match chat-card width */
+    margin: 0 auto; /* centered; vertical spacing handled by section gap */
+    position: relative;
+    overflow: hidden;                      /* clip glass layers to rounded corners */
+    z-index: 0;                            /* create stacking context for layers */
 }
 
 .profile-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md); /* slightly tighter header spacing */
 }
 
 .profile-avatar-lg {
@@ -1292,7 +1577,8 @@ body {
 .profile-grid {
     display: grid;
     grid-template-columns: 200px 1fr;
-    gap: var(--spacing-sm) var(--spacing-md);
+    row-gap: 10px;
+    column-gap: var(--spacing-md);
 }
 
 .profile-row {
@@ -1338,6 +1624,40 @@ body {
     font-style: italic;
     letter-spacing: 1px;
 }
+
+/* Liquid glass layers for profile/admin cards */
+.profile-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: inherit;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.profile-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: 
+        0 4px 4px rgba(0, 0, 0, 0.15), 
+        0 0 12px rgba(0, 0, 0, 0.08),
+        inset 1px 1px 2px 0 rgba(255, 255, 255, 0.12),
+        inset -1px -1px 2px 0 rgba(255, 255, 255, 0.12);
+    border-radius: inherit;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Ensure content appears above glass layers */
+.profile-card > * { position: relative; z-index: 2; }
 
 /* TODO: Widget styles for future dashboard components */
 /*
@@ -1587,14 +1907,7 @@ body {
    ======================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-    }
+    /* Animation overrides for accessibility */
 }
 
 /* Focus management */
@@ -1701,12 +2014,12 @@ body.panel-open .app-header {
     font-weight: 500;
     background: transparent;       /* match default (not highlighted) */
     border-color: transparent;      /* match default */
-    color: #8a8a8a;                 /* same as other tool icons */
+    color: #ffffff;                 /* white like other tool icons */
 }
 
 .tool-btn.fal-tool:hover {
-    color: #bfbfbf;                      /* same hover color */
-    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;                      /* white hover color */
+    background: rgba(255, 255, 255, 0.15);
     border-color: var(--color-border);
     transform: translateY(-1px);
 }

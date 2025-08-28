@@ -5,44 +5,167 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TURFMAPP - Profile</title>
     <meta name="description" content="Profile background view">
-    <link rel="preload" as="image" href="/ProfileBackground.jpg">
-    <link rel="stylesheet" href="/styles/home.css">
+    <link rel="stylesheet" href="styles/home.css">
+    <link rel="stylesheet" href="styles/sphere.css">
     <style>
         html, body {
             height: 100%;
         }
         body {
             margin: 0;
-            background: url('/ProfileBackground.jpg') center center/cover no-repeat fixed;
             font-family: 'DANSON', sans-serif;
+            position: relative;
+            background: url('ProfileBackground.jpg') center center/cover no-repeat fixed;
         }
+
+        /* Override shared app-background to use Profile page image */
+        .app-background {
+            background: url('ProfileBackground.jpg') center center/cover no-repeat;
+            background-attachment: scroll;
+        }
+        
+        /* Pull main content and section closer to header */
+        .main-content { padding: var(--spacing-lg) 0 var(--spacing-xl); }
+        .profile-section { margin-top: var(--spacing-md); }
+        
+        
+        .announcement-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .announcement-label {
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .announcement-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            font-weight: 500;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* System Prompt Styles */
+        .system-prompt-section {
+            margin: 24px 0;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 8px;
+        }
+
+        .input-hint {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
+
+        .system-prompt-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'DANSON', sans-serif;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            resize: vertical;
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .system-prompt-textarea:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.4);
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .system-prompt-textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .textarea-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .char-count {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .input-status {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .input-status.success {
+            color: #4ade80;
+        }
+
+        .input-status.error {
+            color: #f87171;
+        }
+
+        .input-status.loading {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
     </style>
 </head>
 <body>
+    <!-- Sphere background -->
+    <div class="app-background">
+        <div class="sphere" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+    </div>
+    
     <header class="app-header" role="banner">
         <div class="header-container">
             <div class="brand-section">
-                <h1 class="app-title">TURFMAPP</h1>
-                <p class="app-tagline">Profile</p>
-            </div>
-            <div class="top-actions">
-                <button class="hamburger-btn" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="top-menu">
-                    <span></span><span></span><span></span>
+                <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="left-panel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </button>
-                <div class="menu-panel" id="top-menu" role="menu" aria-hidden="true">
-                    <a href="/home.html" class="menu-item" role="menuitem">Home</a>
-                    <a href="/admin" class="menu-item" role="menuitem">Admin</a>
-                    <button class="menu-item danger" role="menuitem" onclick="return AuthActions.handleLogout()">Logout</button>
+                <h1 class="app-title">TURFMAPP</h1>
+            </div>
+            
+            <!-- Announcement area -->
+            <div class="top-actions">
+                <div class="announcement-display" id="announcement-display" style="display: none;">
+                    <span class="announcement-label">Announcement:</span>
+                    <span class="announcement-text" id="announcement-text"></span>
                 </div>
             </div>
         </div>
     </header>
 
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/utils.js"></script>
-    <script src="/scripts/auth.js"></script>
-    <script src="/scripts/chat.js"></script>
-    
     <main class="main-content" role="main">
         <div class="content-container">
             <section class="profile-section" aria-labelledby="profile-title">
@@ -58,19 +181,19 @@
                     <div class="profile-grid">
                         <div class="profile-row">
                             <div class="profile-label">Name</div>
-                            <div class="profile-value">Test User</div>
+                            <div class="profile-value" id="profile-name">Loading...</div>
                         </div>
                         <div class="profile-row">
                             <div class="profile-label">Email</div>
-                            <div class="profile-value">test@example.com</div>
+                            <div class="profile-value" id="profile-email">Loading...</div>
                         </div>
                         <div class="profile-row">
                             <div class="profile-label">Role</div>
-                            <div class="profile-value">User</div>
+                            <div class="profile-value" id="profile-role">Loading...</div>
                         </div>
                         <div class="profile-row">
                             <div class="profile-label">Member Since</div>
-                            <div class="profile-value">2024</div>
+                            <div class="profile-value" id="profile-member-since">Loading...</div>
                         </div>
                     </div>
 
@@ -79,8 +202,360 @@
                         <button class="outline-action-btn" disabled title="Coming soon">Cancel</button>
                     </div>
                 </div>
+
+                <!-- System Prompt / Custom Instructions Section -->
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div>
+                            <h2 class="profile-title">Custom Instructions</h2>
+                            <p class="profile-subtitle">Set your personal system prompt (like ChatGPT Custom Instructions)</p>
+                        </div>
+                    </div>
+
+                    <div class="system-prompt-section">
+                        <div class="input-group">
+                            <label for="system-prompt-textarea" class="input-label">
+                                System Prompt
+                                <span class="input-hint">This will be added to every conversation. Tell the AI how you want it to behave.</span>
+                            </label>
+                            <textarea 
+                                id="system-prompt-textarea" 
+                                class="system-prompt-textarea" 
+                                placeholder="Example: You are a helpful assistant that always responds in a friendly and professional manner. When explaining technical concepts, break them down into simple terms..."
+                                maxlength="2000"
+                            ></textarea>
+                            <div class="textarea-footer">
+                                <span class="char-count"><span id="char-count">0</span>/2000</span>
+                                <span class="input-status" id="prompt-status"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button id="save-system-prompt" class="primary-action-btn">Save Instructions</button>
+                        <button id="clear-system-prompt" class="outline-action-btn">Clear</button>
+                    </div>
+                </div>
             </section>
         </div>
     </main>
+    
+    <!-- Left sidebar panel -->
+    <aside id="left-panel" class="left-panel" aria-hidden="true">
+        <div class="left-panel-inner">
+            <div class="left-panel-header">
+                <button id="btn-new-chat" class="new-chat-btn" type="button" onclick="window.location.href='home.html'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    New chat
+                </button>
+                <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="left-panel-content">
+                <!-- Bottom Menu Section -->
+                <div class="panel-bottom-menu">
+                    <a href="home.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Home</span>
+                    </a>
+                    <a href="profile.html" class="menu-item profile-item">
+                        <span class="profile-thumb" aria-hidden="true"></span>
+                        <span>Profile</span>
+                    </a>
+                    <a href="admin.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+                    <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-auth.js"></script>
+    <script src="scripts/chat.js"></script>
+    <script>
+        // Profile page initialization
+        (function() {
+            'use strict';
+            
+            function initializeProfilePage() {
+                // Left panel functionality is handled by chat.js - no need to duplicate
+                console.log('Profile page initialized - left panel handled by chat.js');
+            
+                // Load and display announcement
+                function loadAnnouncement() {
+                    const announcement = localStorage.getItem('announcement');
+                    const announcementDisplay = document.getElementById('announcement-display');
+                    const announcementText = document.getElementById('announcement-text');
+                    
+                    // Check if announcement elements exist (they may not be present on all pages)
+                    if (!announcementDisplay || !announcementText) {
+                        console.log('Announcement elements not found on this page, skipping...');
+                        return;
+                    }
+                    
+                    if (announcement && announcement.trim() !== '') {
+                        announcementText.textContent = announcement;
+                        announcementDisplay.style.display = 'flex';
+                    } else {
+                        announcementDisplay.style.display = 'none';
+                    }
+                }
+                
+                // Load announcement when page loads
+                loadAnnouncement();
+                
+                // Listen for storage changes (when announcement is updated from admin page)
+                window.addEventListener('storage', function(e) {
+                    if (e.key === 'announcement') {
+                        loadAnnouncement();
+                    }
+                });
+                
+                // Load user profile data
+                async function loadUserProfile() {
+                    try {
+                        // Check authentication
+                        if (!window.supabase || !window.supabase.isSessionValid()) {
+                            console.warn('User not authenticated, redirecting to login');
+                            window.location.href = '/portal.html';
+                            return;
+                        }
+
+                        // Get user info from Supabase session
+                        const user = window.supabase.getUser();
+                        if (user) {
+                            // Update profile fields with user data
+                            document.getElementById('profile-name').textContent = 
+                                user.user_metadata?.full_name || user.user_metadata?.name || 'Not provided';
+                            document.getElementById('profile-email').textContent = user.email || 'Not provided';
+                            
+                            // Try to get additional user info from backend
+                            try {
+                                const response = await window.supabase.apiRequest('/api/v1/auth/status');
+                                if (response.ok) {
+                                    const authStatus = await response.json();
+                                    if (authStatus.authenticated && authStatus.user) {
+                                        // Update with backend user info
+                                        document.getElementById('profile-name').textContent = 
+                                            authStatus.user.name || user.user_metadata?.full_name || user.user_metadata?.name || 'Not provided';
+                                        document.getElementById('profile-role').textContent = 
+                                            authStatus.role || 'User';
+                                        
+                                        // Format member since date
+                                        const createdAt = new Date(user.created_at);
+                                        document.getElementById('profile-member-since').textContent = 
+                                            createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                                    } else {
+                                        // Fallback to basic info
+                                        document.getElementById('profile-role').textContent = 'User';
+                                        const createdAt = new Date(user.created_at);
+                                        document.getElementById('profile-member-since').textContent = 
+                                            createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                                    }
+                                }
+                            } catch (backendError) {
+                                console.warn('Could not fetch user info from backend:', backendError);
+                                // Use fallback values
+                                document.getElementById('profile-role').textContent = 'User';
+                                const createdAt = new Date(user.created_at);
+                                document.getElementById('profile-member-since').textContent = 
+                                    createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                            }
+                        } else {
+                            // No user data available
+                            document.getElementById('profile-name').textContent = 'Not available';
+                            document.getElementById('profile-email').textContent = 'Not available';
+                            document.getElementById('profile-role').textContent = 'Not available';
+                            document.getElementById('profile-member-since').textContent = 'Not available';
+                        }
+                    } catch (error) {
+                        console.error('Error loading user profile:', error);
+                        // Set error state
+                        document.getElementById('profile-name').textContent = 'Error loading data';
+                        document.getElementById('profile-email').textContent = 'Error loading data';
+                        document.getElementById('profile-role').textContent = 'Error loading data';
+                        document.getElementById('profile-member-since').textContent = 'Error loading data';
+                    }
+                }
+            
+                // Load user profile when page loads
+                loadUserProfile();
+                
+                // Initialize system prompt functionality
+                initializeSystemPrompt();
+            }
+            
+            // System Prompt functionality
+            function initializeSystemPrompt() {
+                const textarea = document.getElementById('system-prompt-textarea');
+                const charCount = document.getElementById('char-count');
+                const promptStatus = document.getElementById('prompt-status');
+                const saveBtn = document.getElementById('save-system-prompt');
+                const clearBtn = document.getElementById('clear-system-prompt');
+                
+                if (!textarea) return;
+                
+                // Character counter
+                textarea.addEventListener('input', function() {
+                    const length = this.value.length;
+                    charCount.textContent = length;
+                    
+                    if (length > 1800) {
+                        charCount.style.color = '#f87171';
+                    } else if (length > 1500) {
+                        charCount.style.color = '#fbbf24';
+                    } else {
+                        charCount.style.color = 'rgba(255, 255, 255, 0.5)';
+                    }
+                });
+                
+                // Load existing system prompt
+                async function loadSystemPrompt() {
+                    try {
+                        if (!window.supabase || !window.supabase.isSessionValid()) {
+                            return;
+                        }
+                        
+                        // Try to load from backend API first
+                        try {
+                            const response = await window.supabase.apiRequest('/api/v1/preferences/me');
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.system_prompt) {
+                                    textarea.value = data.system_prompt;
+                                    charCount.textContent = data.system_prompt.length;
+                                }
+                                return;
+                            }
+                        } catch (apiError) {
+                            console.warn('API not available, falling back to localStorage:', apiError);
+                        }
+                        
+                        // Fallback to localStorage
+                        const savedPrompt = localStorage.getItem('user_system_prompt');
+                        if (savedPrompt) {
+                            textarea.value = savedPrompt;
+                            charCount.textContent = savedPrompt.length;
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error loading system prompt:', error);
+                        promptStatus.textContent = 'Error loading system prompt';
+                        promptStatus.className = 'input-status error';
+                    }
+                }
+                
+                // Save system prompt
+                async function saveSystemPrompt() {
+                    try {
+                        if (!window.supabase || !window.supabase.isSessionValid()) {
+                            promptStatus.textContent = 'Please log in to save';
+                            promptStatus.className = 'input-status error';
+                            return;
+                        }
+                        
+                        const prompt = textarea.value.trim();
+                        
+                        // Show loading state
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = 'Saving...';
+                        promptStatus.textContent = 'Saving...';
+                        promptStatus.className = 'input-status loading';
+                        
+                        // Try to save to backend API first
+                        try {
+                            const response = await window.supabase.apiRequest('/api/v1/preferences/me', {
+                                method: 'PUT',
+                                body: JSON.stringify({
+                                    system_prompt: prompt
+                                })
+                            });
+                            
+                            if (response.ok) {
+                                promptStatus.textContent = 'Saved successfully!';
+                                promptStatus.className = 'input-status success';
+                                
+                                // Also save to localStorage as backup
+                                localStorage.setItem('user_system_prompt', prompt);
+                            } else {
+                                throw new Error('Failed to save to backend');
+                            }
+                        } catch (apiError) {
+                            console.warn('API not available, saving to localStorage only:', apiError);
+                            // Fallback to localStorage
+                            localStorage.setItem('user_system_prompt', prompt);
+                            promptStatus.textContent = 'Saved locally (backend offline)';
+                            promptStatus.className = 'input-status success';
+                        }
+                        
+                        // Clear success message after 3 seconds
+                        setTimeout(() => {
+                            promptStatus.textContent = '';
+                            promptStatus.className = 'input-status';
+                        }, 3000);
+                        
+                    } catch (error) {
+                        console.error('Error saving system prompt:', error);
+                        promptStatus.textContent = 'Error saving system prompt';
+                        promptStatus.className = 'input-status error';
+                    } finally {
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = 'Save Instructions';
+                    }
+                }
+                
+                // Clear system prompt
+                function clearSystemPrompt() {
+                    if (confirm('Are you sure you want to clear your custom instructions? This cannot be undone.')) {
+                        textarea.value = '';
+                        charCount.textContent = '0';
+                        localStorage.removeItem('user_system_prompt');
+                        promptStatus.textContent = 'Custom instructions cleared';
+                        promptStatus.className = 'input-status success';
+                        
+                        setTimeout(() => {
+                            promptStatus.textContent = '';
+                            promptStatus.className = 'input-status';
+                        }, 3000);
+                    }
+                }
+                
+                // Event listeners
+                saveBtn.addEventListener('click', saveSystemPrompt);
+                clearBtn.addEventListener('click', clearSystemPrompt);
+                
+                // Load system prompt on page load
+                loadSystemPrompt();
+            }
+            
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeProfilePage);
+            } else {
+                initializeProfilePage();
+            }
+        })();
+    </script>
 </body>
 </html>

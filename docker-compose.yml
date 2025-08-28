@@ -1,36 +1,37 @@
-version: '3.9'
-
 services:
   backend:
     build: ./backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 5005 --reload
-    ports:
-      - "5005:5005"
+    network_mode: host
     environment:
-      - BACKEND_HOST=0.0.0.0
-      - BACKEND_PORT=5005
-      - BACKEND_CORS_ORIGINS=http://localhost:3005
-      - SESSION_SECRET=change-me-in-production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FAL_KEY=${FAL_KEY}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_DB_URL=${SUPABASE_DB_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_PATH=/app/app.db
+      - BACKEND_CORS_ORIGINS=http://localhost:3005
       - FRONTEND_URL=http://localhost:3005
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL}
-      - FAL_KEY=${FAL_KEY}
     volumes:
       - ./backend:/app
-    depends_on:
-      - frontend
+      - backend_data:/app/data
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build: ./frontend
-    command: npm run dev -- --host
     ports:
-      - "3005:3005"
-    environment:
-      - VITE_BACKEND_URL=http://backend:5005
-    volumes:
-      - ./frontend:/usr/src/app
-      - /usr/src/app/node_modules
+      - "3005:3000"
+    # DISABLED - volumes:
+    #   - ./frontend/public:/usr/share/nginx/html
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
 
 

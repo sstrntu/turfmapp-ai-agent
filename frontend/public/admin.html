@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TURFMAPP - Admin</title>
     <meta name="description" content="Admin configuration">
-    <link rel="preload" as="image" href="/AdminBackground.jpg">
-    <link rel="stylesheet" href="/styles/home.css">
+    <link rel="stylesheet" href="styles/home.css">
+    <link rel="stylesheet" href="styles/sphere.css">
     <style>
         html, body { 
             min-height: 100vh; 
@@ -15,9 +15,46 @@
         }
         body {
             margin: 0;
-            background: url('/AdminBackground.jpg') center center/cover no-repeat fixed;
             font-family: 'DANSON', sans-serif;
+            position: relative;
+            background: url('AdminBackground.jpg') center center/cover no-repeat fixed;
         }
+
+        /* Override shared app-background to use Admin page image */
+        .app-background {
+            background: url('AdminBackground.jpg') center center/cover no-repeat;
+            background-attachment: scroll;
+        }
+
+        /* Pull main content and section closer to header */
+        .main-content { padding: var(--spacing-lg) 0 var(--spacing-xl); }
+        .profile-section { margin-top: var(--spacing-md); }
+        
+        
+        .announcement-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .announcement-label {
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .announcement-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            font-weight: 500;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
         .admin-note { color: var(--color-secondary); font-size: 0.95rem; }
         .form-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px 16px; align-items: center; }
         .form-row .label { color: var(--color-tertiary); }
@@ -87,20 +124,31 @@
     </style>
 </head>
 <body>
+    <!-- Sphere background -->
+    <div class="app-background">
+        <div class="sphere" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+    </div>
+    
     <header class="app-header" role="banner">
         <div class="header-container">
             <div class="brand-section">
-                <h1 class="app-title">TURFMAPP</h1>
-                <p class="app-tagline">Admin</p>
-            </div>
-            <div class="top-actions">
-                <button class="hamburger-btn" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="top-menu">
-                    <span></span><span></span><span></span>
+                <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="left-panel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </button>
-                <div class="menu-panel" id="top-menu" role="menu" aria-hidden="true">
-                    <a href="/home.html" class="menu-item" role="menuitem">Home</a>
-                    <a href="/profile.html" class="menu-item" role="menuitem">Profile</a>
-                    <button class="menu-item danger" role="menuitem" onclick="return AuthActions.handleLogout()">Logout</button>
+                <h1 class="app-title">TURFMAPP</h1>
+            </div>
+            
+            <div class="top-actions">
+                <div class="announcement-display" id="announcement-display" style="display: none;">
+                    <span class="announcement-label">Announcement:</span>
+                    <span class="announcement-text" id="announcement-text-display"></span>
                 </div>
             </div>
         </div>
@@ -119,6 +167,22 @@
                     </div>
 
                     <div class="profile-grid" style="row-gap: 18px;">
+                        <div class="form-row">
+                            <div class="label">Announcement</div>
+                            <div class="admin-note">Set announcement text that appears on all pages</div>
+                        </div>
+                        
+                        <div class="form-row" style="align-items: start;">
+                            <div class="label">Message</div>
+                            <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                                <textarea id="announcement-text" class="textarea-input" placeholder="Enter announcement message..." rows="2"></textarea>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" id="save-announcement" class="save-btn">Save Announcement</button>
+                                    <button type="button" id="clear-announcement" class="save-btn" style="background: rgba(255,100,100,0.14);">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="form-row">
                             <div class="label">LLM Configuration</div>
                             <div class="admin-note">Configure OpenAI Responses API settings for chat functionality</div>
@@ -263,10 +327,11 @@
         </div>
     </main>
 
-    <script src="/scripts/config.js"></script>
-    <script src="/scripts/utils.js"></script>
-    <script src="/scripts/auth.js"></script>
-    <script src="/scripts/chat.js"></script>
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-auth.js"></script>
+    <script src="scripts/chat.js"></script>
     <script>
         // Load existing local settings
         (function(){
@@ -291,8 +356,12 @@
                 var mcpServerLabel = localStorage.getItem('tm_mcp_server_label') || '';
                 var mcpConnectorId = localStorage.getItem('tm_mcp_connector_id') || '';
                 var storeResponses = localStorage.getItem('tm_store_responses') || 'true';
+                var announcement = localStorage.getItem('announcement') || '';
                 
                 // Set basic settings
+                if (document.getElementById('announcement-text')) {
+                    document.getElementById('announcement-text').value = announcement;
+                }
                 if (model && document.getElementById('chat-model')) {
                     document.getElementById('chat-model').value = model;
                 }
@@ -428,6 +497,141 @@
                 
                 alert('All settings have been reset to defaults.');
             }
+        });
+    </script>
+    
+    <!-- Left sidebar panel -->
+    <aside id="left-panel" class="left-panel" aria-hidden="true">
+        <div class="left-panel-inner">
+            <div class="left-panel-header">
+                <button id="btn-new-chat" class="new-chat-btn" type="button" onclick="window.location.href='home.html'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    New chat
+                </button>
+                <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="left-panel-content">
+                <!-- Bottom Menu Section -->
+                <div class="panel-bottom-menu">
+                    <a href="home.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Home</span>
+                    </a>
+                    <a href="profile.html" class="menu-item profile-item">
+                        <span class="profile-thumb" aria-hidden="true"></span>
+                        <span>Profile</span>
+                    </a>
+                    <a href="admin.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+                    <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        // Initialize left panel toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('left-panel-toggle');
+            const closeBtn = document.getElementById('left-panel-close');
+            const panel = document.getElementById('left-panel');
+            
+            if (toggleBtn && panel) {
+                toggleBtn.addEventListener('click', function() {
+                    panel.classList.toggle('open');
+                    toggleBtn.setAttribute('aria-expanded', panel.classList.contains('open'));
+                    panel.setAttribute('aria-hidden', !panel.classList.contains('open'));
+                    document.body.classList.toggle('panel-open', panel.classList.contains('open'));
+                });
+            }
+            
+            if (closeBtn && panel) {
+                closeBtn.addEventListener('click', function() {
+                    panel.classList.remove('open');
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                    panel.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('panel-open');
+                });
+            }
+            
+            // Announcement functionality
+            const saveAnnouncementBtn = document.getElementById('save-announcement');
+            const clearAnnouncementBtn = document.getElementById('clear-announcement');
+            const announcementTextarea = document.getElementById('announcement-text');
+            
+            if (saveAnnouncementBtn && announcementTextarea) {
+                saveAnnouncementBtn.addEventListener('click', function() {
+                    const announcementText = announcementTextarea.value.trim();
+                    localStorage.setItem('announcement', announcementText);
+                    
+                    // Trigger storage event for other pages to update
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'announcement',
+                        newValue: announcementText
+                    }));
+                    
+                    alert('Announcement saved successfully!');
+                });
+            }
+            
+            if (clearAnnouncementBtn && announcementTextarea) {
+                clearAnnouncementBtn.addEventListener('click', function() {
+                    announcementTextarea.value = '';
+                    localStorage.removeItem('announcement');
+                    
+                    // Trigger storage event for other pages to update
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'announcement',
+                        newValue: ''
+                    }));
+                    
+                    alert('Announcement cleared successfully!');
+                });
+            }
+            
+            // Load and display announcement in header
+            function loadAnnouncementDisplay() {
+                const announcement = localStorage.getItem('announcement');
+                const announcementDisplay = document.getElementById('announcement-display');
+                const announcementTextDisplay = document.getElementById('announcement-text-display');
+                
+                if (announcement && announcement.trim() !== '') {
+                    announcementTextDisplay.textContent = announcement;
+                    announcementDisplay.style.display = 'flex';
+                } else {
+                    announcementDisplay.style.display = 'none';
+                }
+            }
+            
+            // Load announcement display when page loads
+            loadAnnouncementDisplay();
+            
+            // Listen for storage changes (when announcement is updated from this page)
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'announcement') {
+                    loadAnnouncementDisplay();
+                }
+            });
+            
         });
     </script>
 </body>

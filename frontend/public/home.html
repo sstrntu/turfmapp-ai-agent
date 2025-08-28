@@ -6,11 +6,21 @@
     <title>TURFMAPP - AI</title>
     <meta name="description" content="TURFMAPP minimal AI interface">
     <link rel="stylesheet" href="styles/home.css">
+    <link rel="stylesheet" href="styles/sphere.css">
 </head>
 <body>
+    <!-- Sphere background -->
+    <div class="app-background">
+        <div class="sphere" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+    </div>
+    
     <!-- Main application container -->
     <div class="app-container">
-        <div class="app-background">
             
             <!-- Application Header -->
             <header class="app-header" role="banner">
@@ -22,11 +32,14 @@
                             </svg>
                         </button>
                         <h1 class="app-title">TURFMAPP</h1>
-                        <p class="app-tagline">AI</p>
                     </div>
                     
-                    <!-- Empty top actions area -->
+                    <!-- Announcement area -->
                     <div class="top-actions">
+                        <div class="announcement-display" id="announcement-display" style="display: none;">
+                            <span class="announcement-label">Announcement:</span>
+                            <span class="announcement-text" id="announcement-text"></span>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -100,7 +113,7 @@
                                 </svg>
                                 <span>Admin</span>
                             </a>
-                            <button class="menu-item danger logout-btn" onclick="return AuthActions.handleLogout()">
+                            <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
@@ -118,7 +131,56 @@
     <!-- JavaScript modules -->
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
-    <script src="scripts/auth.js"></script>
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-auth.js"></script>
     <script src="scripts/chat.js"></script>
+    <script>
+        // Single-pass authentication guard for home page
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Briefly wait for Supabase client to initialize
+            await new Promise(r => setTimeout(r, 200));
+
+            if (!window.supabase) {
+                window.location.replace('/portal.html');
+                return;
+            }
+
+            // Attempt refresh if not valid yet
+            if (!window.supabase.isSessionValid()) {
+                try { await window.supabase.refreshSession(); } catch (e) { /* no-op */ }
+            }
+
+            if (!window.supabase.isSessionValid()) {
+                window.location.replace('/portal.html');
+                return;
+            }
+            // Session is valid; stay on page and let auto-refresh handle longevity
+        });
+    </script>
+    <script>
+        // Load and display announcement
+        function loadAnnouncement() {
+            const announcement = localStorage.getItem('announcement');
+            const announcementDisplay = document.getElementById('announcement-display');
+            const announcementText = document.getElementById('announcement-text');
+            
+            if (announcement && announcement.trim() !== '') {
+                announcementText.textContent = announcement;
+                announcementDisplay.style.display = 'flex';
+            } else {
+                announcementDisplay.style.display = 'none';
+            }
+        }
+        
+        // Load announcement when page loads
+        document.addEventListener('DOMContentLoaded', loadAnnouncement);
+        
+        // Listen for storage changes (when announcement is updated from admin page)
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'announcement') {
+                loadAnnouncement();
+            }
+        });
+    </script>
 </body>
 </html>

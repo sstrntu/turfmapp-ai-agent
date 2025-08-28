@@ -3,28 +3,39 @@ from __future__ import annotations
 import os
 from typing import List
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from .routes.auth import router as auth_router
-from .routes.admin import router as admin_router
-from .routes.chat import router as chat_router
+# Load environment variables FIRST, before any other imports
+load_dotenv()
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# New modular API structure
+from .api.v1.chat import router as chat_router_v1
+from .api.v1.preferences import router as preferences_router_v1
+from .api.v1.auth import router as auth_router_v1
+
+# Legacy routes (keep for backward compatibility during transition)
 from .routes.upload import router as upload_router
 from .routes.fal_tools import router as fal_tools_router
-from .database import Base, engine
+
+from .database import get_supabase_config
 
 
 def _get_cors_origins() -> List[str]:
     origins_env = os.getenv("BACKEND_CORS_ORIGINS", "")
-    if not origins_env:
-        return []
-    return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
+    if origins_env:
+        return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
+    
+    # Default CORS origins
+    return ["http://localhost:3005", "http://localhost:3000"]
 
-
-load_dotenv()
-
-app = FastAPI(title="TurfMapp AI Agent Backend")
+app = FastAPI(
+    title="TURFMAPP AI Agent Backend",
+    description="Modular AI chatbot backend with Supabase integration",
+    version="1.0.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,22 +46,37 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root():
+    """Root endpoint"""
+    return {
+        "message": "TURFMAPP AI Agent Backend",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
+
+
 @app.get("/healthz")
 def health_check() -> dict:
-    """Simple health endpoint for readiness probes."""
+    """Health check endpoint"""
     return {"status": "ok"}
 
 
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(admin_router, prefix="/admin", tags=["admin"])
-app.include_router(chat_router, prefix="/chat", tags=["chat"])
-app.include_router(upload_router, prefix="/uploads", tags=["uploads"])
-app.include_router(fal_tools_router, prefix="/fal-tools", tags=["fal-tools"])
+# API v1 routes
+app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(preferences_router_v1, prefix="/api/v1/preferences", tags=["preferences"])
+app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
+
+# Legacy routes (for backward compatibility)
+app.include_router(upload_router, prefix="/api/uploads", tags=["uploads"])
+app.include_router(fal_tools_router, prefix="/api/fal-tools", tags=["fal-tools"])
 
 
 @app.on_event("startup")
 def on_startup() -> None:
-    # Create tables if they do not exist
-    Base.metadata.create_all(bind=engine)
+    """Initialize application on startup"""
+    # Supabase integration - configuration loaded
+    config = get_supabase_config()
+    print(f"Supabase configured: {bool(config['url'])}")
 
 
