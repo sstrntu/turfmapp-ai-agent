@@ -10,7 +10,6 @@ services:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - SUPABASE_DB_URL=${SUPABASE_DB_URL}
       - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_PATH=/app/app.db
       - BACKEND_CORS_ORIGINS=http://localhost:3005
       - FRONTEND_URL=http://localhost:3005
     volumes:

@@ -10,14 +10,11 @@ except ImportError:
 
 
 class Settings(BaseSettings):
-    # Database
-    supabase_url: Optional[str] = os.getenv("SUPABASE_URL")
-    supabase_anon_key: Optional[str] = os.getenv("SUPABASE_ANON_KEY")
-    supabase_service_role_key: Optional[str] = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    supabase_db_url: Optional[str] = os.getenv("SUPABASE_DB_URL")
-    
-    # Fallback to SQLite for local development
-    database_path: str = os.getenv("DATABASE_PATH", "./app.db")
+    # Database - Supabase Required
+    supabase_url: str = os.getenv("SUPABASE_URL")
+    supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY") 
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    supabase_db_url: str = os.getenv("SUPABASE_DB_URL")
     
     # OpenAI
     openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")

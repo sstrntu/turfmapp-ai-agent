@@ -42,12 +42,17 @@ _connection_pool = None
 async def get_db_pool():
     """Get or create PostgreSQL connection pool"""
     global _connection_pool
-    if _connection_pool is None and SUPABASE_DB_URL:
+    if _connection_pool is None:
+        if not SUPABASE_DB_URL:
+            raise RuntimeError("SUPABASE_DB_URL environment variable is required")
+            
         try:
             db_url = _ensure_sslmode(SUPABASE_DB_URL)
             print(f"Attempting to connect to: {db_url}")
             # Ensure SSL is used for Supabase connections
             ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
             _connection_pool = await asyncpg.create_pool(
                 db_url,
                 min_size=1,
@@ -66,25 +71,18 @@ async def get_db_pool():
                 
         except Exception as e:
             print(f"❌ Failed to create PostgreSQL connection pool: {e}")
-            print("Chat will continue to work with in-memory storage")
-            return None
+            raise RuntimeError(f"Failed to connect to Supabase database: {e}")
     return _connection_pool
 
 async def execute_query(query: str, *args):
     """Execute a query with the connection pool"""
     pool = await get_db_pool()
-    if not pool:
-        return None
-    
     async with pool.acquire() as connection:
         return await connection.fetch(query, *args)
 
 async def execute_query_one(query: str, *args):
     """Execute a query and return one row"""
     pool = await get_db_pool()
-    if not pool:
-        return None
-    
     async with pool.acquire() as connection:
         return await connection.fetchrow(query, *args)
 
@@ -204,8 +202,6 @@ class ConversationService:
                 WHERE id = $2
             """
             pool = await get_db_pool()
-            if not pool:
-                return False
             async with pool.acquire() as connection:
                 await connection.execute(query, title, conversation_id)
             return True
@@ -237,9 +233,8 @@ class ConversationService:
                 # Update conversation's updated_at timestamp
                 update_query = "UPDATE turfmapp_agent.conversations SET updated_at = NOW() WHERE id = $1"
                 pool = await get_db_pool()
-                if pool:
-                    async with pool.acquire() as connection:
-                        await connection.execute(update_query, conversation_id)
+                async with pool.acquire() as connection:
+                    await connection.execute(update_query, conversation_id)
                 return dict(result)
             return None
         except Exception as e:
@@ -268,8 +263,6 @@ class ConversationService:
             # Delete conversation (messages will be deleted automatically due to CASCADE)
             query = "DELETE FROM turfmapp_agent.conversations WHERE id = $1"
             pool = await get_db_pool()
-            if not pool:
-                return False
             async with pool.acquire() as connection:
                 await connection.execute(query, conversation_id)
             return True
