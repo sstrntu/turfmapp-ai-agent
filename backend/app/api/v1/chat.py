@@ -122,7 +122,12 @@ async def send_chat_message(
             
             if conversation:
                 # Successfully got from database
-                if conversation["user_id"] != user_id:
+                # Clean and compare user IDs
+                conv_user_id = str(conversation["user_id"]).strip()
+                req_user_id = str(user_id).strip()
+                
+                if conv_user_id != req_user_id:
+                    print(f"❌ Send access denied: conversation owner '{conv_user_id}' != requester '{req_user_id}'")
                     raise HTTPException(status_code=403, detail="Access denied to conversation")
                 
                 conversation_id = request.conversation_id
@@ -579,7 +584,14 @@ async def get_conversation_details(
         conversation = await ConversationService.get_conversation(conversation_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        if conversation["user_id"] != user_id:
+        
+        # Clean and compare user IDs
+        conv_user_id = str(conversation["user_id"]).strip()
+        req_user_id = str(user_id).strip()
+        
+        print(f"🔍 Conversation {conversation_id}: owner='{conv_user_id}' ({len(conv_user_id)}), requester='{req_user_id}' ({len(req_user_id)})")
+        if conv_user_id != req_user_id:
+            print(f"❌ Access denied: conversation owner '{conv_user_id}' != requester '{req_user_id}'")
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Get messages
@@ -627,7 +639,13 @@ async def delete_conversation(
         conversation = await ConversationService.get_conversation(conversation_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
-        if conversation["user_id"] != user_id:
+        
+        # Clean and compare user IDs
+        conv_user_id = str(conversation["user_id"]).strip()
+        req_user_id = str(user_id).strip()
+        
+        if conv_user_id != req_user_id:
+            print(f"❌ Delete access denied: conversation owner '{conv_user_id}' != requester '{req_user_id}'")
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Delete the conversation

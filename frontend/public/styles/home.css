@@ -614,6 +614,33 @@ p {
     color: #ff9aa2;
 }
 
+/* Date group header styles */
+.date-group-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 12px 8px 4px 8px !important;
+    margin-top: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: block !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.date-group-header:first-child {
+    margin-top: 0;
+}
+
+/* Update conversation items to work better with grouping */
+.conversation-item {
+    margin-left: 8px;
+    border-left: 2px solid transparent;
+}
+
+.conversation-item:hover {
+    border-left-color: rgba(255, 255, 255, 0.2);
+}
+
 /* Bottom menu section */
 .panel-bottom-menu {
     margin-top: auto;
@@ -924,6 +951,16 @@ p {
     line-height: 1.55;
     font-family: 'JUST Sans', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
+
+/* Ensure assistant message text is bright and readable */
+.assistant-message,
+.assistant-message .assistant-content,
+.assistant-message .assistant-content p,
+.assistant-message .assistant-content li {
+    color: var(--text-primary);
+}
+.assistant-message .assistant-content a { text-decoration: none; color: inherit; }
+.assistant-message .assistant-content a:hover { text-decoration: underline; }
 
 /* Keep typing indicator small inside assistant full-width panel */
 .assistant-message .typing-indicator { gap: 4px; }
@@ -1386,20 +1423,24 @@ p {
     position: fixed;
     left: 0;
     bottom: auto;
-    background: rgba(20,20,20,0.95);
-    color: var(--color-primary);
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    padding: 10px;
-    min-width: 280px;
-    box-shadow: var(--shadow-card);
+    /* Liquid glass style */
+    background: rgba(20,20,20,0.55);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    color: var(--text-primary);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 12px 14px;
+    min-width: 300px;
+    max-width: 520px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
     z-index: 1002;
 }
 .sources-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
-.sources-list li { display: grid; grid-template-columns: 1fr; gap: 2px; padding: 8px; border-radius: 8px; }
+.sources-list li { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 10px; border-radius: 10px; }
 .sources-list li:hover { background: rgba(255,255,255,0.06); }
-.sources-list a { color: var(--color-primary); text-decoration: none; font-weight: 600; }
-.source-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.8; }
+.sources-list a { color: var(--text-primary); text-decoration: none; font-weight: 600; line-height: 1.35; }
+.source-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.9; }
 
 /* ========================================================================
    PROFILE PLACEHOLDER STYLES

@@ -27,14 +27,16 @@
     // Conversation tracking
     let currentConversationId = null;
 
-    if (hasChat) {
-        function scrollToBottom() {
-            try {
-                // Keep the message list pinned to bottom
-                list.scrollTop = list.scrollHeight;
-            } catch (e) { /* no-op */ }
-        }
-        function appendMessage(role, text) {
+    // Make these functions globally accessible for conversation loading
+    function scrollToBottom() {
+        try {
+            // Keep the message list pinned to bottom
+            if (list) list.scrollTop = list.scrollHeight;
+        } catch (e) { /* no-op */ }
+    }
+    
+    function appendMessage(role, text) {
+        if (!list) return;
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'assistant') + ' message-initial';
             bubble.textContent = text;
@@ -49,6 +51,335 @@
             scrollToBottom();
         }
 
+        // Helper to robustly extract sources from metadata
+        function extractSources(meta) {
+            try {
+                if (!meta || typeof meta !== 'object') return [];
+                if (Array.isArray(meta.sources)) return meta.sources;
+                if (typeof meta.sources === 'string') {
+                    try {
+                        const parsed = JSON.parse(meta.sources);
+                        if (Array.isArray(parsed)) return parsed;
+                    } catch (_) {}
+                }
+                // Fallback: find case-insensitive key that equals "sources"
+                const key = Object.keys(meta).find(function(k){ return k && k.trim().toLowerCase() === 'sources'; });
+                if (key) {
+                    const val = meta[key];
+                    if (Array.isArray(val)) return val;
+                    if (typeof val === 'string') {
+                        try {
+                            const parsedVal = JSON.parse(val);
+                            if (Array.isArray(parsedVal)) return parsedVal;
+                        } catch (_) {}
+                    }
+                }
+            } catch (_) {}
+            return [];
+        }
+
+        // Function to properly render loaded messages with formatting
+        function renderLoadedMessage(role, content, metadata = {}) {
+            if (role === 'user') {
+                // User messages can use simple append
+                appendMessage(role, content);
+            } else if (role === 'assistant') {
+                console.log('Rendering assistant message with metadata:', metadata);
+                
+                // Assistant messages need the full assistant message structure
+                const msg = document.createElement('div');
+                msg.className = 'assistant-message message-appear';
+                
+                // Process content with markdown and formatting into blocks
+                renderRichAssistantContent(msg, content);
+                
+                list.appendChild(msg);
+                
+                // Add sources if available
+                var extracted = extractSources(metadata);
+                console.log('Sources check:', {
+                    sources: metadata.sources,
+                    isArray: Array.isArray(metadata.sources),
+                    length: metadata.sources?.length,
+                    truthy: !!metadata.sources,
+                    keys: (metadata && typeof metadata === 'object') ? Object.keys(metadata) : null,
+                    extractedLength: extracted.length
+                });
+                
+                // Render reasoning first (if any), then sources last
+                if (metadata.reasoning) {
+                    console.log('Adding reasoning to loaded message');
+                    renderReasoning(msg, metadata.reasoning);
+                }
+
+                if (Array.isArray(extracted) && extracted.length > 0) {
+                    console.log('Adding sources to bottom of loaded message:', extracted);
+                    renderSources(msg, extracted);
+                } else {
+                    console.log('No valid sources found in metadata for assistant message');
+                }
+                
+                scrollToBottom();
+            }
+        }
+        
+        // Helper functions for message processing
+        function normalizeMarkdown(text) {
+            let out = String(text).replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, _label, raw) {
+                let href = raw.trim();
+                if (!/^https?:\/\//i.test(href)) {
+                    href = 'https://' + href.replace(/^\/*/, '');
+                }
+                try {
+                    const host = new URL(href).hostname.replace(/^www\./, '');
+                    return host;
+                } catch (_) {
+                    return raw;
+                }
+            });
+            // Remove domain-only parentheticals like "(en.wikipedia.org, jleague.jp)"
+            out = stripDomainParentheticals(out);
+            return out;
+        }
+        
+        function linkifyText(text) {
+            const escaped = sanitizeText(text);
+            return escaped.replace(/(https?:\/\/[^\s)]+)([\.)]?)/g, function(_, url, trail) {
+                const clean = url.replace(/[\.,);\]]+$/,'');
+                const t = trail || '';
+                try {
+                    const u = new URL(clean);
+                    const host = u.hostname.replace(/^www\./,'');
+                    return '<a href="' + clean + '" target="_blank" rel="noopener noreferrer">' + host + '</a>' + t;
+                } catch (_) {
+                    return url + (trail || '');
+                }
+            });
+        }
+
+        // Render rich blocks (paragraphs and lists) similar to ChatGPT output
+        function renderRichAssistantContent(container, rawContent) {
+            const root = document.createElement('div');
+            root.className = 'assistant-content';
+
+            const content = linkifyText(normalizeMarkdown(String(rawContent || '')));
+
+            // Split into blocks by blank lines
+            const blocks = content.split(/\n\s*\n/);
+
+            // Helpers to build lists
+            function appendParagraph(text) {
+                const p = document.createElement('p');
+                p.style.margin = '0 0 10px 0';
+                p.innerHTML = text;
+                root.appendChild(p);
+            }
+            function parseList(lines, startIndex) {
+                // Decide if ordered or unordered
+                const isOrdered = /^\d+[\.)]\s+/.test(lines[startIndex]);
+                const list = document.createElement(isOrdered ? 'ol' : 'ul');
+                list.style.margin = '0 0 10px 18px';
+                list.style.paddingLeft = '18px';
+                let i = startIndex;
+                while (i < lines.length) {
+                    const l = lines[i];
+                    if (!l || !(isOrdered ? /^\d+[\.)]\s+/.test(l) : /^(?:[-*•]\s+)/.test(l))) break;
+                    const li = document.createElement('li');
+                    li.style.marginBottom = '6px';
+                    const itemText = l.replace(isOrdered ? /^\d+[\.)]\s+/ : /^(?:[-*•]\s+)/, '');
+                    li.innerHTML = itemText;
+                    list.appendChild(li);
+                    i++;
+                }
+                root.appendChild(list);
+                return i - 1; // last consumed index
+            }
+
+            blocks.forEach(function(block){
+                const lines = block.split(/\n/).map(function(s){ return s.trim(); });
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    if (!line) continue;
+                    if (/^(?:[-*•]\s+|\d+[\.)]\s+)/.test(line)) {
+                        i = parseList(lines, i);
+                        continue;
+                    }
+                    appendParagraph(line);
+                }
+            });
+
+            container.innerHTML = '';
+            container.appendChild(root);
+        }
+        
+        function sanitizeText(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+        
+        function stripDomainParentheticals(text) {
+            return text.replace(/\s*\([^)]*\b(?:\.com|\.org|\.net|\.edu|\.gov|\.co\.uk|\.jp)\b[^)]*\)/g, '');
+        }
+
+        // Function to render reasoning section
+        function renderReasoning(container, reasoning) {
+            if (!reasoning) return;
+
+            const group = document.createElement('div');
+            group.className = 'assistant-group';
+
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'reason-chip';
+            chip.textContent = 'Reasoning';
+            chip.setAttribute('aria-expanded', 'false');
+
+            const panel = document.createElement('div');
+            panel.className = 'reason-panel';
+            panel.style.display = 'none';
+            panel.textContent = String(reasoning);
+
+            chip.addEventListener('click', function () {
+                const isOpen = panel.style.display !== 'none';
+                panel.style.display = isOpen ? 'none' : 'block';
+                chip.setAttribute('aria-expanded', (!isOpen).toString());
+            });
+
+            group.appendChild(chip);
+            group.appendChild(panel);
+            container.appendChild(group);
+        }
+
+        // Function to add sources to the last message (for loading conversation history)
+        function addSourcesToLastMessage(sources) {
+            if (!list || !sources) return;
+            
+            const lastMessage = list.lastElementChild;
+            if (lastMessage && lastMessage.classList.contains('assistant')) {
+                renderSources(lastMessage, sources);
+            }
+        }
+
+        // Extract renderSources function to be globally accessible
+        function renderSources(container, sources) {
+            if (!Array.isArray(sources) || sources.length === 0) return;
+            // Toggle button with popover
+            const toggleWrap = document.createElement('div');
+            toggleWrap.className = 'sources-toggle-wrap';
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'sources-toggle';
+            const stack = document.createElement('span');
+            stack.className = 'favicon-stack';
+            (sources.slice(0, 3)).forEach(function(s){
+                const img = document.createElement('img');
+                img.src = s.favicon || '';
+                img.alt = '';
+                img.width = 16; img.height = 16;
+                img.loading = 'lazy';
+                stack.appendChild(img);
+            });
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = 'Sources';
+            toggle.appendChild(stack);
+            toggle.appendChild(labelSpan);
+            toggle.setAttribute('aria-expanded', 'false');
+            const pop = document.createElement('div');
+            pop.className = 'sources-popover';
+            pop.setAttribute('role', 'dialog');
+            pop.setAttribute('aria-label', 'Citations');
+            pop.style.display = 'none';
+            const listEl = document.createElement('ul');
+            listEl.className = 'sources-list';
+            sources.slice(0, 10).forEach(function(s) {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.href = s.url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                const title = s.title || s.site || new URL(s.url).hostname;
+                a.textContent = title;
+                const meta = document.createElement('div');
+                meta.className = 'source-meta';
+                const fav = document.createElement('img');
+                fav.src = s.favicon || '';
+                fav.width = 16; fav.height = 16; fav.alt = '';
+                const host = document.createElement('span');
+                host.textContent = s.site || new URL(s.url).hostname;
+                meta.appendChild(fav);
+                meta.appendChild(host);
+                li.appendChild(a);
+                li.appendChild(meta);
+                listEl.appendChild(li);
+            });
+            pop.appendChild(listEl);
+            
+            // Position popover function
+            function positionPopover() {
+                const rect = toggle.getBoundingClientRect();
+                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+                pop.style.position = 'fixed';
+                pop.style.display = 'block';
+                // Desired default: centered under the toggle
+                let left = Math.round(rect.left + (rect.width / 2) - Math.min(pop.offsetWidth || 320, 520) / 2);
+                let top = Math.round(rect.bottom + 10);
+                // Measure after display for size
+                const width = pop.offsetWidth || 320;
+                const height = pop.offsetHeight || 180;
+                // Keep within viewport with 12px gutter
+                const gutter = 12;
+                if (left + width + gutter > vw) left = vw - width - gutter;
+                if (left < gutter) left = gutter;
+                // Flip above if not enough space below
+                if (top + height + gutter > vh) {
+                    top = Math.max(gutter, Math.round(rect.top - height - 10));
+                }
+                pop.style.left = left + 'px';
+                pop.style.top = top + 'px';
+            }
+            
+            // Close on outside click
+            function closeOnOutside(event) {
+                if (!pop.contains(event.target) && !toggle.contains(event.target)) {
+                    pop.style.display = 'none';
+                    toggle.setAttribute('aria-expanded', 'false');
+                    window.removeEventListener('scroll', positionPopover, true);
+                    window.removeEventListener('resize', positionPopover, true);
+                    document.removeEventListener('mousedown', closeOnOutside, true);
+                }
+            }
+            
+            toggle.addEventListener('click', function() {
+                const isOpen = window.getComputedStyle(pop).display !== 'none';
+                if (isOpen) {
+                    pop.style.display = 'none';
+                    toggle.setAttribute('aria-expanded', 'false');
+                    window.removeEventListener('scroll', positionPopover, true);
+                    window.removeEventListener('resize', positionPopover, true);
+                    document.removeEventListener('mousedown', closeOnOutside, true);
+                } else {
+                    // Ensure popover is attached to body to avoid clipping/stacking contexts
+                    if (!pop.__attachedToBody) {
+                        document.body.appendChild(pop);
+                        pop.__attachedToBody = true;
+                    }
+                    positionPopover();
+                    toggle.setAttribute('aria-expanded', 'true');
+                    window.addEventListener('scroll', positionPopover, true);
+                    window.addEventListener('resize', positionPopover, true);
+                    document.addEventListener('mousedown', closeOnOutside, true);
+                }
+            });
+
+            toggleWrap.appendChild(toggle);
+            toggleWrap.appendChild(pop);
+            container.appendChild(toggleWrap);
+        }
+
+    if (hasChat) {
         function createAssistantPlaceholder() {
             const msg = document.createElement('div');
             // Start as a compact typing bubble; promote to full-width on finish()
@@ -90,12 +421,13 @@
                     if (looksLikeNews) {
                         this.renderStructuredMessage(msg, content, sources);
                         this.renderReasoning(msg, reasoning);
+                        this.renderSources(msg, sources);
                         scrollToBottom();
                     } else {
                         // Always render full answer without collapsing
                         this.typewriterEffect(msg, content, () => {
-                            this.renderSources(msg, sources);
                             this.renderReasoning(msg, reasoning);
+                            this.renderSources(msg, sources);
                             scrollToBottom();
                         });
                     }
@@ -237,7 +569,6 @@
                     endList();
 
                     container.appendChild(root);
-                    this.renderSources(container, sources);
                 },
                 typewriterEffect(element, text, callback) {
                     let i = 0;
@@ -271,6 +602,7 @@
                     // Toggle button with popover
                     const toggleWrap = document.createElement('div');
                     toggleWrap.className = 'sources-toggle-wrap';
+                    toggleWrap.style.marginTop = '10px';
                     const toggle = document.createElement('button');
                     toggle.type = 'button';
                     toggle.className = 'sources-toggle';
@@ -1115,6 +1447,8 @@
                 if (chatList) chatList.innerHTML = '';
                 const textarea = document.getElementById('chat-input');
                 if (textarea) textarea.value = '';
+                // Remove focus before hiding sidebar
+                this.blur();
                 if (lp) { 
                     lp.classList.remove('open'); 
                     lp.setAttribute('aria-hidden','true'); 
@@ -1128,12 +1462,15 @@
         const historyLoadState = { inProgress: false, lastAt: 0 };
 
         async function loadConversationHistory() {
+            console.log('loadConversationHistory called');
             // Prevent re-entrant or overly-frequent calls
             const now = Date.now();
             if (historyLoadState.inProgress) {
+                console.log('History load already in progress, skipping');
                 return;
             }
             if (now - historyLoadState.lastAt < 5000) { // 5s minimum interval
+                console.log('History load throttled (5s cooldown)');
                 return;
             }
             historyLoadState.inProgress = true;
@@ -1189,57 +1526,85 @@
                 return;
             }
             
+            // Group conversations by date
+            const groupedByDate = {};
             conversations.forEach(conv => {
-                const li = document.createElement('li');
-                li.className = 'conversation-item';
-                
-                // Create main conversation button
-                const button = document.createElement('button');
-                button.className = 'conversation-btn';
-                button.textContent = conv.title || 'Untitled';
-                button.title = conv.title || 'Untitled';
-                
-                button.addEventListener('click', async function() {
-                    await loadConversation(conv.id);
-                    // Close sidebar after loading
-                    if (lp) { 
-                        lp.classList.remove('open'); 
-                        lp.setAttribute('aria-hidden','true'); 
-                        lpToggle?.setAttribute('aria-expanded','false'); 
-                        document.body.classList.remove('panel-open'); 
-                    }
-                });
-                
-                // Create delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'conversation-delete-btn';
-                deleteBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6m4-6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                deleteBtn.title = 'Delete conversation';
-                
-                deleteBtn.addEventListener('click', async function(e) {
-                    e.stopPropagation(); // Prevent triggering the conversation load
-                    
-                    if (confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
-                        await deleteConversation(conv.id);
-                    }
-                });
-                
-                // Create conversation header with button and delete
-                const header = document.createElement('div');
-                header.className = 'conversation-header';
-                header.appendChild(button);
-                header.appendChild(deleteBtn);
-                
-                // Format date
                 const date = new Date(conv.updated_at);
                 const dateStr = date.toLocaleDateString();
-                const timeSpan = document.createElement('span');
-                timeSpan.className = 'conversation-date';
-                timeSpan.textContent = dateStr;
+                if (!groupedByDate[dateStr]) {
+                    groupedByDate[dateStr] = [];
+                }
+                groupedByDate[dateStr].push(conv);
+            });
+            
+            // Sort dates (most recent first) and render
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => {
+                return new Date(b).getTime() - new Date(a).getTime();
+            });
+            
+            sortedDates.forEach(dateStr => {
+                // Create date header
+                const dateHeader = document.createElement('li');
+                dateHeader.className = 'date-group-header';
+                dateHeader.textContent = dateStr;
+                histList.appendChild(dateHeader);
                 
-                li.appendChild(header);
-                li.appendChild(timeSpan);
-                histList.appendChild(li);
+                // Sort conversations within this date by most recent first
+                const dateConversations = groupedByDate[dateStr].sort((a, b) => {
+                    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+                });
+                
+                // Render conversations for this date
+                dateConversations.forEach(conv => {
+                    const li = document.createElement('li');
+                    li.className = 'conversation-item';
+                    
+                    // Create main conversation button
+                    const button = document.createElement('button');
+                    button.className = 'conversation-btn';
+                    button.textContent = conv.title || 'Untitled';
+                    button.title = conv.title || 'Untitled';
+                    
+                    button.addEventListener('click', async function() {
+                        await loadConversation(conv.id);
+                        // Remove focus before hiding sidebar to fix accessibility issue
+                        this.blur();
+                        // Close sidebar after loading
+                        if (lp) { 
+                            lp.classList.remove('open'); 
+                            lp.setAttribute('aria-hidden','true'); 
+                            lpToggle?.setAttribute('aria-expanded','false'); 
+                            document.body.classList.remove('panel-open'); 
+                        }
+                    });
+                    
+                    // Create delete button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'conversation-delete-btn';
+                    deleteBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6m4-6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                    deleteBtn.title = 'Delete conversation';
+                    
+                    deleteBtn.addEventListener('click', async function(e) {
+                        e.stopPropagation(); // Prevent triggering the conversation load
+                        
+                        console.log('Delete button clicked for conversation:', conv.id);
+                        if (confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+                            console.log('User confirmed deletion, calling deleteConversation...');
+                            await deleteConversation(conv.id);
+                        } else {
+                            console.log('User cancelled deletion');
+                        }
+                    });
+                    
+                    // Create conversation header with button and delete (no individual date since it's grouped)
+                    const header = document.createElement('div');
+                    header.className = 'conversation-header';
+                    header.appendChild(button);
+                    header.appendChild(deleteBtn);
+                    
+                    li.appendChild(header);
+                    histList.appendChild(li);
+                });
             });
         }
         
@@ -1269,15 +1634,31 @@
                 const chatList = document.getElementById('chat-list');
                 if (chatList) chatList.innerHTML = '';
                 
-                // Render messages
+                // Render messages with proper formatting
                 data.messages.forEach(msg => {
                     if (msg.role === 'user' || msg.role === 'assistant') {
-                        appendMessage(msg.role, msg.content);
-                        
-                        // Add sources if available
-                        if (msg.role === 'assistant' && msg.metadata?.sources) {
-                            addSourcesToLastMessage(msg.metadata.sources);
+                        // Parse metadata if it's a string
+                        let parsedMetadata = {};
+                        if (msg.metadata) {
+                            try {
+                                parsedMetadata = typeof msg.metadata === 'string' 
+                                    ? JSON.parse(msg.metadata) 
+                                    : msg.metadata;
+                            } catch (e) {
+                                console.error('Failed to parse metadata:', e, msg.metadata);
+                                parsedMetadata = {};
+                            }
                         }
+                        
+                        console.log('Loading message:', {
+                            role: msg.role,
+                            content: msg.content?.substring(0, 50) + '...',
+                            rawMetadata: msg.metadata,
+                            parsedMetadata: parsedMetadata,
+                            sources: parsedMetadata?.sources,
+                            extractedSourcesLength: extractSources(parsedMetadata).length
+                        });
+                        renderLoadedMessage(msg.role, msg.content, parsedMetadata);
                     }
                 });
                 
@@ -1287,10 +1668,15 @@
         }
         
         async function deleteConversation(conversationId) {
+            console.log('deleteConversation called with ID:', conversationId);
             try {
                 const token = window.supabase?.getAccessToken();
-                if (!token) return;
+                if (!token) {
+                    console.log('No access token available');
+                    return;
+                }
                 
+                console.log('Sending DELETE request to:', `/api/v1/chat/conversations/${conversationId}`);
                 const response = await fetch(`/api/v1/chat/conversations/${conversationId}`, {
                     method: 'DELETE',
                     headers: {
@@ -1299,6 +1685,7 @@
                     }
                 });
                 
+                console.log('Delete response status:', response.status);
                 if (!response.ok) {
                     console.error('Failed to delete conversation:', response.status);
                     alert('Failed to delete conversation. Please try again.');
@@ -1312,12 +1699,46 @@
                     if (chatList) chatList.innerHTML = '';
                 }
                 
-                // Do not auto-refresh history to avoid background polling loops
-                // Users can manually trigger history load if needed
+                console.log('Conversation deleted successfully, refreshing history...');
+                // Force refresh conversation history immediately after successful deletion
+                await forceRefreshConversationHistory();
                 
             } catch (error) {
                 console.error('Error deleting conversation:', error);
                 alert('Failed to delete conversation. Please try again.');
+            }
+        }
+        
+        async function forceRefreshConversationHistory() {
+            console.log('forceRefreshConversationHistory called - bypassing throttle');
+            if (!histList) return;
+            
+            try {
+                const token = window.supabase.getAccessToken();
+                if (!token) {
+                    histList.innerHTML = '<li class="empty">Authentication required</li>';
+                    return;
+                }
+                
+                const response = await fetch('/api/v1/chat/conversations', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    console.error('❌ Failed to load conversation history:', response.status);
+                    histList.innerHTML = '<li class="error">Failed to load history</li>';
+                    return;
+                }
+                
+                const data = await response.json();
+                renderHistory(data.conversations || []);
+                console.log('History force refreshed successfully');
+            } catch (error) {
+                console.error('Error force refreshing conversation history:', error);
+                histList.innerHTML = '<li class="error">Failed to load history</li>';
             }
         }
         
@@ -1326,11 +1747,16 @@
             setTimeout(() => { loadConversationHistory(); }, 800);
         }
         
-        // DISABLED - Refresh history after sending messages
-        function refreshHistoryAfterMessage() {}
+        // Refresh history after sending messages
+        function refreshHistoryAfterMessage() {
+            setTimeout(() => { loadConversationHistory(); }, 1000);
+        }
         
         // Export functions so they can be called from other scripts
         window.refreshConversationHistory = refreshHistoryAfterMessage;
         window.loadConversationHistory = loadConversationHistory;
+        
+        // Initialize conversation history on page load
+        initializeConversationHistory();
     })();
 })();
