@@ -119,13 +119,22 @@ async def chat(req: ChatRequest) -> ChatReply:
         payload = {
             "model": model,
             "input": user_input,
+            "max_completion_tokens": 1500,  # Reduced for faster processing
+            "temperature": 0.7,
+            "top_p": 0.9,  # Nucleus sampling for faster generation
+            "frequency_penalty": 0.1,  # Slight penalty for repetition
         }
         
-        # Add tools if provided
+        # Add tools if provided with optimizations
         if req.tools:
-            payload["tools"] = req.tools
-            # Let the model decide when to call tools per Responses API guidance
+            # Limit number of tools for faster processing
+            payload["tools"] = req.tools[:5]  # Limit to 5 tools max
             payload["tool_choice"] = "auto"
+            # Optimize for speed when using tools
+            payload["stream"] = False
+            payload["parallel_tool_calls"] = True
+            # Add tool-specific optimizations
+            payload["tool_timeout"] = 30  # 30 second timeout per tool
 
         # Add instructions (system-like context) when provided
         system_instructions = ""
@@ -162,14 +171,27 @@ async def chat(req: ChatRequest) -> ChatReply:
         print(f"Making request to: {url}")
         print(f"Payload: {payload}")
         
-        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
-            # Initial request with timeout handling
+        # Use optimized timeout configuration
+        timeout_config = httpx.Timeout(
+            timeout=60.0 if use_responses_api else 30.0,  # Shorter timeout for chat completions
+            connect=10.0,
+            read=45.0 if use_responses_api else 25.0,
+            write=10.0
+        )
+        
+        async with httpx.AsyncClient(timeout=timeout_config, limits=httpx.Limits(max_connections=10)) as client:
+            # Initial request with timeout handling and optimization headers
             try:
+                # Add request optimization headers for faster processing
+                if use_responses_api:
+                    headers["X-Request-Priority"] = "high"
+                    headers["X-Processing-Mode"] = "fast"
+                
                 resp = await client.post(url, json=payload, headers=headers)
-            except (httpx.ReadTimeout, httpx.TimeoutException):
-                # Fall back to Chat Completions if Responses API timed out
+            except (httpx.ReadTimeout, httpx.TimeoutException) as e:
+                # Enhanced fallback with better logging
                 if use_responses_api and url.endswith("/responses"):
-                    print("Responses API timed out, falling back to Chat Completions API")
+                    print(f"⚠️  Responses API timed out after {timeout_config.timeout}s: {e}")
                     fallback_messages = []
                     system_content = ""
                     if req.developer_instructions:
@@ -290,9 +312,9 @@ async def chat(req: ChatRequest) -> ChatReply:
                 status = data.get("status")
                 response_id = data.get("id")
                 try:
-                    attempts_remaining = 12  # ~4.8s at 0.4s intervals
+                    attempts_remaining = 15  # ~3.75s at 0.25s intervals for faster polling
                     while status in {"in_progress", "queued"} and attempts_remaining > 0 and response_id:
-                        await asyncio.sleep(0.4)
+                        await asyncio.sleep(0.25)  # Faster polling
                         poll = await client.get(f"https://api.openai.com/v1/responses/{response_id}", headers=headers)
                         if poll.status_code != 200:
                             break
@@ -397,7 +419,7 @@ async def chat(req: ChatRequest) -> ChatReply:
             # Try to enrich sources with thumbnails (Open Graph images)
             if sources:
                 try:
-                    async with httpx.AsyncClient(timeout=httpx.Timeout(2.0, connect=1.0)) as _client:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(3.0, connect=1.5)) as _client:
                         sem = asyncio.Semaphore(3)
                         async def enrich(s: dict) -> None:
                             try:

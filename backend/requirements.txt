@@ -7,18 +7,14 @@ pydantic==2.10.6
 email-validator==2.2.0
 pytest==8.2.2
 PyJWT==2.8.0
-
-# Supabase and PostgreSQL
-asyncpg==0.29.0
+# Database
+asyncpg==0.30.0
 supabase==2.7.4
-
-# OpenAI
+# AI/ML
 openai==1.55.3
-
-# Vector database (optional - for RAG)
+# Vector database
 pgvector==0.3.6
-
-# Additional utilities
-python-multipart==0.0.7  # For file uploads
+# Utilities
+python-multipart==0.0.7
 pydantic-settings==2.6.1
 

@@ -185,7 +185,7 @@
                         
                         <div class="form-row">
                             <div class="label">LLM Configuration</div>
-                            <div class="admin-note">Configure OpenAI Responses API settings for chat functionality</div>
+                            <div class="admin-note">Configure OpenAI Responses API settings - All models use Responses API with intelligent tool calling</div>
                         </div>
                         
                         <div class="form-row">
@@ -196,13 +196,10 @@
                         <div class="form-row">
                             <div class="label">Model</div>
                             <select id="chat-model" class="select-input">
-                                <option value="gpt-5-mini">gpt-5-mini (Latest, Fast)</option>
-                                <option value="gpt-4o-mini">gpt-4o-mini (Fast, Cost-effective)</option>
-                                <option value="gpt-4o">gpt-4o (Balanced)</option>
-                                <option value="gpt-4-turbo">gpt-4-turbo (Advanced)</option>
-                                <option value="gpt-4">gpt-4 (Legacy)</option>
-                                <option value="gpt-3.5-turbo">gpt-3.5-turbo (Basic)</option>
+                                <option value="gpt-4o">gpt-4o (Default, Fast & Reliable)</option>
+                                <option value="gpt-5-mini">gpt-5-mini (Latest, Experimental)</option>
                             </select>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">All models use Responses API with automatic tool calling</div>
                         </div>
                         
                         <div class="form-row" style="align-items: start;">
@@ -477,7 +474,7 @@
                 keys.forEach(key => localStorage.removeItem(key));
                 
                 // Reset form values to defaults
-                if (document.getElementById('chat-model')) document.getElementById('chat-model').value = 'gpt-5-mini';
+                if (document.getElementById('chat-model')) document.getElementById('chat-model').value = 'gpt-4o';
                 if (document.getElementById('developer-instructions')) {
                     document.getElementById('developer-instructions').value = '';
                 }

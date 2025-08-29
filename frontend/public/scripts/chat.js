@@ -264,7 +264,14 @@
 
         // Extract renderSources function to be globally accessible
         function renderSources(container, sources) {
-            if (!Array.isArray(sources) || sources.length === 0) return;
+            console.log('🔍 renderSources called with:', sources);
+            console.log('🔍 Sources is array:', Array.isArray(sources));
+            console.log('🔍 Sources length:', sources?.length);
+            
+            if (!Array.isArray(sources) || sources.length === 0) {
+                console.log('⚠️ renderSources early return - no sources');
+                return;
+            }
             // Toggle button with popover
             const toggleWrap = document.createElement('div');
             toggleWrap.className = 'sources-toggle-wrap';
@@ -275,10 +282,32 @@
             stack.className = 'favicon-stack';
             (sources.slice(0, 3)).forEach(function(s){
                 const img = document.createElement('img');
-                img.src = s.favicon || '';
                 img.alt = '';
                 img.width = 16; img.height = 16;
                 img.loading = 'lazy';
+                
+                // Handle favicon loading with fallbacks
+                function loadFavicon(faviconUrl, fallbackIndex = 0) {
+                    if (!faviconUrl) return;
+                    
+                    img.onerror = function() {
+                        // Try fallback URLs if available
+                        if (s.favicon_fallbacks && s.favicon_fallbacks[fallbackIndex]) {
+                            loadFavicon(s.favicon_fallbacks[fallbackIndex], fallbackIndex + 1);
+                        } else {
+                            // Use a default icon if all fallbacks fail
+                            img.style.display = 'none';
+                        }
+                    };
+                    
+                    img.onload = function() {
+                        img.style.display = 'block';
+                    };
+                    
+                    img.src = faviconUrl;
+                }
+                
+                loadFavicon(s.favicon);
                 stack.appendChild(img);
             });
             const labelSpan = document.createElement('span');
@@ -304,8 +333,30 @@
                 const meta = document.createElement('div');
                 meta.className = 'source-meta';
                 const fav = document.createElement('img');
-                fav.src = s.favicon || '';
                 fav.width = 16; fav.height = 16; fav.alt = '';
+                
+                // Handle favicon loading with fallbacks for sources list
+                function loadSourceFavicon(faviconUrl, fallbackIndex = 0) {
+                    if (!faviconUrl) return;
+                    
+                    fav.onerror = function() {
+                        // Try fallback URLs if available
+                        if (s.favicon_fallbacks && s.favicon_fallbacks[fallbackIndex]) {
+                            loadSourceFavicon(s.favicon_fallbacks[fallbackIndex], fallbackIndex + 1);
+                        } else {
+                            // Use a default icon if all fallbacks fail
+                            fav.style.display = 'none';
+                        }
+                    };
+                    
+                    fav.onload = function() {
+                        fav.style.display = 'block';
+                    };
+                    
+                    fav.src = faviconUrl;
+                }
+                
+                loadSourceFavicon(s.favicon);
                 const host = document.createElement('span');
                 host.textContent = s.site || new URL(s.url).hostname;
                 meta.appendChild(fav);
@@ -316,32 +367,28 @@
             });
             pop.appendChild(listEl);
             
-            // Position popover function
             function positionPopover() {
-                const rect = toggle.getBoundingClientRect();
-                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+                // Use fixed positioning to escape scroll container clipping
                 pop.style.position = 'fixed';
+                // Temporarily show to measure
+                pop.style.visibility = 'hidden';
                 pop.style.display = 'block';
-                // Desired default: centered under the toggle
-                let left = Math.round(rect.left + (rect.width / 2) - Math.min(pop.offsetWidth || 320, 520) / 2);
-                let top = Math.round(rect.bottom + 10);
-                // Measure after display for size
-                const width = pop.offsetWidth || 320;
-                const height = pop.offsetHeight || 180;
-                // Keep within viewport with 12px gutter
-                const gutter = 12;
-                if (left + width + gutter > vw) left = vw - width - gutter;
-                if (left < gutter) left = gutter;
-                // Flip above if not enough space below
-                if (top + height + gutter > vh) {
-                    top = Math.max(gutter, Math.round(rect.top - height - 10));
-                }
+                const rect = toggle.getBoundingClientRect();
+                const spacing = 8;
+                let left = rect.left;
+                let top = rect.top - pop.offsetHeight - spacing; // place above by default
+                // If off top, place below
+                if (top < 8) top = rect.bottom + spacing;
+                // Constrain horizontally
+                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                const maxLeft = vw - pop.offsetWidth - 8;
+                if (left > maxLeft) left = Math.max(8, maxLeft);
+                if (left < 8) left = 8;
                 pop.style.left = left + 'px';
                 pop.style.top = top + 'px';
+                pop.style.visibility = 'visible';
             }
             
-            // Close on outside click
             function closeOnOutside(event) {
                 if (!pop.contains(event.target) && !toggle.contains(event.target)) {
                     pop.style.display = 'none';
@@ -352,27 +399,27 @@
                 }
             }
             
-            toggle.addEventListener('click', function() {
-                const isOpen = window.getComputedStyle(pop).display !== 'none';
-                if (isOpen) {
-                    pop.style.display = 'none';
-                    toggle.setAttribute('aria-expanded', 'false');
-                    window.removeEventListener('scroll', positionPopover, true);
-                    window.removeEventListener('resize', positionPopover, true);
-                    document.removeEventListener('mousedown', closeOnOutside, true);
-                } else {
-                    // Ensure popover is attached to body to avoid clipping/stacking contexts
-                    if (!pop.__attachedToBody) {
-                        document.body.appendChild(pop);
-                        pop.__attachedToBody = true;
-                    }
-                    positionPopover();
-                    toggle.setAttribute('aria-expanded', 'true');
-                    window.addEventListener('scroll', positionPopover, true);
-                    window.addEventListener('resize', positionPopover, true);
-                    document.addEventListener('mousedown', closeOnOutside, true);
-                }
-            });
+                                toggle.addEventListener('click', function() {
+                        const isOpen = window.getComputedStyle(pop).display !== 'none';
+                        if (isOpen) {
+                            pop.style.display = 'none';
+                            toggle.setAttribute('aria-expanded', 'false');
+                            window.removeEventListener('scroll', positionPopover, true);
+                            window.removeEventListener('resize', positionPopover, true);
+                            document.removeEventListener('mousedown', closeOnOutside, true);
+                        } else {
+                            // Ensure popover is attached to body to avoid clipping/stacking contexts
+                            if (!pop.__attachedToBody) {
+                                document.body.appendChild(pop);
+                                pop.__attachedToBody = true;
+                            }
+                            positionPopover();
+                            toggle.setAttribute('aria-expanded', 'true');
+                            window.addEventListener('scroll', positionPopover, true);
+                            window.addEventListener('resize', positionPopover, true);
+                            document.addEventListener('mousedown', closeOnOutside, true);
+                        }
+                    });
 
             toggleWrap.appendChild(toggle);
             toggleWrap.appendChild(pop);
@@ -421,13 +468,13 @@
                     if (looksLikeNews) {
                         this.renderStructuredMessage(msg, content, sources);
                         this.renderReasoning(msg, reasoning);
-                        this.renderSources(msg, sources);
+                        renderSources(msg, sources);  // Use global function
                         scrollToBottom();
                     } else {
                         // Always render full answer without collapsing
                         this.typewriterEffect(msg, content, () => {
                             this.renderReasoning(msg, reasoning);
-                            this.renderSources(msg, sources);
+                            renderSources(msg, sources);  // Use global function
                             scrollToBottom();
                         });
                     }
@@ -596,103 +643,7 @@
                     
                     typeChar();
                 },
-                renderSources(container, sources) {
-                    if (!Array.isArray(sources) || sources.length === 0) return;
-
-                    // Toggle button with popover
-                    const toggleWrap = document.createElement('div');
-                    toggleWrap.className = 'sources-toggle-wrap';
-                    toggleWrap.style.marginTop = '10px';
-                    const toggle = document.createElement('button');
-                    toggle.type = 'button';
-                    toggle.className = 'sources-toggle';
-                    const stack = document.createElement('span');
-                    stack.className = 'favicon-stack';
-                    (sources.slice(0, 3)).forEach(function(s){
-                        const img = document.createElement('img');
-                        img.src = s.favicon || '';
-                        img.alt = '';
-                        img.width = 16; img.height = 16;
-                        img.loading = 'lazy';
-                        stack.appendChild(img);
-                    });
-                    const labelSpan = document.createElement('span');
-                    labelSpan.textContent = 'Sources';
-                    toggle.appendChild(stack);
-                    toggle.appendChild(labelSpan);
-                    toggle.setAttribute('aria-expanded', 'false');
-
-                    const pop = document.createElement('div');
-                    pop.className = 'sources-popover';
-                    pop.setAttribute('role', 'dialog');
-                    pop.setAttribute('aria-label', 'Citations');
-                    pop.style.display = 'none';
-
-                    const listEl = document.createElement('ul');
-                    listEl.className = 'sources-list';
-                    sources.slice(0, 10).forEach(function(s) {
-                        const li = document.createElement('li');
-                        const a = document.createElement('a');
-                        a.href = s.url;
-                        a.target = '_blank';
-                        a.rel = 'noopener noreferrer';
-                        const title = s.title || s.site || new URL(s.url).hostname;
-                        a.textContent = title;
-                        const meta = document.createElement('div');
-                        meta.className = 'source-meta';
-                        const fav = document.createElement('img');
-                        fav.src = s.favicon || '';
-                        fav.width = 16; fav.height = 16; fav.alt = '';
-                        const host = document.createElement('span');
-                        host.textContent = s.site || new URL(s.url).hostname;
-                        meta.appendChild(fav);
-                        meta.appendChild(host);
-                        li.appendChild(a);
-                        li.appendChild(meta);
-                        listEl.appendChild(li);
-                    });
-                    pop.appendChild(listEl);
-
-                    function positionPopover() { window.UI?.positionPopover(toggle, pop, 8); }
-
-                    function closeOnOutside(event) {
-                        if (!pop.contains(event.target) && !toggle.contains(event.target)) {
-                            pop.style.display = 'none';
-                            toggle.setAttribute('aria-expanded', 'false');
-                            window.removeEventListener('scroll', positionPopover, true);
-                            window.removeEventListener('resize', positionPopover, true);
-                            document.removeEventListener('mousedown', closeOnOutside, true);
-                        }
-                    }
-
-                    toggle.addEventListener('click', function() {
-                        const isOpen = window.getComputedStyle(pop).display !== 'none';
-                        if (isOpen) {
-                            pop.style.display = 'none';
-                            toggle.setAttribute('aria-expanded', 'false');
-                            window.removeEventListener('scroll', positionPopover, true);
-                            window.removeEventListener('resize', positionPopover, true);
-                            document.removeEventListener('mousedown', closeOnOutside, true);
-                        } else {
-                            // Ensure popover is attached to body to avoid clipping/stacking contexts
-                            if (!pop.__attachedToBody) {
-                                document.body.appendChild(pop);
-                                pop.__attachedToBody = true;
-                            }
-                            positionPopover();
-                            toggle.setAttribute('aria-expanded', 'true');
-                            window.addEventListener('scroll', positionPopover, true);
-                            window.addEventListener('resize', positionPopover, true);
-                            document.addEventListener('mousedown', closeOnOutside, true);
-                        }
-                    });
-
-                    toggleWrap.appendChild(toggle);
-                    toggleWrap.appendChild(pop);
-                    container.appendChild(toggleWrap);
-
-                    // Remove thumbnail grid per request
-                },
+                // renderSources function removed - using the global one above instead
                 renderReasoning(container, reasoning) {
                     if (!reasoning) return;
 
@@ -849,7 +800,8 @@
                     textVerbosity: localStorage.getItem('tm_text_verbosity') || 'medium',
                     reasoningEffort: localStorage.getItem('tm_reasoning_effort') || 'medium',
                     reasoningSummary: localStorage.getItem('tm_reasoning_summary') || 'auto',
-                    toolWebSearch: localStorage.getItem('tm_tool_web_search') !== 'false',
+                    // Make tools available by default; user can explicitly disable via settings
+                    toolWebSearch: (localStorage.getItem('tm_tool_web_search') ?? 'true') === 'true',
                     webSearchContext: localStorage.getItem('tm_web_search_context') || 'medium',
                     toolImageGen: localStorage.getItem('tm_tool_image_generation') === 'true',
                     imageQuality: localStorage.getItem('tm_image_quality') || 'auto',
@@ -873,7 +825,8 @@
                 textVerbosity: 'medium',
                 reasoningEffort: 'medium',
                 reasoningSummary: 'auto',
-                toolWebSearch: true,
+                // Default off to avoid unnecessary latency
+                toolWebSearch: false,
                 webSearchContext: 'medium',
                 toolImageGen: false,
                 imageQuality: 'auto',
@@ -921,6 +874,30 @@
             }
 
             return tools;
+        }
+
+        // Enhanced system instructions to help LLM understand when to use tools
+        function buildSystemInstructions(settings, isWebSearchForced = false) {
+            let instructions = [];
+            
+            // Base instructions for tool usage
+            if (settings.toolWebSearch) {
+                instructions.push(
+                    "Use web search for current information: sports scores, news, weather, current season data, latest facts, or when users ask 'who is', 'what is the latest', 'this season', 'this year'."
+                );
+            }
+            
+            if (settings.toolImageGen) {
+                instructions.push(
+                    "Generate images for creative requests or when users explicitly ask for images."
+                );
+            }
+            
+            if (instructions.length > 0) {
+                instructions.unshift("You have tools available. Use them when they would provide better, more current information than your training data.");
+            }
+            
+            return instructions.join(" ");
         }
 
         // FAL Tools System
@@ -1299,15 +1276,20 @@
             // create live placeholder with thinking dots
             var placeholder = createAssistantPlaceholder();
 
-            // Build tools array based on settings and active modes
+            // Make tools available by default; if user clicks the toggles, force-include those
             const tools = buildToolsArray(settings, isImageGen, isWebSearch);
+            
+            // Build enhanced system instructions to guide tool usage
+            const systemInstructions = buildSystemInstructions(settings, isWebSearch);
             
             // Build request payload for v1 API
             const requestBody = {
                 message: value,
                 conversation_id: currentConversationId, // Use current conversation or null for new
-                model: settings.model || "gpt-4o-mini",
+                model: settings.model || "gpt-5-mini",
                 tools: tools.length > 0 ? tools : null,
+                tool_choice: isWebSearch ? 'required' : 'auto',
+                assistant_context: systemInstructions, // Add system instructions to guide tool usage
                 attachments: attachments.length > 0 ? attachments.map(att => ({
                     type: att.type,
                     url: att.url,
@@ -1332,6 +1314,7 @@
                 return;
             }
             
+            console.log('Sending chat request with tools:', tools?.map?.(t => t.type), 'tool_choice:', requestBody.tool_choice);
             fetch('/api/v1/chat/send', {
                 method: 'POST',
                 headers: { 
@@ -1363,6 +1346,12 @@
                         // Sources and reasoning are at the top level of the response
                         const sources = res.sources || [];
                         const reasoning = res.reasoning || '';
+                        
+                        // Debug logging for sources
+                        console.log('🔍 Frontend received sources:', sources);
+                        console.log('🔍 Sources type:', typeof sources);
+                        console.log('🔍 Sources length:', Array.isArray(sources) ? sources.length : 'Not array');
+                        
                         placeholder.finish(messageContent, reasoning, sources);
                         
                         // Clear attachments and reset tool buttons after successful response

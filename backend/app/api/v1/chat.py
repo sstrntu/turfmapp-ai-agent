@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from ...core.simple_auth import get_current_user_from_token
 from ...database import ConversationService, UserService
+# Removed routing agent - always use Responses API
 
 router = APIRouter()
 
@@ -77,7 +78,7 @@ class ChatRequest(BaseModel):
     """Enhanced chat request supporting conversation context and tools"""
     message: str
     conversation_id: Optional[str] = None
-    model: Optional[str] = "gpt-4o-mini"
+    model: Optional[str] = "gpt-4o"
     attachments: Optional[List[dict]] = None
     include_reasoning: bool = False
     developer_instructions: Optional[str] = None
@@ -87,6 +88,9 @@ class ChatRequest(BaseModel):
     reasoning_effort: Optional[str] = "medium"
     reasoning_summary: Optional[str] = "auto"
     tools: Optional[List[dict]] = None
+    # How the model should decide tool usage: 'auto' (default), 'none', 'required', or
+    # provider-specific structured values. We forward this as-is when present.
+    tool_choice: Optional[str] = "auto"
     store: bool = True
 
 
@@ -153,7 +157,7 @@ async def send_chat_message(
                 "create_conversation",
                 user_id=user_id,
                 title=title,
-                model=request.model or "gpt-4o-mini",
+                model=request.model or "gpt-4o",
                 system_prompt=system_prompt
             )
             
@@ -168,7 +172,7 @@ async def send_chat_message(
                     "id": conversation_id,
                     "user_id": user_id,
                     "title": title,
-                    "model": request.model or "gpt-4o-mini",
+                    "model": request.model or "gpt-4o",
                     "system_prompt": system_prompt,
                     "created_at": datetime.now().isoformat(),
                     "updated_at": datetime.now().isoformat()
@@ -222,7 +226,7 @@ async def send_chat_message(
         if not api_key:
             raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
 
-        model = request.model or "gpt-4o-mini"
+        model = request.model or "gpt-4o"
         
         # Check if web search is requested in tools
         has_web_search = request.tools and any(tool.get("type") == "web_search_preview" for tool in request.tools)
@@ -230,17 +234,18 @@ async def send_chat_message(
         # Debug logging
         print(f"Chat request - Model: {model}")
         print(f"Tools provided: {request.tools}")
+        print(f"Tool choice: {request.tool_choice}")
         print(f"Has web search: {has_web_search}")
+        print(f"Developer instructions: {bool(request.developer_instructions)}")
+        print(f"Assistant context: {bool(request.assistant_context)}")
         
-        # Use Responses API for advanced features or gpt-5 models
-        use_responses_api = (
-            model.lower().startswith("gpt-5") or 
-            request.tools is not None or 
-            request.developer_instructions or 
-            request.assistant_context
-        )
-        
-        print(f"Using Responses API: {use_responses_api}")
+        # Always use Responses API - let the API handle tool calling decisions
+        print(f"🚀 Using Responses API with model: {model}")
+        print(f"   Message: '{request.message}'")
+        print(f"   Tools available: {bool(request.tools)}")
+        print(f"   Tool choice: {request.tool_choice}")
+        print(f"   Developer instructions: {bool(request.developer_instructions)}")
+        print(f"   Assistant context: {bool(request.assistant_context)}")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -251,206 +256,190 @@ async def send_chat_message(
         reasoning: Optional[str] = None
         sources: Optional[List[dict]] = None
 
-        if use_responses_api:
-            # Use Responses API for advanced features
-            # For conversation context, we need to pass the full conversation
-            conversation_context = ""
-            if use_fallback and conversation_id in fallback_conversations and len(fallback_conversations[conversation_id]) > 1:
-                # Build conversation context from fallback storage (exclude the just-added user message)
-                for msg in fallback_conversations[conversation_id][:-1]:
-                    role = msg["role"].capitalize()
-                    conversation_context += f"{role}: {msg['content']}\n"
-                conversation_context += f"User: {request.message}"
-            elif not use_fallback and len(conversation_messages) > 1:
-                # Build conversation context from database messages (exclude the just-added user message)
-                for msg in conversation_messages[:-1]:
-                    role = msg["role"].capitalize()
-                    conversation_context += f"{role}: {msg['content']}\n"
-                conversation_context += f"User: {request.message}"
-            else:
-                conversation_context = request.message
+        # Build proper message history for Responses API
+        # Responses API can handle both single input or structured messages
+        conversation_messages_for_api = []
+        
+        # Add system prompt as first message if available
+        if system_prompt and system_prompt.strip():
+            conversation_messages_for_api.append({
+                "role": "system",
+                "content": system_prompt.strip()
+            })
+        
+        # Add conversation history (excluding the current user message we're about to add)
+        if use_fallback and conversation_id in fallback_conversations and len(fallback_conversations[conversation_id]) > 1:
+            # Use fallback storage (exclude the just-added user message)
+            for msg in fallback_conversations[conversation_id][:-1]:
+                conversation_messages_for_api.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+        elif not use_fallback and len(conversation_messages) > 1:
+            # Use database messages (exclude the just-added user message)
+            for msg in conversation_messages[:-1]:
+                conversation_messages_for_api.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+        
+        # Add the current user message
+        conversation_messages_for_api.append({
+            "role": "user", 
+            "content": request.message
+        })
+        
+        # Convert structured messages to single input for Responses API
+        # Responses API uses 'input' parameter, not 'messages'
+        conversation_context = ""
+        for msg in conversation_messages_for_api:
+            role = msg["role"].title()
+            conversation_context += f"{role}: {msg['content']}\n\n"
+        
+        payload = {
+            "model": model,
+            "input": conversation_context.strip(),  # Use single input string
+            "max_output_tokens": 1500,  # Responses API uses max_output_tokens
+        }
+        
+        # Add temperature only for models that support it
+        if model not in ["gpt-5-mini"]:
+            payload["temperature"] = 0.7
+        
+        # Add tools if provided - let the API decide when to use them
+        if request.tools:
+            payload["tools"] = request.tools[:5]  # Limit to 5 tools for better performance
+            payload["tool_choice"] = request.tool_choice or "auto"  # Let model decide
+            payload["parallel_tool_calls"] = True  # Enable parallel execution
+            print(f"🔧 Added {len(request.tools)} tools with choice: {payload['tool_choice']}")
+        
+        # Add additional instructions (developer_instructions and assistant_context)
+        # These are separate from the system message in the conversation
+        additional_instructions = ""
+        if request.developer_instructions:
+            additional_instructions += request.developer_instructions
+        if request.assistant_context:
+            if additional_instructions:
+                additional_instructions += "\n\n"
+            additional_instructions += request.assistant_context
+        if additional_instructions:
+            payload["instructions"] = additional_instructions
             
-            payload = {
-                "model": model,
-                "input": conversation_context,
-            }
-            
-            # Add tools if provided
-            if request.tools:
-                payload["tools"] = request.tools
-                payload["tool_choice"] = "auto"
-                print(f"Added tools to Responses API payload: {request.tools}")
-
-            # Add system instructions combining user system prompt with other instructions
-            system_instructions = ""
-            if system_prompt and system_prompt.strip():
-                system_instructions += system_prompt.strip()
-            if request.developer_instructions:
-                if system_instructions:
-                    system_instructions += "\n\n"
-                system_instructions += request.developer_instructions
-            if request.assistant_context:
-                if system_instructions:
-                    system_instructions += "\n\n"
-                system_instructions += request.assistant_context
-            if system_instructions:
-                payload["instructions"] = system_instructions
-                
-            url = "https://api.openai.com/v1/responses"
-        else:
-            # Use Chat Completions API
-            if request.include_reasoning:
-                system_prefix = (
-                    "Respond in compact JSON with keys 'answer' and 'reason'. "
-                    "Keep 'reason' to 1-3 short bullet points or sentences; "
-                    "do not include internal chain-of-thought."
-                )
-                api_messages = (
-                    [{"role": "system", "content": system_prefix}] + api_messages
-                )
-
-            payload = {
-                "model": model,
-                "messages": api_messages,
-                "temperature": 0.7,
-            }
-            url = "https://api.openai.com/v1/chat/completions"
-
-        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0, connect=15.0)) as client:
-            # Make API request with fallback logic
+        url = "https://api.openai.com/v1/responses"
+        
+        # Set timeout based on whether tools are involved
+        api_timeout = 60.0 if request.tools else 30.0
+        
+        print(f"🔍 Sending Responses API request to: {url}")
+        print(f"🔍 Model: {model} | Tools: {len(request.tools) if request.tools else 0} | Timeout: {api_timeout}s")
+        
+        # Make the Responses API call
+        async with httpx.AsyncClient(timeout=httpx.Timeout(api_timeout, connect=15.0)) as client:
+            # Make Responses API request
             try:
                 resp = await client.post(url, json=payload, headers=headers)
-            except (httpx.ReadTimeout, httpx.TimeoutException):
-                # Fall back to Chat Completions if Responses API timed out
-                if use_responses_api and url.endswith("/responses"):
-                    fallback_payload = {
-                        "model": model,
-                        "messages": api_messages,
-                        "temperature": 0.7,
-                    }
-                    resp = await client.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        json=fallback_payload,
-                        headers=headers,
-                    )
-                else:
-                    raise HTTPException(status_code=504, detail="Upstream timeout from OpenAI")
+            except (httpx.ReadTimeout, httpx.TimeoutException) as e:
+                print(f"⚠️  Responses API timed out after {api_timeout}s: {e}")
+                raise HTTPException(status_code=504, detail=f"Responses API timeout after {api_timeout}s")
 
-            # Handle API response
+            # Handle API response errors
             if resp.status_code != 200:
-                # Try fallback to Chat Completions if Responses API fails
-                if use_responses_api and url.endswith("/responses"):
-                    fallback_payload = {
-                        "model": model,
-                        "messages": api_messages,
-                        "temperature": 0.7,
-                    }
-                    resp = await client.post(
-                        "https://api.openai.com/v1/chat/completions",
-                        json=fallback_payload,
-                        headers=headers
-                    )
-                    if resp.status_code != 200:
-                        raise HTTPException(status_code=resp.status_code, detail=resp.text)
-                else:
-                    raise HTTPException(status_code=resp.status_code, detail=resp.text)
+                print(f"❌ Responses API failed with status {resp.status_code}")
+                print(f"❌ Error response: {resp.text}")
+                raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
             data = resp.json()
 
-            if use_responses_api and url.endswith("/responses"):
-                # Handle Responses API response
-                status_val = data.get("status")
-                response_id = data.get("id")
-                try:
-                    attempts_remaining = 12
-                    while status_val in {"in_progress", "queued"} and attempts_remaining > 0 and response_id:
-                        await asyncio.sleep(0.4)
-                        poll = await client.get(f"https://api.openai.com/v1/responses/{response_id}", headers=headers)
-                        if poll.status_code != 200:
-                            break
-                        data = poll.json()
-                        status_val = data.get("status")
-                        attempts_remaining -= 1
-                except Exception:
-                    pass
-
-                # Parse Responses API output
-                content = _stringify_text(data.get("output_text") or "")
-                if not content:
-                    output_items = data.get("output", [])
-                    if isinstance(output_items, list):
-                        parts: List[str] = []
-                        for item in output_items:
-                            if not isinstance(item, dict):
-                                continue
-                            item_type = item.get("type")
-                            if item_type == "output_text":
-                                parts.append(_stringify_text(item.get("text")))
-                                continue
-                            if item_type == "message":
-                                for block in item.get("content", []) or []:
-                                    if not isinstance(block, dict):
-                                        continue
-                                    block_type = block.get("type")
-                                    if block_type == "output_text":
-                                        parts.append(_stringify_text(block.get("text")))
-                        content = "".join(parts)
-
-                # Extract reasoning if available
-                if request.include_reasoning or request.reasoning_summary != "never":
-                    reasoning_data = data.get("reasoning", {})
-                    if isinstance(reasoning_data, dict):
-                        reasoning = reasoning_data.get("summary", "")
-
-                if not content:
-                    content = "I received your message but couldn't generate a proper response. Please try again."
-                else:
-                    content = _stringify_text(content)
-            else:
-                # Handle Chat Completions API response
-                content = (
-                    data.get("choices", [{}])[0]
-                    .get("message", {})
-                    .get("content", "")
-                ) or ""
-                if request.include_reasoning:
-                    try:
-                        parsed = json.loads(content)
-                        if isinstance(parsed, dict):
-                            maybe = str(parsed.get("reason", ""))
-                            if maybe:
-                                reasoning = maybe
-                            content = str(parsed.get("answer", content))
-                    except Exception:
-                        pass
-
-            # Extract sources from content (URLs)
+            # Handle Responses API response (always using Responses API now)
+            # Handle Responses API response
+            status_val = data.get("status")
+            response_id = data.get("id")
             try:
-                sources = []
-                if isinstance(content, str) and content:
-                    raw_urls = re.findall(r"https?://[^\s)]+", content)
-                    seen = set()
-                    for u in raw_urls:
-                        cleaned = u.rstrip('.,);]')
-                        if cleaned in seen:
-                            continue
-                        seen.add(cleaned)
-                        try:
-                            parsed = urlparse(cleaned)
-                            if parsed.scheme in {"http", "https"} and parsed.netloc:
-                                sources.append({
-                                    "url": cleaned,
-                                    "site": parsed.netloc,
-                                    "favicon": f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64",
-                                })
-                        except Exception:
-                            continue
-                    if sources:
-                        sources = sources[:8]
-                    else:
-                        sources = None
+                # Reduce polling frequency and cap attempts for faster tool responses
+                attempts_remaining = 8  # Reduced from 12
+                while status_val in {"in_progress", "queued"} and attempts_remaining > 0 and response_id:
+                    await asyncio.sleep(0.25)  # Reduced from 0.4s
+                    poll = await client.get(f"https://api.openai.com/v1/responses/{response_id}", headers=headers)
+                    if poll.status_code != 200:
+                        break
+                    data = poll.json()
+                    status_val = data.get("status")
+                    attempts_remaining -= 1
             except Exception:
-                sources = None
+                pass
+
+            # Parse Responses API output
+            content = _stringify_text(data.get("output_text") or "")
+            if not content:
+                output_items = data.get("output", [])
+                if isinstance(output_items, list):
+                    parts: List[str] = []
+                    for item in output_items:
+                        if not isinstance(item, dict):
+                            continue
+                        item_type = item.get("type")
+                        if item_type == "output_text":
+                            parts.append(_stringify_text(item.get("text")))
+                            continue
+                        if item_type == "message":
+                            for block in item.get("content", []) or []:
+                                if not isinstance(block, dict):
+                                    continue
+                                block_type = block.get("type")
+                                if block_type == "output_text":
+                                    parts.append(_stringify_text(block.get("text")))
+                    content = "".join(parts)
+
+            # Extract reasoning if available
+            if request.include_reasoning or request.reasoning_summary != "never":
+                reasoning_data = data.get("reasoning", {})
+                if isinstance(reasoning_data, dict):
+                    reasoning = reasoning_data.get("summary", "")
+
+            if not content:
+                content = "I received your message but couldn't generate a proper response. Please try again."
+            else:
+                content = _stringify_text(content)
+
+        # Extract sources from content (URLs)
+        try:
+            sources = []
+            if isinstance(content, str) and content:
+                raw_urls = re.findall(r"https?://[^\s)]+", content)
+                print(f"🔍 Found {len(raw_urls)} URLs in content")
+                seen = set()
+                for u in raw_urls:
+                    cleaned = u.rstrip('.,);]')
+                    if cleaned in seen:
+                        continue
+                    seen.add(cleaned)
+                    try:
+                        parsed = urlparse(cleaned)
+                        if parsed.scheme in {"http", "https"} and parsed.netloc:
+                            # Try multiple favicon services for better reliability
+                            favicon_urls = [
+                                f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64",
+                                f"https://favicon.io/favicon/{parsed.netloc}/64",
+                                f"https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={parsed.netloc}&size=64"
+                            ]
+                            
+                            sources.append({
+                                "url": cleaned,
+                                "site": parsed.netloc,
+                                "favicon": favicon_urls[0],  # Use first one as primary
+                                "favicon_fallbacks": favicon_urls[1:],  # Store fallbacks
+                            })
+                    except Exception:
+                        continue
+                if sources:
+                    sources = sources[:8]
+                    print(f"✅ Extracted {len(sources)} sources: {[s['site'] for s in sources]}")
+                else:
+                    sources = None
+                    print("ℹ️ No sources found in content")
+        except Exception as e:
+            sources = None
+            print(f"❌ Error extracting sources: {e}")
 
             # Enrich sources with thumbnails (Open Graph images)
             if sources:
@@ -484,6 +473,10 @@ async def send_chat_message(
                 except Exception:
                     pass
 
+        # Add API selection info to response metadata
+        api_used = "Responses API"
+        print(f"✅ Response generated using {api_used}")
+        
         # Add assistant response to storage
         if use_fallback:
             # Add to in-memory storage
@@ -524,6 +517,11 @@ async def send_chat_message(
             "created_at": datetime.now().isoformat()
         }
         
+        # Debug logging for response
+        print(f"🔍 Final response sources: {sources}")
+        print(f"🔍 Sources type: {type(sources)}")
+        print(f"🔍 Sources length: {len(sources) if sources else 'None'}")
+
         return ChatResponse(
             conversation_id=conversation_id,
             user_message=user_message,
@@ -535,6 +533,7 @@ async def send_chat_message(
     except HTTPException:
         raise
     except Exception as e:
+            
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Chat error: {str(e)}"

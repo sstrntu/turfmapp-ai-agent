@@ -20,7 +20,7 @@ class PreferencesUpdate(BaseModel):
 class PreferencesResponse(BaseModel):
     """User preferences response model"""
     system_prompt: Optional[str] = None
-    default_model: str = "gpt-4o-mini"
+    default_model: str = "gpt-4o"
 
 
 @router.get("/me", response_model=PreferencesResponse)
@@ -34,7 +34,7 @@ async def get_user_preferences(
         
         return PreferencesResponse(
             system_prompt=prefs.get("system_prompt"),
-            default_model=prefs.get("default_model", "gpt-4o-mini")
+            default_model=prefs.get("default_model", "gpt-4o")
         )
         
     except Exception as e:
@@ -68,7 +68,7 @@ async def update_user_preferences(
         prefs = user_preferences[user_id]
         return PreferencesResponse(
             system_prompt=prefs.get("system_prompt"),
-            default_model=prefs.get("default_model", "gpt-4o-mini")
+            default_model=prefs.get("default_model", "gpt-4o")
         )
         
     except Exception as e:

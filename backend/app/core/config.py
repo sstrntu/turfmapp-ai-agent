@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     
     # OpenAI
     openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY")
-    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
     
     # App settings
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")

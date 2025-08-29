@@ -137,7 +137,7 @@ class ConversationService:
     """Service for managing conversations and messages in PostgreSQL"""
     
     @staticmethod
-    async def create_conversation(user_id: str, title: str = None, model: str = "gpt-4o-mini", system_prompt: str = None) -> Dict[str, Any]:
+    async def create_conversation(user_id: str, title: str = None, model: str = "gpt-4o", system_prompt: str = None) -> Dict[str, Any]:
         """Create a new conversation"""
         try:
             # Ensure user exists before creating conversation

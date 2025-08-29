@@ -26,7 +26,7 @@ class Conversation(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, server_default=func.gen_random_uuid())
     user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("turfmapp_agent.users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    model: Mapped[str] = mapped_column(String, default="gpt-4o-mini")
+    model: Mapped[str] = mapped_column(String, default="gpt-4o")
     system_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Snapshot of user's system prompt at conversation start
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -61,7 +61,7 @@ class Message(Base):
 # Pydantic models for API
 class ConversationCreate(BaseModel):
     title: Optional[str] = None
-    model: str = "gpt-4o-mini"
+    model: str = "gpt-4o"
     system_prompt: Optional[str] = None
 
 
