@@ -2069,3 +2069,25 @@ body.panel-open .app-header {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(138, 43, 226, 0.2);
 }
+
+/* ========================================================================
+   PAGE-SPECIFIC SIDEBAR OVERRIDES
+   ======================================================================== */
+
+/* Move sidebar menus up for admin/profile pages (no chat history needed) */
+body[data-page="admin"] .panel-bottom-menu,
+body[data-page="profile"] .panel-bottom-menu {
+    margin-top: 0;  /* Remove auto margin that pushes to bottom */
+    padding-top: 8px;  /* Reduce top padding */
+}
+
+body[data-page="admin"] .left-panel-content,
+body[data-page="profile"] .left-panel-content {
+    justify-content: flex-start;  /* Align content to top instead of space-between */
+    padding-top: 16px;  /* Add some top padding */
+}
+
+/* Keep home page sidebar menus at bottom (for chat history) */
+body:not([data-page="admin"]):not([data-page="profile"]) .panel-bottom-menu {
+    margin-top: auto;  /* Ensure home page keeps auto margin */
+}

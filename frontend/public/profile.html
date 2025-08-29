@@ -132,9 +132,20 @@
             color: rgba(255, 255, 255, 0.6);
         }
         
+        /* Move sidebar menus up for profile page */
+        body[data-page="profile"] .panel-bottom-menu {
+            margin-top: 0;  /* Remove auto margin */
+            padding-top: 8px;  /* Reduce padding */
+        }
+
+        body[data-page="profile"] .left-panel-content {
+            justify-content: flex-start;  /* Align to top */
+            padding-top: 16px;  /* Add top padding */
+        }
+        
     </style>
 </head>
-<body>
+<body data-page="profile">
     <!-- Sphere background -->
     <div class="app-background">
         <div class="sphere" aria-hidden="true">
