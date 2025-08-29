@@ -914,11 +914,12 @@
         // Load available tools from backend
         async function loadAvailableTools() {
             try {
-                const response = await fetch('/api/fal-tools/available');
+                const response = await fetch('/api/v1/fal-tools/available');
                 if (response.ok) {
                     availableTools = await response.json();
+                    console.log('Loaded available tools:', availableTools);
                 } else {
-                    console.error('Failed to load available tools');
+                    console.error('Failed to load available tools:', response.status, response.statusText);
                 }
             } catch (error) {
                 console.error('Error loading available tools:', error);
@@ -928,11 +929,17 @@
         // Initialize tool buttons
         function initializeFALTools() {
             const toolButtons = document.querySelectorAll('.fal-tool');
+            console.log('Found FAL tool buttons:', toolButtons.length);
             toolButtons.forEach(button => {
+                console.log('Initializing button:', button.id, button.dataset.tool);
                 button.addEventListener('click', function() {
+                    console.log('FAL tool button clicked:', this.id, this.dataset.tool);
                     const toolId = this.dataset.tool;
                     if (toolId && availableTools[toolId]) {
+                        console.log('Activating FAL tool:', toolId);
                         activateFALTool(toolId);
+                    } else {
+                        console.error('Tool not available:', toolId, 'Available tools:', availableTools);
                     }
                 });
             });
@@ -1102,7 +1109,7 @@
 
             try {
                 // Make API call to backend
-                const response = await fetch(`/api/fal-tools/${toolId}`, {
+                const response = await fetch(`/api/v1/fal-tools/${toolId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

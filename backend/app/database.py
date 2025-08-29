@@ -9,14 +9,6 @@ import ssl
 import asyncio
 
 # Database configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
-
-print(f"Supabase URL: {SUPABASE_URL}")
-print(f"Service role key present: {bool(SUPABASE_SERVICE_ROLE_KEY)}")
-print(f"Database URL present: {bool(SUPABASE_DB_URL)}")
-
 def _ensure_sslmode(url: str) -> str:
     """Append sslmode=require to the connection string if missing."""
     if not url:
@@ -26,6 +18,21 @@ def _ensure_sslmode(url: str) -> str:
         return url
     separator = '&' if '?' in url else '?'
     return f"{url}{separator}sslmode=require"
+
+
+# Database configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
+
+# Database URL setup
+DATABASE_URL = os.getenv("DATABASE_URL") or SUPABASE_DB_URL
+if DATABASE_URL:
+    DATABASE_URL = _ensure_sslmode(DATABASE_URL)
+
+print(f"Supabase URL: {SUPABASE_URL}")
+print(f"Service role key present: {bool(SUPABASE_SERVICE_ROLE_KEY)}")
+print(f"Database URL present: {bool(SUPABASE_DB_URL)}")
 
 
 def get_supabase_config():

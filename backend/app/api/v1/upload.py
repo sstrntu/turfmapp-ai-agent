@@ -18,7 +18,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 ALLOWED_EXTENSIONS = {
     'image': {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'},
     'video': {'.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm'},
-    'audio': {'.mp3', '.wav', '.ogg', '.m4a', '.flac'},
+    'audio': {'.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac'},
     'document': {'.pdf', '.doc', '.docx', '.txt', '.rtf'},
     'data': {'.json', '.csv', '.xml', '.xlsx'}
 }
@@ -41,7 +41,7 @@ def get_file_type(filename: str) -> str:
     for file_type, extensions in ALLOWED_EXTENSIONS.items():
         if suffix in extensions:
             return file_type
-    return 'unknown'
+    return 'other'
 
 
 @router.post("/", response_model=UploadResponse)
@@ -49,7 +49,7 @@ async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
     """Upload a file and return file information"""
     
     if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
+        raise HTTPException(status_code=400, detail="No filename provided")
     
     # Check file size
     contents = await file.read()
@@ -58,7 +58,7 @@ async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
     
     # Check file type
     file_type = get_file_type(file.filename)
-    if file_type == 'unknown':
+    if file_type == 'other':
         raise HTTPException(status_code=400, detail="File type not allowed")
     
     # Generate unique filename

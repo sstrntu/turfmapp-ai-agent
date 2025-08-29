@@ -1,0 +1,413 @@
+"""
+Test Authentication Module
+
+Tests for app.core.auth module following code.md standards.
+Comprehensive coverage for authentication and authorization functions.
+"""
+
+from __future__ import annotations
+
+import pytest
+from unittest.mock import Mock, AsyncMock, patch
+from datetime import datetime
+from fastapi import HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
+
+from app.core.auth import (
+    verify_supabase_token,
+    get_current_user,
+    get_current_admin_user,
+    get_current_super_admin_user,
+    get_current_user_optional
+)
+from app.models.user import User, UserRole, UserStatus
+from app.models.auth import PublicUser
+
+
+class TestVerifySupabaseToken:
+    """Test Supabase token verification functionality."""
+
+    @pytest.mark.asyncio
+    async def test_verify_valid_token(self, mock_httpx_client: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test verification of valid Supabase token.
+        
+        Args:
+            mock_httpx_client: Mock HTTP client
+            monkeypatch: pytest fixture for environment variables
+        """
+        # Set up environment
+        monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+        monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
+        
+        # Mock successful response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "test-user-id",
+            "email": "test@example.com",
+            "user_metadata": {
+                "full_name": "Test User",
+                "avatar_url": "https://example.com/avatar.jpg"
+            }
+        }
+        mock_httpx_client.get.return_value = mock_response
+        
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
+            result = await verify_supabase_token("test-token")
+        
+        assert result is not None
+        assert isinstance(result, PublicUser)
+        assert result.id == "test-user-id"
+        assert result.email == "test@example.com"
+        assert result.name == "Test User"
+        assert result.avatar_url == "https://example.com/avatar.jpg"
+
+    @pytest.mark.asyncio
+    async def test_verify_token_with_minimal_user_data(self, mock_httpx_client: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test verification with minimal user data.
+        
+        Args:
+            mock_httpx_client: Mock HTTP client
+            monkeypatch: pytest fixture for environment variables
+        """
+        monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+        monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
+        
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "test-user-id",
+            "email": "test@example.com"
+        }
+        mock_httpx_client.get.return_value = mock_response
+        
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
+            result = await verify_supabase_token("test-token")
+        
+        assert result is not None
+        assert result.id == "test-user-id"
+        assert result.email == "test@example.com"
+        assert result.name is None
+        assert result.avatar_url is None
+
+    @pytest.mark.asyncio
+    async def test_verify_token_missing_supabase_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test verification when SUPABASE_URL is not configured.
+        
+        Args:
+            monkeypatch: pytest fixture for environment variables
+        """
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        
+        result = await verify_supabase_token("test-token")
+        
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_verify_invalid_token(self, mock_httpx_client: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test verification of invalid token.
+        
+        Args:
+            mock_httpx_client: Mock HTTP client
+            monkeypatch: pytest fixture for environment variables
+        """
+        monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+        monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
+        
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_httpx_client.get.return_value = mock_response
+        
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
+            result = await verify_supabase_token("invalid-token")
+        
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_verify_token_network_error(self, mock_httpx_client: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test verification with network error.
+        
+        Args:
+            mock_httpx_client: Mock HTTP client
+            monkeypatch: pytest fixture for environment variables
+        """
+        monkeypatch.setenv("SUPABASE_URL", "https://test.supabase.co")
+        monkeypatch.setenv("SUPABASE_ANON_KEY", "test-anon-key")
+        
+        mock_httpx_client.get.side_effect = Exception("Network error")
+        
+        with patch("httpx.AsyncClient", return_value=mock_httpx_client):
+            result = await verify_supabase_token("test-token")
+        
+        assert result is None
+
+
+class TestGetCurrentUser:
+    """Test current user authentication dependency."""
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_valid_token(self, mock_db_session: Mock, mock_user: User) -> None:
+        """Test getting current user with valid token.
+        
+        Args:
+            mock_db_session: Mock database session
+            mock_user: Mock user instance
+        """
+        # Mock credentials
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+        
+        # Mock verify_supabase_token
+        public_user = PublicUser(
+            id=mock_user.id,
+            email=mock_user.email,
+            name=mock_user.name
+        )
+        
+        # Mock database query
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_user
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=public_user):
+            result = await get_current_user(credentials, mock_db_session)
+        
+        assert result == mock_user
+        assert mock_user.last_login_at is not None
+        mock_db_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_missing_credentials(self, mock_db_session: Mock) -> None:
+        """Test getting current user with missing credentials.
+        
+        Args:
+            mock_db_session: Mock database session
+        """
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_user(None, mock_db_session)
+        
+        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "Missing authentication token" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_invalid_token(self, mock_db_session: Mock) -> None:
+        """Test getting current user with invalid token.
+        
+        Args:
+            mock_db_session: Mock database session
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=None):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(credentials, mock_db_session)
+        
+        assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+        assert "Invalid authentication token" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_not_found_in_db(self, mock_db_session: Mock) -> None:
+        """Test getting current user not found in database.
+        
+        Args:
+            mock_db_session: Mock database session
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+        
+        public_user = PublicUser(
+            id="nonexistent-user-id",
+            email="test@example.com",
+            name="Test User"
+        )
+        
+        mock_db_session.query.return_value.filter.return_value.first.return_value = None
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=public_user):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(credentials, mock_db_session)
+        
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+        assert "User not found" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_inactive_status(self, mock_db_session: Mock, mock_user: User) -> None:
+        """Test getting current user with inactive status.
+        
+        Args:
+            mock_db_session: Mock database session
+            mock_user: Mock user instance
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+        
+        # Set user as inactive
+        mock_user.status = UserStatus.SUSPENDED
+        
+        public_user = PublicUser(
+            id=mock_user.id,
+            email=mock_user.email,
+            name=mock_user.name
+        )
+        
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_user
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=public_user):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_current_user(credentials, mock_db_session)
+        
+        assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+        assert "Account is not active" in exc_info.value.detail
+
+
+class TestGetCurrentAdminUser:
+    """Test admin user authentication dependency."""
+
+    @pytest.mark.asyncio
+    async def test_get_admin_user_valid_admin(self, mock_admin_user: User) -> None:
+        """Test getting admin user with valid admin role.
+        
+        Args:
+            mock_admin_user: Mock admin user instance
+        """
+        result = await get_current_admin_user(mock_admin_user)
+        
+        assert result == mock_admin_user
+
+    @pytest.mark.asyncio
+    async def test_get_admin_user_valid_super_admin(self, mock_super_admin_user: User) -> None:
+        """Test getting admin user with super admin role.
+        
+        Args:
+            mock_super_admin_user: Mock super admin user instance
+        """
+        result = await get_current_admin_user(mock_super_admin_user)
+        
+        assert result == mock_super_admin_user
+
+    @pytest.mark.asyncio
+    async def test_get_admin_user_regular_user(self, mock_user: User) -> None:
+        """Test getting admin user with regular user role.
+        
+        Args:
+            mock_user: Mock regular user instance
+        """
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_admin_user(mock_user)
+        
+        assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+        assert "Admin privileges required" in exc_info.value.detail
+
+
+class TestGetCurrentSuperAdminUser:
+    """Test super admin user authentication dependency."""
+
+    @pytest.mark.asyncio
+    async def test_get_super_admin_user_valid(self, mock_super_admin_user: User) -> None:
+        """Test getting super admin user with valid role.
+        
+        Args:
+            mock_super_admin_user: Mock super admin user instance
+        """
+        result = await get_current_super_admin_user(mock_super_admin_user)
+        
+        assert result == mock_super_admin_user
+
+    @pytest.mark.asyncio
+    async def test_get_super_admin_user_regular_admin(self, mock_admin_user: User) -> None:
+        """Test getting super admin user with regular admin role.
+        
+        Args:
+            mock_admin_user: Mock admin user instance
+        """
+        with pytest.raises(HTTPException) as exc_info:
+            await get_current_super_admin_user(mock_admin_user)
+        
+        assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+        assert "Super admin privileges required" in exc_info.value.detail
+
+
+class TestGetCurrentUserOptional:
+    """Test optional user authentication dependency."""
+
+    @pytest.mark.asyncio
+    async def test_get_optional_user_valid_token(self, mock_db_session: Mock, mock_user: User) -> None:
+        """Test getting optional user with valid token.
+        
+        Args:
+            mock_db_session: Mock database session
+            mock_user: Mock user instance
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+        
+        public_user = PublicUser(
+            id=mock_user.id,
+            email=mock_user.email,
+            name=mock_user.name
+        )
+        
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_user
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=public_user):
+            result = await get_current_user_optional(mock_db_session, credentials)
+        
+        assert result == mock_user
+
+    @pytest.mark.asyncio
+    async def test_get_optional_user_no_credentials_returns_none(self, mock_db_session: Mock) -> None:
+        """Test getting optional user with no credentials returns None.
+        
+        Args:
+            mock_db_session: Mock database session
+        """
+        result = await get_current_user_optional(mock_db_session, None)
+        
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_optional_user_invalid_token_returns_none(self, mock_db_session: Mock) -> None:
+        """Test getting optional user with invalid token returns None.
+        
+        Args:
+            mock_db_session: Mock database session
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid-token")
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=None):
+            result = await get_current_user_optional(mock_db_session, credentials)
+        
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_optional_user_inactive_returns_none(self, mock_db_session: Mock, mock_user: User) -> None:
+        """Test getting optional user with inactive status returns None.
+        
+        Args:
+            mock_db_session: Mock database session
+            mock_user: Mock user instance
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+        
+        mock_user.status = UserStatus.SUSPENDED
+        
+        public_user = PublicUser(
+            id=mock_user.id,
+            email=mock_user.email,
+            name=mock_user.name
+        )
+        
+        mock_db_session.query.return_value.filter.return_value.first.return_value = mock_user
+        
+        with patch("app.core.auth.verify_supabase_token", return_value=public_user):
+            result = await get_current_user_optional(mock_db_session, credentials)
+        
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_optional_user_exception_returns_none(self, mock_db_session: Mock) -> None:
+        """Test getting optional user with exception returns None.
+        
+        Args:
+            mock_db_session: Mock database session
+        """
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token")
+        
+        with patch("app.core.auth.verify_supabase_token", side_effect=Exception("Token verification failed")):
+            result = await get_current_user_optional(mock_db_session, credentials)
+        
+        assert result is None

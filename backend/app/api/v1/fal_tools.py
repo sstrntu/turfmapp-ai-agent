@@ -188,7 +188,7 @@ async def generate_sound_effect(
                 success=True,
                 tool_id="sound-effects",
                 result={
-                    "audio_file": f"/api/fal-tools/media/{local_filename}",
+                    "audio_file": f"/api/v1/fal-tools/media/{local_filename}",
                     "original_url": audio_url,
                     "prompt": request.prompt,
                     "duration": request.duration,
