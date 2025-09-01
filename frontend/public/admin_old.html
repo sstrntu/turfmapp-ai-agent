@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - Admin</title>
+    <meta name="description" content="Admin configuration">
+    <link rel="stylesheet" href="styles/home.css">
+    <link rel="stylesheet" href="styles/sphere.css">
+    <style>
+        html, body { 
+            min-height: 100vh; 
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        body {
+            margin: 0;
+            font-family: 'DANSON', sans-serif;
+            position: relative;
+            background: url('AdminBackground.jpg') center center/cover no-repeat fixed;
+        }
+
+        /* Override shared app-background to use Admin page image */
+        .app-background {
+            background: url('AdminBackground.jpg') center center/cover no-repeat;
+            background-attachment: scroll;
+        }
+
+        /* Pull main content and section closer to header */
+        .main-content { padding: var(--spacing-lg) 0 var(--spacing-xl); }
+        .profile-section { margin-top: var(--spacing-md); }
+        
+        
+        .announcement-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .announcement-label {
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .announcement-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            font-weight: 500;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .admin-note { color: var(--color-secondary); font-size: 0.95rem; }
+        .form-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px 16px; align-items: center; }
+        .form-row .label { color: var(--color-tertiary); }
+        .text-input {
+            width: 100%;
+            background: rgba(0,0,0,0.35);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            outline: none;
+        }
+        .save-btn {
+            background: rgba(255,255,255,0.14);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .save-btn:hover {
+            background: rgba(255,255,255,0.22);
+            border-color: var(--color-border-hover);
+            transform: translateY(-1px);
+        }
+        
+        /* Tool Checkboxes */
+        .tool-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--color-primary);
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .tool-checkbox:hover {
+            color: var(--color-border-hover);
+        }
+        .tool-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .tool-checkbox input[type="checkbox"]:checked {
+            background: rgba(255,255,255,0.2);
+            border-color: var(--color-border-hover);
+        }
+        .tool-checkbox input[type="checkbox"]:checked::after {
+            content: "✓";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--color-primary);
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        /* Move sidebar menus up for admin page */
+        body[data-page="admin"] .panel-bottom-menu {
+            margin-top: 0;  /* Remove auto margin */
+            padding-top: 8px;  /* Reduce padding */
+        }
+
+        body[data-page="admin"] .left-panel-content {
+            justify-content: flex-start;  /* Align to top */
+            padding-top: 16px;  /* Add top padding */
+        }
+    </style>
+</head>
+<body data-page="admin">
+    <!-- Sphere background -->
+    <div class="app-background">
+        <div class="sphere" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+    </div>
+    
+    <header class="app-header" role="banner">
+        <div class="header-container">
+            <div class="brand-section">
+                <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="left-panel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <h1 class="app-title">TURFMAPP</h1>
+            </div>
+            
+            <div class="top-actions">
+                <div class="announcement-display" id="announcement-display" style="display: none;">
+                    <span class="announcement-label">Announcement:</span>
+                    <span class="announcement-text" id="announcement-text-display"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content" role="main">
+        <div class="content-container">
+            <section class="profile-section" aria-labelledby="admin-title">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar-lg" aria-hidden="true"></div>
+                        <div>
+                            <h2 id="admin-title" class="profile-title">Administration</h2>
+                            <p class="admin-note">Manage roles and configuration (placeholders).</p>
+                        </div>
+                    </div>
+
+                    <div class="profile-grid" style="row-gap: 18px;">
+                        <!-- Announcement Section -->
+                        <div class="form-row">
+                            <div class="label">Announcement</div>
+                            <div class="admin-note">Set announcement text that appears on all pages</div>
+                        </div>
+                        
+                        <div class="form-row" style="align-items: start;">
+                            <div class="label">Message</div>
+                            <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                                <textarea id="announcement-text" class="textarea-input" placeholder="Enter announcement message..." rows="2"></textarea>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" id="save-announcement" class="save-btn">Save Announcement</button>
+                                    <button type="button" id="clear-announcement" class="save-btn" style="background: rgba(255,100,100,0.14);">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- LLM Configuration Section -->
+                        <div class="form-row">
+                            <div class="label">LLM Configuration</div>
+                            <div class="admin-note">Configure OpenAI Responses API settings - All models use Responses API with intelligent tool calling</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">API Settings</div>
+                            <div class="admin-note">OpenAI API key is loaded from .env (OPENAI_API_KEY). No key entry here.</div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="label">Model</div>
+                            <select id="chat-model" class="select-input">
+                                <option value="gpt-4o">gpt-4o (Default, Fast & Reliable)</option>
+                                <option value="gpt-5-mini">gpt-5-mini (Latest, Experimental)</option>
+                            </select>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">All models use Responses API with automatic tool calling</div>
+                        </div>
+                        
+                        <!-- Tools Configuration Section -->
+                        <div class="form-row" style="align-items: start;">
+                            <div class="label">Tools Configuration</div>
+                            <div style="display: flex; flex-direction: column; gap: 12px;">
+                                <!-- Web Search Tool (Working) -->
+                                <div class="tool-section">
+                                    <label class="tool-checkbox">
+                                        <input type="checkbox" id="tool-web-search" checked>
+                                        <span>Web Search Preview</span>
+                                    </label>
+                                    <div class="tool-config" style="margin-left: 24px; margin-top: 4px;">
+                                        <label style="font-size: 0.8rem; color: var(--color-tertiary);">
+                                            Search Context:
+                                            <select id="web-search-context" class="select-input" style="font-size: 0.8rem; margin-left: 8px;">
+                                                <option value="small">Small</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="large">Large</option>
+                                            </select>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Image Generation Tool (Placeholder for future) -->
+                                <div class="tool-section">
+                                    <label class="tool-checkbox">
+                                        <input type="checkbox" id="tool-image-generation" disabled>
+                                        <span>Image Generation</span>
+                                        <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
+                                    </label>
+                                </div>
+                                
+                                <!-- MCP Integration Tool (Placeholder for future) -->
+                                <div class="tool-section">
+                                    <label class="tool-checkbox">
+                                        <input type="checkbox" id="tool-mcp" disabled>
+                                        <span>MCP Integration</span>
+                                        <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="admin-note" style="grid-column: 2; margin-top: 4px;">Configure available tools and their settings</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button class="save-btn" id="save-chat-settings" title="Save LLM settings to this browser">Save Settings</button>
+                        <button class="outline-action-btn" id="reset-form" title="Reset all settings to defaults">Reset to Defaults</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/announcement.js"></script>
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-auth.js"></script>
+    <script src="scripts/ui.js"></script>
+    <script src="scripts/chat.js"></script>
+    <script>
+        // Load existing local settings
+        (function(){
+            try {
+                // Load basic settings
+                var model = localStorage.getItem('tm_model');
+                var announcement = localStorage.getItem('announcement') || '';
+                
+                // Load tool settings
+                var toolWebSearch = localStorage.getItem('tm_tool_web_search') || 'true';
+                var webSearchContext = localStorage.getItem('tm_web_search_context') || 'medium';
+                
+                // Set basic settings
+                if (document.getElementById('announcement-text')) {
+                    document.getElementById('announcement-text').value = announcement;
+                }
+                if (model && document.getElementById('chat-model')) {
+                    document.getElementById('chat-model').value = model;
+                }
+                
+                // Set tool settings
+                if (document.getElementById('tool-web-search')) {
+                    document.getElementById('tool-web-search').checked = toolWebSearch === 'true';
+                }
+                if (document.getElementById('web-search-context')) {
+                    document.getElementById('web-search-context').value = webSearchContext;
+                }
+                
+            } catch (e) {
+                console.error('Error loading settings:', e);
+            }
+        })();
+
+        // Save LLM settings to localStorage (browser)
+        document.getElementById('save-chat-settings')?.addEventListener('click', function () {
+            try {
+                // Get basic settings
+                var model = document.getElementById('chat-model')?.value || '';
+                
+                // Get tool settings
+                var toolWebSearch = document.getElementById('tool-web-search')?.checked || false;
+                var webSearchContext = document.getElementById('web-search-context')?.value || 'medium';
+                
+                // Save settings
+                if (model) localStorage.setItem('tm_model', model);
+                localStorage.setItem('tm_tool_web_search', toolWebSearch.toString());
+                localStorage.setItem('tm_web_search_context', webSearchContext);
+                
+                alert('Settings saved successfully!');
+            } catch (e) {
+                alert('Unable to save settings: ' + (e && e.message ? e.message : 'unknown error'));
+            }
+        });
+
+        // Reset form to defaults
+        document.getElementById('reset-form')?.addEventListener('click', function () {
+            if (confirm('Are you sure you want to reset all settings to defaults? This will clear all saved configurations.')) {
+                // Clear localStorage
+                const keys = Object.keys(localStorage).filter(key => key.startsWith('tm_'));
+                keys.forEach(key => localStorage.removeItem(key));
+                
+                // Reset form values to defaults
+                if (document.getElementById('chat-model')) document.getElementById('chat-model').value = 'gpt-4o';
+                if (document.getElementById('tool-web-search')) document.getElementById('tool-web-search').checked = true;
+                if (document.getElementById('web-search-context')) document.getElementById('web-search-context').value = 'medium';
+                
+                alert('Settings reset to defaults.');
+            }
+        });
+    </script>
+    
+    <!-- Left sidebar panel -->
+    <aside id="left-panel" class="left-panel" aria-hidden="true">
+        <div class="left-panel-inner">
+            <div class="left-panel-header">
+                <button id="btn-new-chat" class="new-chat-btn" type="button" onclick="window.location.href='home.html'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    New chat
+                </button>
+                <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="left-panel-content">
+                <!-- Bottom Menu Section -->
+                <div class="panel-bottom-menu">
+                    <a href="home.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Home</span>
+                    </a>
+                    <a href="profile.html" class="menu-item profile-item">
+                        <span class="profile-thumb" aria-hidden="true"></span>
+                        <span>Profile</span>
+                    </a>
+                    <a href="admin.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span>Admin</span>
+                    </a>
+                    <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        // Initialize left panel toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('left-panel-toggle');
+            const closeBtn = document.getElementById('left-panel-close');
+            const panel = document.getElementById('left-panel');
+            
+            if (toggleBtn && panel) {
+                toggleBtn.addEventListener('click', function() {
+                    panel.classList.toggle('open');
+                    toggleBtn.setAttribute('aria-expanded', panel.classList.contains('open'));
+                    panel.setAttribute('aria-hidden', !panel.classList.contains('open'));
+                    document.body.classList.toggle('panel-open', panel.classList.contains('open'));
+                });
+            }
+            
+            if (closeBtn && panel) {
+                closeBtn.addEventListener('click', function() {
+                    panel.classList.remove('open');
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                    panel.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('panel-open');
+                });
+            }
+            
+            // Announcement functionality
+            const saveAnnouncementBtn = document.getElementById('save-announcement');
+            const clearAnnouncementBtn = document.getElementById('clear-announcement');
+            const announcementTextarea = document.getElementById('announcement-text');
+            
+            if (saveAnnouncementBtn && announcementTextarea) {
+                saveAnnouncementBtn.addEventListener('click', function() {
+                    const announcementText = announcementTextarea.value.trim();
+                    localStorage.setItem('announcement', announcementText);
+                    
+                    // Trigger storage event for other pages to update
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'announcement',
+                        newValue: announcementText
+                    }));
+                    
+                    alert('Announcement saved successfully!');
+                });
+            }
+            
+            if (clearAnnouncementBtn && announcementTextarea) {
+                clearAnnouncementBtn.addEventListener('click', function() {
+                    announcementTextarea.value = '';
+                    localStorage.removeItem('announcement');
+                    
+                    // Trigger storage event for other pages to update
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'announcement',
+                        newValue: ''
+                    }));
+                    
+                    alert('Announcement cleared successfully!');
+                });
+            }
+            
+            // Load and display announcement in header
+            // Initialize shared announcement header
+            Announcement.initHeader('announcement-display', 'announcement-text-display');
+            
+        });
+    </script>
+</body>
+</html>

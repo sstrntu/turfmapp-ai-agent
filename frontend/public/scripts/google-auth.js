@@ -90,6 +90,9 @@ const GoogleAuth = {
      */
     async signOut() {
         try {
+            // Clear admin cache on sign out
+            this.clearAdminCache();
+            
             await window.supabase.signOut();
             this.showStatus('Signed out successfully', 'success');
             
@@ -136,6 +139,118 @@ const GoogleAuth = {
             console.error('Auth status check error:', error);
             return null;
         }
+    },
+
+    /**
+     * Get current access token for API requests
+     */
+    getToken() {
+        const session = window.supabase?.session;
+        return session?.access_token || null;
+    },
+
+    /**
+     * Check if current user is authenticated
+     */
+    isAuthenticated() {
+        return window.supabase?.isSessionValid() || false;
+    },
+
+    /**
+     * Get current user information
+     */
+    getCurrentUser() {
+        return window.supabase?.getUser() || null;
+    },
+
+    /**
+     * Check if current user has admin privileges (cached for performance)
+     */
+    async isAdmin() {
+        try {
+            const token = this.getToken();
+            if (!token) return false;
+
+            // Check cache first (valid for 5 minutes)
+            const cacheKey = 'tm_user_admin_status';
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { isAdmin, timestamp, userToken } = JSON.parse(cached);
+                // Use cache if less than 5 minutes old and same token
+                if (Date.now() - timestamp < 300000 && userToken === token) {
+                    return isAdmin;
+                }
+            }
+
+            const response = await fetch('/api/v1/settings/profile', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const user = await response.json();
+                const isAdminUser = ['admin', 'super_admin'].includes(user.role);
+                
+                // Cache the result
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    isAdmin: isAdminUser,
+                    timestamp: Date.now(),
+                    userToken: token
+                }));
+                
+                return isAdminUser;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+            return false;
+        }
+    },
+
+    /**
+     * Ensure user is authenticated and redirect if not
+     */
+    requireAuth() {
+        if (!this.isAuthenticated()) {
+            window.location.href = '/portal.html';
+            return false;
+        }
+        return true;
+    },
+
+    /**
+     * Show/hide elements based on admin status (optimized for loading screen)
+     */
+    async setupAdminUI() {
+        // Get admin status (this will use cache if valid, or fetch fresh data)
+        const isAdmin = await this.isAdmin();
+        
+        // Apply UI changes only once after verification completes
+        this.applyAdminUI(isAdmin);
+
+        return isAdmin;
+    },
+
+    /**
+     * Apply admin UI changes
+     */
+    applyAdminUI(isAdmin) {
+        const adminElements = document.querySelectorAll('[data-admin-only]');
+        adminElements.forEach(element => {
+            if (isAdmin) {
+                element.style.display = element.dataset.adminDisplay || 'block';
+            } else {
+                element.style.display = 'none';
+            }
+        });
+    },
+
+    /**
+     * Clear admin cache (useful when user logs out or role changes)
+     */
+    clearAdminCache() {
+        localStorage.removeItem('tm_user_admin_status');
     }
 };
 

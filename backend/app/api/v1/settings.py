@@ -1,29 +1,28 @@
 from __future__ import annotations
 
-from typing import List, Optional, Annotated, Dict, Any
-
+from typing import Annotated, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from ...database import execute_query, execute_query_one
-from ...core.auth import get_current_user_supabase, get_current_admin_user_supabase
+from ...core.auth import get_current_user_supabase
 
 router = APIRouter()
 
 
-@router.get("/me")
-async def get_current_user_profile(
+@router.get("/profile")
+async def get_profile(
     current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
 ):
-    """Get current user's profile"""
+    """Get current user profile"""
     return current_user
 
 
-@router.put("/me")
-async def update_current_user_profile(
-    user_data: Dict[str, Any],
+@router.put("/profile")
+async def update_profile(
+    profile_data: Dict[str, Any],
     current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
 ):
-    """Update current user's profile"""
+    """Update current user profile"""
     try:
         # Only allow updating name and avatar_url for regular users
         allowed_fields = {'name', 'avatar_url'}
@@ -31,7 +30,7 @@ async def update_current_user_profile(
         params = []
         param_count = 1
         
-        for field, value in user_data.items():
+        for field, value in profile_data.items():
             if field in allowed_fields:
                 update_fields.append(f"{field} = ${param_count}")
                 params.append(value)
@@ -62,10 +61,10 @@ async def update_current_user_profile(
 
 
 @router.get("/preferences")
-async def get_user_preferences(
+async def get_preferences(
     current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
 ):
-    """Get current user's preferences"""
+    """Get current user preferences"""
     try:
         query = """
             SELECT id, user_id, system_prompt, default_model, settings, created_at, updated_at
@@ -73,6 +72,18 @@ async def get_user_preferences(
             WHERE user_id = $1
         """
         preferences = await execute_query_one(query, current_user["id"])
+        
+        if not preferences:
+            # Create default preferences if they don't exist
+            import uuid
+            pref_id = str(uuid.uuid4())
+            create_query = """
+                INSERT INTO turfmapp_agent.user_preferences (id, user_id, default_model, settings, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, NOW(), NOW())
+                RETURNING id, user_id, system_prompt, default_model, settings, created_at, updated_at
+            """
+            preferences = await execute_query_one(create_query, pref_id, current_user["id"], "gpt-4o", "{}")
+            
         return dict(preferences) if preferences else {}
         
     except Exception as e:
@@ -83,11 +94,11 @@ async def get_user_preferences(
 
 
 @router.put("/preferences")
-async def update_user_preferences(
+async def update_preferences(
     preferences_data: Dict[str, Any],
     current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
 ):
-    """Update current user's preferences"""
+    """Update current user preferences"""
     try:
         # Check if preferences exist
         check_query = "SELECT id FROM turfmapp_agent.user_preferences WHERE user_id = $1"
@@ -158,144 +169,18 @@ async def update_user_preferences(
         )
 
 
-# Admin endpoints for user management
-@router.get("/")
-async def get_all_users(
-    current_admin: Annotated[Dict[str, Any], Depends(get_current_admin_user_supabase)],
-    skip: int = 0,
-    limit: int = 50,
-    role: Optional[str] = None,
-    status: Optional[str] = None
+@router.delete("/account")
+async def delete_account(
+    current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
 ):
-    """Get all users (admin only)"""
+    """Delete current user account"""
     try:
-        query = "SELECT id, email, name, avatar_url, role, status, created_at, updated_at, last_login_at FROM turfmapp_agent.users"
-        params = []
-        conditions = []
-        
-        if role:
-            conditions.append(f"role = ${len(params) + 1}")
-            params.append(role)
-        
-        if status:
-            conditions.append(f"status = ${len(params) + 1}")
-            params.append(status)
-        
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        query += f" ORDER BY created_at DESC OFFSET ${len(params) + 1} LIMIT ${len(params) + 2}"
-        params.extend([skip, limit])
-        
-        users = await execute_query(query, *params)
-        return [dict(user) for user in users]
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching users: {str(e)}"
-        )
-
-
-@router.put("/{user_id}/role")
-async def update_user_role(
-    user_id: str,
-    role_data: Dict[str, str],
-    current_admin: Annotated[Dict[str, Any], Depends(get_current_admin_user_supabase)]
-):
-    """Update user role (admin only)"""
-    try:
-        new_role = role_data.get("role")
-        if not new_role or new_role not in ["user", "admin", "super_admin"]:
-            raise HTTPException(status_code=400, detail="Invalid role")
-        
-        # Prevent non-super-admin from setting super admin role
-        if new_role == "super_admin" and current_admin.get("role") != "super_admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only super admins can assign super admin role"
-            )
-        
-        query = """
-            UPDATE turfmapp_agent.users 
-            SET role = $1, updated_at = NOW()
-            WHERE id = $2
-            RETURNING id, email, name, avatar_url, role, status, created_at, updated_at, last_login_at
-        """
-        
-        result = await execute_query_one(query, new_role, user_id)
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="User not found")
-            
-        return dict(result)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating user role: {str(e)}"
-        )
-
-
-@router.put("/{user_id}/status")
-async def update_user_status(
-    user_id: str,
-    status_data: Dict[str, str],
-    current_admin: Annotated[Dict[str, Any], Depends(get_current_admin_user_supabase)]
-):
-    """Update user status (admin only)"""
-    try:
-        new_status = status_data.get("status")
-        if not new_status or new_status not in ["pending", "active", "suspended"]:
-            raise HTTPException(status_code=400, detail="Invalid status")
-        
-        query = """
-            UPDATE turfmapp_agent.users 
-            SET status = $1, updated_at = NOW()
-            WHERE id = $2
-            RETURNING id, email, name, avatar_url, role, status, created_at, updated_at, last_login_at
-        """
-        
-        result = await execute_query_one(query, new_status, user_id)
-        
-        if not result:
-            raise HTTPException(status_code=404, detail="User not found")
-            
-        return dict(result)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error updating user status: {str(e)}"
-        )
-
-
-@router.delete("/{user_id}")
-async def delete_user(
-    user_id: str,
-    current_admin: Annotated[Dict[str, Any], Depends(get_current_admin_user_supabase)]
-):
-    """Delete user (admin only)"""
-    try:
-        # Prevent admins from deleting themselves
-        if user_id == current_admin["id"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot delete your own account"
-            )
-        
         query = "DELETE FROM turfmapp_agent.users WHERE id = $1"
-        await execute_query(query, user_id)
-        return {"message": "User deleted successfully"}
+        await execute_query(query, current_user["id"])
+        return {"message": "Account deleted successfully"}
         
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error deleting user: {str(e)}"
+            detail=f"Error deleting account: {str(e)}"
         )

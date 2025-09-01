@@ -8,26 +8,37 @@ A modern, enterprise-grade full-stack application with FastAPI backend and acces
 ├── backend/                    # FastAPI Python Backend
 │   ├── app/
 │   │   ├── api/v1/            # API endpoints
+│   │   │   ├── admin.py       # Admin management endpoints
 │   │   │   ├── auth.py        # Authentication endpoints
 │   │   │   ├── chat.py        # Chat API endpoints
-│   │   │   └── preferences.py  # User preferences
+│   │   │   ├── preferences.py  # User preferences
+│   │   │   └── settings.py    # User settings endpoints
 │   │   ├── core/              # Core functionality
+│   │   │   ├── auth.py        # Supabase authentication
 │   │   │   ├── config.py      # App configuration
-│   │   │   └── simple_auth.py # Authentication middleware
+│   │   │   └── simple_auth.py # Legacy authentication
 │   │   ├── services/          # Business logic layer
 │   │   │   └── enhanced_chat_service.py # Chat service
 │   │   ├── database/          # Database models & services
 │   │   └── utils/             # Utility functions
 │   ├── tests/                 # Comprehensive test suite
+│   │   ├── test_admin_api.py  # Admin API tests
+│   │   ├── test_settings_api.py # Settings API tests
 │   │   ├── test_api_ping/     # API ping tests
 │   │   └── test_integration/  # Integration tests
+│   ├── API_DOCUMENTATION.md   # API endpoint documentation
 │   └── requirements.txt       # Python dependencies
 ├── frontend/                  # Static Frontend
 │   ├── public/
 │   │   ├── home.html          # Main chat interface
+│   │   ├── settings.html      # Settings & admin interface
 │   │   ├── scripts/
-│   │   │   └── chat.js        # Chat functionality
+│   │   │   ├── chat.js        # Chat functionality
+│   │   │   └── google-auth.js # Authentication & permissions
 │   │   └── styles/            # CSS modules
+│   ├── tests/
+│   │   └── permission-system.test.js # Frontend permission tests
+│   ├── USER_GUIDE.md          # User guide for permission system
 │   └── Dockerfile             # Frontend container
 ├── docker-compose.yml         # Multi-container orchestration
 └── README.md                  # This file
@@ -99,6 +110,8 @@ A modern, enterprise-grade full-stack application with FastAPI backend and acces
 
 ### **Authentication & Security**
 - ✅ **JWT-based authentication** with Supabase integration
+- ✅ **Role-based access control** (user, admin, super_admin)
+- ✅ **Permission management system** with admin caching
 - ✅ **Secure token handling** with automatic refresh
 - ✅ **Input validation** and sanitization
 - ✅ **CORS configuration** for cross-origin requests
@@ -111,9 +124,16 @@ A modern, enterprise-grade full-stack application with FastAPI backend and acces
 - ✅ **Detailed logging** - Debug and monitoring capabilities
 - ✅ **API documentation** - Auto-generated OpenAPI specs
 
-## 🛠️ Recent Improvements (August 2025)
+## 🛠️ Recent Improvements (September 2025)
 
-### **Major Fixes Applied**
+### **Permission Management System (NEW)**
+1. **Role-based Access Control**: Complete RBAC implementation with user, admin, and super_admin roles
+2. **Settings Page Redesign**: Transformed admin page into tabbed settings interface
+3. **Admin Caching**: 5-minute cache for admin status verification improving UI responsiveness
+4. **User Management**: Full admin interface for user role assignment and account management
+5. **Supabase Integration**: Migration from SQLAlchemy to pure Supabase authentication
+
+### **Major Fixes Applied (August 2025)**
 1. **Sources Loading Fixed**: Conversation history now properly preserves message metadata including sources
 2. **UUID Import Error Resolved**: Fixed missing import causing conversation loading failures  
 3. **Pydantic Validation Fixed**: Removed conflicting response model constraints
@@ -121,11 +141,14 @@ A modern, enterprise-grade full-stack application with FastAPI backend and acces
 5. **Auto-naming Conversations**: Titles now generated from first user message
 
 ### **Enhanced Testing**
+- **Frontend permission tests** for admin UI functionality and caching
+- **Backend API tests** for admin and settings endpoints with role validation
 - **Integration tests** that verify actual functionality vs just endpoint accessibility
 - **Test coverage** expanded to catch real business logic issues
 - **Response format validation** to ensure frontend-backend compatibility
 
 ### **Performance Optimizations**
+- **Admin status caching** - 5-minute cache with automatic invalidation on token changes
 - **Token limit optimization** - GPT-5-mini gets 4000 tokens, others get 1500
 - **Incomplete response handling** - Graceful degradation for truncated responses
 - **Database fallback patterns** - Resilient operation even with database issues
@@ -216,7 +239,10 @@ pytest tests/test_integration/test_simple_integration.py -v
 ### **Test Coverage**
 - **18/18 ping tests passing** - Endpoint accessibility verified
 - **4/4 integration tests passing** - Business logic functionality verified
-- **185+ total tests** across authentication, chat, and core functionality
+- **Admin API tests** - Role-based access control and user management
+- **Settings API tests** - Profile and preferences management
+- **Frontend permission tests** - UI visibility and caching functionality
+- **200+ total tests** across authentication, chat, admin, and core functionality
 - **Response format validation** ensures frontend-backend compatibility
 
 ## 📝 API Documentation
@@ -229,6 +255,30 @@ GET    /api/v1/chat/conversations/{id} # Get conversation details
 DELETE /api/v1/chat/conversations/{id} # Delete conversation
 GET    /api/v1/chat/health            # Health check
 GET    /api/v1/chat/models            # Available models
+```
+
+### **Settings Endpoints**
+```
+GET    /api/v1/settings/profile       # Get user profile
+PUT    /api/v1/settings/profile       # Update user profile
+GET    /api/v1/settings/preferences   # Get user preferences
+PUT    /api/v1/settings/preferences   # Update user preferences
+DELETE /api/v1/settings/account       # Delete user account
+```
+
+### **Admin Endpoints** (Requires admin/super_admin role)
+```
+GET    /api/v1/admin/stats            # System statistics
+GET    /api/v1/admin/users            # List all users
+GET    /api/v1/admin/users/pending    # List pending users
+PUT    /api/v1/admin/users/{id}       # Update user role/status
+POST   /api/v1/admin/users/{id}/approve # Approve pending user
+DELETE /api/v1/admin/users/{id}       # Delete user account
+GET    /api/v1/admin/announcements    # List announcements
+POST   /api/v1/admin/announcements    # Create announcement
+PUT    /api/v1/admin/announcements/{id} # Update announcement
+DELETE /api/v1/admin/announcements/{id} # Delete announcement
+GET    /api/v1/admin/announcements/active # Get active announcements (public)
 ```
 
 ### **Response Formats**
@@ -259,8 +309,10 @@ GET    /api/v1/chat/models            # Available models
 
 ## 🔒 Security Features
 
-### **Authentication**
+### **Authentication & Authorization**
 - ✅ **JWT tokens** with Supabase integration
+- ✅ **Role-based access control** (user, admin, super_admin)
+- ✅ **Admin status caching** with 5-minute TTL for performance
 - ✅ **Automatic token refresh** handling
 - ✅ **Secure session management** with proper cleanup
 - ✅ **User context preservation** across requests
@@ -288,8 +340,9 @@ GET    /api/v1/chat/models            # Available models
 ## 🔮 Roadmap
 
 ### **Immediate Improvements**
-- [ ] **Rate limiting** implementation
-- [ ] **Caching layer** for frequent queries
+- [x] **Permission management system** with role-based access control
+- [x] **Admin caching** for improved performance
+- [ ] **Rate limiting** implementation  
 - [ ] **Monitoring & alerting** integration
 - [ ] **Load testing** and optimization
 
@@ -302,7 +355,7 @@ GET    /api/v1/chat/models            # Available models
 
 ### **Enterprise Features**
 - [ ] **Multi-tenant support** 
-- [ ] **Admin dashboard** with analytics
+- [x] **Admin dashboard** with user management and system analytics
 - [ ] **Audit logging** for compliance
 - [ ] **Backup and disaster recovery** procedures
 
@@ -310,4 +363,4 @@ GET    /api/v1/chat/models            # Available models
 
 **Production Ready**: This application follows enterprise-grade standards with comprehensive testing, security best practices, and scalable architecture. The system is optimized for reliability, performance, and maintainability.
 
-**Last Updated**: August 30, 2025 - All major functionality working, comprehensive test coverage, and documentation complete.
+**Last Updated**: September 1, 2025 - Permission management system implemented with role-based access control, comprehensive testing, and complete documentation.

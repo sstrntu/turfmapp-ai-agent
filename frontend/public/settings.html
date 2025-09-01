@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TURFMAPP - Settings</title>
+    <meta name="description" content="User settings and administration">
+    <link rel="stylesheet" href="styles/home.css">
+    <link rel="stylesheet" href="styles/sphere.css">
+    <style>
+        html, body { 
+            min-height: 100vh; 
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        body {
+            margin: 0;
+            font-family: 'DANSON', sans-serif;
+            position: relative;
+            background: url('AdminBackground.jpg') center center/cover no-repeat fixed;
+        }
+
+        /* Override shared app-background to use Admin page image */
+        .app-background {
+            background: url('AdminBackground.jpg') center center/cover no-repeat;
+            background-attachment: scroll;
+        }
+
+        /* Pull main content and section closer to header */
+        .main-content { padding: var(--spacing-lg) 0 var(--spacing-xl); }
+        .profile-section { margin-top: var(--spacing-md); }
+        
+        /* Announcement styling */
+        .announcement-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .announcement-label {
+            color: #ffffff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .announcement-text {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+            font-weight: 500;
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Tab System */
+        .settings-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .tab-button {
+            background: transparent;
+            border: none;
+            padding: 12px 24px;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: 'DANSON', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .tab-button:hover {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .tab-button.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-border-hover);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Loading screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top: 3px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        .loading-text {
+            color: #ffffff;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .settings-content {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .settings-content.loaded {
+            opacity: 1;
+        }
+
+        /* Admin-only indicator */
+        .admin-only-badge {
+            background: rgba(255, 100, 100, 0.2);
+            color: #ff6b6b;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            border: 1px solid rgba(255, 100, 100, 0.3);
+        }
+        
+        /* Form styling from original admin page */
+        .admin-note { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; }
+        .form-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px 16px; align-items: center; }
+        .form-row .label { color: rgba(255, 255, 255, 0.9); }
+        .text-input, .select-input, .textarea-input {
+            width: 100%;
+            background: rgba(0,0,0,0.35);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            outline: none;
+            font-family: inherit;
+        }
+        .save-btn {
+            background: rgba(255,255,255,0.14);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .save-btn:hover {
+            background: rgba(255,255,255,0.22);
+            border-color: var(--color-border-hover);
+            transform: translateY(-1px);
+        }
+        
+        /* Tool Checkboxes */
+        .tool-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: var(--color-primary);
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .tool-checkbox:hover {
+            color: var(--color-border-hover);
+        }
+        .tool-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .tool-checkbox input[type="checkbox"]:checked {
+            background: rgba(255,255,255,0.2);
+            border-color: var(--color-border-hover);
+        }
+        .tool-checkbox input[type="checkbox"]:checked::after {
+            content: "✓";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--color-primary);
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        /* User management table */
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        
+        .users-table th,
+        .users-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .users-table th {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--color-primary);
+            font-weight: 600;
+        }
+        
+        .users-table td {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .role-select {
+            background: rgba(0,0,0,0.3);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background: rgba(72, 187, 120, 0.2);
+            color: #48bb78;
+            border: 1px solid rgba(72, 187, 120, 0.3);
+        }
+        
+        .status-pending {
+            background: rgba(237, 137, 54, 0.2);
+            color: #ed8936;
+            border: 1px solid rgba(237, 137, 54, 0.3);
+        }
+        
+        .status-suspended {
+            background: rgba(245, 101, 101, 0.2);
+            color: #f56565;
+            border: 1px solid rgba(245, 101, 101, 0.3);
+        }
+        
+        .action-btn {
+            background: rgba(255,255,255,0.1);
+            color: var(--color-primary);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-right: 4px;
+        }
+        
+        .action-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .action-btn.danger {
+            background: rgba(245, 101, 101, 0.2);
+            color: #f56565;
+            border-color: rgba(245, 101, 101, 0.3);
+        }
+        
+        /* Move sidebar menus up for settings page */
+        body[data-page="settings"] .panel-bottom-menu {
+            margin-top: 0;
+            padding-top: 8px;
+        }
+
+        body[data-page="settings"] .left-panel-content {
+            justify-content: flex-start;
+            padding-top: 16px;
+        }
+        
+        /* Error/Success messages */
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+        
+        .message.error {
+            background: rgba(245, 101, 101, 0.2);
+            color: #f56565;
+            border: 1px solid rgba(245, 101, 101, 0.3);
+        }
+        
+        .message.success {
+            background: rgba(72, 187, 120, 0.2);
+            color: #48bb78;
+            border: 1px solid rgba(72, 187, 120, 0.3);
+        }
+    </style>
+</head>
+<body data-page="settings">
+    <!-- Loading screen -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Settings...</div>
+    </div>
+
+    <!-- Settings content (initially hidden) -->
+    <div class="settings-content" id="settings-content">
+        <!-- Sphere background -->
+        <div class="app-background">
+        <div class="sphere" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+    </div>
+    
+    <header class="app-header" role="banner">
+        <div class="header-container">
+            <div class="brand-section">
+                <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="left-panel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <h1 class="app-title">TURFMAPP</h1>
+            </div>
+            
+            <div class="top-actions">
+                <div class="announcement-display" id="announcement-display" style="display: none;">
+                    <span class="announcement-label">Announcement:</span>
+                    <span class="announcement-text" id="announcement-text-display"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content" role="main">
+        <div class="content-container">
+            <section class="profile-section" aria-labelledby="settings-title">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar-lg" aria-hidden="true"></div>
+                        <div>
+                            <h2 id="settings-title" class="profile-title">Settings</h2>
+                            <p class="admin-note">Manage your account settings and preferences.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab Navigation -->
+                    <div class="settings-tabs">
+                        <button class="tab-button active" data-tab="settings">Settings</button>
+                        <button class="tab-button" data-tab="admin" id="admin-tab" style="display: none;">
+                            Admin
+                            <span class="admin-only-badge">Admin</span>
+                        </button>
+                    </div>
+
+                    <!-- Settings Tab Content -->
+                    <div id="settings-tab" class="tab-content active">
+                        <div class="profile-grid" style="row-gap: 18px;">
+                            
+                            <!-- User Profile Section -->
+                            <div class="form-row">
+                                <div class="label">Profile</div>
+                                <div class="admin-note">Update your profile information</div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="label">Name</div>
+                                <input type="text" id="user-name" class="text-input" placeholder="Enter your name">
+                            </div>
+                            
+                            <!-- Model Selection -->
+                            <div class="form-row">
+                                <div class="label">Preferred Model</div>
+                                <select id="user-model" class="select-input">
+                                    <option value="gpt-4o">gpt-4o (Default, Fast & Reliable)</option>
+                                    <option value="gpt-5-mini">gpt-5-mini (Latest, Experimental)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- System Prompt -->
+                            <div class="form-row" style="align-items: start;">
+                                <div class="label">System Prompt</div>
+                                <textarea id="system-prompt" class="textarea-input" placeholder="Enter custom system prompt (optional)" rows="3"></textarea>
+                            </div>
+                            
+                            <!-- Account Actions -->
+                            <div class="form-row">
+                                <div class="label">Account Actions</div>
+                                <div style="display: flex; gap: 12px;">
+                                    <button type="button" id="save-settings" class="save-btn">Save Settings</button>
+                                    <button type="button" id="delete-account" class="save-btn danger" style="background: rgba(245,101,101,0.2); border-color: rgba(245,101,101,0.3);">Delete Account</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Tab Content -->
+                    <div id="admin-tab-content" class="tab-content">
+                        <div class="profile-grid" style="row-gap: 18px;">
+                            
+                            <!-- User Management Section -->
+                            <div class="form-row">
+                                <div class="label">User Management</div>
+                                <div class="admin-note">Manage user roles and permissions</div>
+                            </div>
+                            
+                            <div style="grid-column: 1 / -1;">
+                                <div id="users-list" class="admin-note">Loading users...</div>
+                            </div>
+                            
+                            <!-- Announcement Section -->
+                            <div class="form-row">
+                                <div class="label">Announcement</div>
+                                <div class="admin-note">Set announcement text that appears on all pages</div>
+                            </div>
+                            
+                            <div class="form-row" style="align-items: start;">
+                                <div class="label">Message</div>
+                                <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                                    <textarea id="announcement-text" class="textarea-input" placeholder="Enter announcement message..." rows="2"></textarea>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button type="button" id="save-announcement" class="save-btn">Save Announcement</button>
+                                        <button type="button" id="clear-announcement" class="save-btn" style="background: rgba(255,100,100,0.14);">Clear</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tools Configuration Section -->
+                            <div class="form-row" style="align-items: start;">
+                                <div class="label">Tools Configuration</div>
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- Web Search Tool -->
+                                    <div class="tool-section">
+                                        <label class="tool-checkbox">
+                                            <input type="checkbox" id="tool-web-search" checked>
+                                            <span>Web Search Preview</span>
+                                        </label>
+                                        <div class="tool-config" style="margin-left: 24px; margin-top: 4px;">
+                                            <label style="font-size: 0.8rem; color: var(--color-tertiary);">
+                                                Search Context:
+                                                <select id="web-search-context" class="select-input" style="font-size: 0.8rem; margin-left: 8px;">
+                                                    <option value="small">Small</option>
+                                                    <option value="medium">Medium</option>
+                                                    <option value="large">Large</option>
+                                                </select>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Placeholder tools -->
+                                    <div class="tool-section">
+                                        <label class="tool-checkbox">
+                                            <input type="checkbox" id="tool-image-generation" disabled>
+                                            <span>Image Generation</span>
+                                            <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="tool-section">
+                                        <label class="tool-checkbox">
+                                            <input type="checkbox" id="tool-mcp" disabled>
+                                            <span>MCP Integration</span>
+                                            <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Admin Actions -->
+                            <div class="form-row">
+                                <div class="label">Admin Actions</div>
+                                <div style="display: flex; gap: 12px;">
+                                    <button class="save-btn" id="save-admin-settings">Save Admin Settings</button>
+                                    <button class="outline-action-btn" id="reset-admin-form">Reset to Defaults</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Message container for notifications -->
+    <div id="message-container" style="position: fixed; top: 80px; right: 20px; z-index: 1000;"></div>
+
+    <script src="scripts/config.js"></script>
+    <script src="scripts/utils.js"></script>
+    <script src="scripts/announcement.js"></script>
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-auth.js"></script>
+    <script src="scripts/ui.js"></script>
+    <script src="scripts/chat.js"></script>
+    
+    <!-- Settings JavaScript -->
+    <script>
+        // Global state
+        let currentUser = null;
+        let isAdmin = false;
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                await initializeSettings();
+            } catch (error) {
+                console.error('Error initializing settings:', error);
+                showMessage('Error loading settings. Please refresh the page.', 'error');
+            }
+        });
+        
+        // Initialize settings page
+        async function initializeSettings() {
+            // Ensure user is authenticated
+            if (!GoogleAuth.requireAuth()) {
+                hideLoadingScreen();
+                return;
+            }
+
+            try {
+                // Load current user and check admin status first (before showing UI)
+                await loadCurrentUser();
+                
+                // Setup admin UI permissions and wait for completion
+                isAdmin = await GoogleAuth.setupAdminUI();
+                
+                // Initialize tab switching after admin verification
+                initTabSwitching();
+                
+                // Load user settings
+                await loadUserSettings();
+                
+                // Load admin settings if user is admin
+                if (isAdmin) {
+                    document.getElementById('admin-tab').style.display = 'block';
+                    await loadAdminSettings();
+                    await loadUsersList();
+                }
+                
+                // Setup event listeners
+                setupEventListeners();
+                
+                // Load existing local settings (for tools config)
+                loadLocalSettings();
+                
+                // Initialize shared announcement header
+                Announcement.initHeader('announcement-display', 'announcement-text-display');
+                
+                // All initialization complete - show content
+                hideLoadingScreen();
+                
+            } catch (error) {
+                console.error('Settings initialization error:', error);
+                hideLoadingScreen();
+                showMessage('Error loading settings. Please refresh the page.', 'error');
+            }
+        }
+
+        // Hide loading screen and show content
+        function hideLoadingScreen() {
+            const loadingScreen = document.getElementById('loading-screen');
+            const settingsContent = document.getElementById('settings-content');
+            
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+            
+            if (settingsContent) {
+                settingsContent.classList.add('loaded');
+            }
+        }
+        
+        // Load current user data
+        async function loadCurrentUser() {
+            try {
+                const token = GoogleAuth.getToken();
+                if (!token) {
+                    window.location.href = '/';
+                    return;
+                }
+                
+                const response = await fetch('/api/v1/settings/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    currentUser = await response.json();
+                    isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
+                    
+                    // Update UI with user data
+                    document.getElementById('user-name').value = currentUser.name || '';
+                } else {
+                    throw new Error('Failed to load user profile');
+                }
+            } catch (error) {
+                console.error('Error loading current user:', error);
+                showMessage('Error loading user profile', 'error');
+            }
+        }
+        
+        // Load user preferences
+        async function loadUserSettings() {
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/settings/preferences', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const preferences = await response.json();
+                    document.getElementById('user-model').value = preferences.default_model || 'gpt-4o';
+                    document.getElementById('system-prompt').value = preferences.system_prompt || '';
+                }
+            } catch (error) {
+                console.error('Error loading user settings:', error);
+            }
+        }
+        
+        // Load admin settings (announcements, etc.)
+        async function loadAdminSettings() {
+            try {
+                const announcement = localStorage.getItem('announcement') || '';
+                document.getElementById('announcement-text').value = announcement;
+            } catch (error) {
+                console.error('Error loading admin settings:', error);
+            }
+        }
+        
+        // Load users list for admin
+        async function loadUsersList() {
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/admin/users', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const users = await response.json();
+                    renderUsersTable(users);
+                } else {
+                    throw new Error('Failed to load users');
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('users-list').textContent = 'Error loading users';
+            }
+        }
+        
+        // Render users table
+        function renderUsersTable(users) {
+            const container = document.getElementById('users-list');
+            
+            if (users.length === 0) {
+                container.innerHTML = '<div class="admin-note">No users found</div>';
+                return;
+            }
+            
+            const table = document.createElement('table');
+            table.className = 'users-table';
+            
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${users.map(user => `
+                        <tr data-user-id="${user.id}">
+                            <td>${user.name || 'N/A'}</td>
+                            <td>${user.email}</td>
+                            <td>
+                                <select class="role-select" data-user-id="${user.id}" data-current-role="${user.role}">
+                                    <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
+                                    <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                    ${currentUser?.role === 'super_admin' ? `<option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>` : ''}
+                                </select>
+                            </td>
+                            <td>
+                                <span class="status-badge status-${user.status}">${user.status}</span>
+                            </td>
+                            <td>
+                                ${user.status === 'pending' ? `<button class="action-btn" onclick="approveUser('${user.id}')">Approve</button>` : ''}
+                                ${user.status === 'active' ? `<button class="action-btn" onclick="suspendUser('${user.id}')">Suspend</button>` : ''}
+                                ${user.id !== currentUser?.id ? `<button class="action-btn danger" onclick="deleteUser('${user.id}', '${user.email}')">Delete</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+            
+            container.innerHTML = '';
+            container.appendChild(table);
+            
+            // Add change listeners to role selects
+            table.querySelectorAll('.role-select').forEach(select => {
+                select.addEventListener('change', handleRoleChange);
+            });
+        }
+        
+        // Handle role change
+        async function handleRoleChange(event) {
+            const userId = event.target.dataset.userId;
+            const newRole = event.target.value;
+            const currentRole = event.target.dataset.currentRole;
+            
+            if (newRole === currentRole) return;
+            
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/admin/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ role: newRole })
+                });
+                
+                if (response.ok) {
+                    event.target.dataset.currentRole = newRole;
+                    showMessage(`User role updated to ${newRole}`, 'success');
+                } else {
+                    event.target.value = currentRole; // Revert on error
+                    const error = await response.json();
+                    showMessage(error.detail || 'Failed to update role', 'error');
+                }
+            } catch (error) {
+                event.target.value = currentRole; // Revert on error
+                console.error('Error updating role:', error);
+                showMessage('Error updating role', 'error');
+            }
+        }
+        
+        // User action functions
+        window.approveUser = async function(userId) {
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/admin/users/${userId}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showMessage('User approved successfully', 'success');
+                    await loadUsersList();
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Failed to approve user', 'error');
+                }
+            } catch (error) {
+                console.error('Error approving user:', error);
+                showMessage('Error approving user', 'error');
+            }
+        };
+        
+        window.suspendUser = async function(userId) {
+            if (!confirm('Are you sure you want to suspend this user?')) return;
+            
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/admin/users/${userId}/suspend`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showMessage('User suspended successfully', 'success');
+                    await loadUsersList();
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Failed to suspend user', 'error');
+                }
+            } catch (error) {
+                console.error('Error suspending user:', error);
+                showMessage('Error suspending user', 'error');
+            }
+        };
+        
+        window.deleteUser = async function(userId, userEmail) {
+            if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) return;
+            
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showMessage('User deleted successfully', 'success');
+                    await loadUsersList();
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Failed to delete user', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showMessage('Error deleting user', 'error');
+            }
+        };
+        
+        // Load local settings (legacy tool configs)
+        function loadLocalSettings() {
+            try {
+                const toolWebSearch = localStorage.getItem('tm_tool_web_search') || 'true';
+                const webSearchContext = localStorage.getItem('tm_web_search_context') || 'medium';
+                
+                if (document.getElementById('tool-web-search')) {
+                    document.getElementById('tool-web-search').checked = toolWebSearch === 'true';
+                }
+                if (document.getElementById('web-search-context')) {
+                    document.getElementById('web-search-context').value = webSearchContext;
+                }
+            } catch (e) {
+                console.error('Error loading local settings:', e);
+            }
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Settings tab save
+            document.getElementById('save-settings')?.addEventListener('click', saveUserSettings);
+            
+            // Delete account
+            document.getElementById('delete-account')?.addEventListener('click', deleteAccount);
+            
+            // Admin settings save
+            document.getElementById('save-admin-settings')?.addEventListener('click', saveAdminSettings);
+            
+            // Reset admin form
+            document.getElementById('reset-admin-form')?.addEventListener('click', resetAdminForm);
+            
+            // Announcement actions
+            document.getElementById('save-announcement')?.addEventListener('click', saveAnnouncement);
+            document.getElementById('clear-announcement')?.addEventListener('click', clearAnnouncement);
+        }
+        
+        // Tab switching functionality
+        function initTabSwitching() {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetTab = button.getAttribute('data-tab');
+                    
+                    // Update active tab button
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    // Update active tab content
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    const targetContent = document.getElementById(
+                        targetTab === 'admin' ? 'admin-tab-content' : `${targetTab}-tab`
+                    );
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                    }
+                });
+            });
+        }
+        
+        // Save user settings
+        async function saveUserSettings() {
+            try {
+                const token = GoogleAuth.getToken();
+                
+                // Update profile
+                const profileData = {
+                    name: document.getElementById('user-name').value.trim() || null
+                };
+                
+                await fetch('/api/v1/settings/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(profileData)
+                });
+                
+                // Update preferences
+                const preferencesData = {
+                    default_model: document.getElementById('user-model').value,
+                    system_prompt: document.getElementById('system-prompt').value.trim() || null
+                };
+                
+                const response = await fetch('/api/v1/settings/preferences', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(preferencesData)
+                });
+                
+                if (response.ok) {
+                    showMessage('Settings saved successfully!', 'success');
+                } else {
+                    throw new Error('Failed to save settings');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showMessage('Error saving settings', 'error');
+            }
+        }
+        
+        // Delete account
+        async function deleteAccount() {
+            if (!confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your data.')) {
+                return;
+            }
+            
+            if (!prompt('Type "DELETE" to confirm account deletion:') === 'DELETE') {
+                return;
+            }
+            
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/settings/account', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    showMessage('Account deleted successfully. Logging out...', 'success');
+                    setTimeout(() => {
+                        GoogleAuth.signOut();
+                    }, 2000);
+                } else {
+                    throw new Error('Failed to delete account');
+                }
+            } catch (error) {
+                console.error('Error deleting account:', error);
+                showMessage('Error deleting account', 'error');
+            }
+        }
+        
+        // Save admin settings
+        function saveAdminSettings() {
+            try {
+                // Save tool settings to localStorage
+                const toolWebSearch = document.getElementById('tool-web-search')?.checked || false;
+                const webSearchContext = document.getElementById('web-search-context')?.value || 'medium';
+                
+                localStorage.setItem('tm_tool_web_search', toolWebSearch.toString());
+                localStorage.setItem('tm_web_search_context', webSearchContext);
+                
+                showMessage('Admin settings saved successfully!', 'success');
+            } catch (e) {
+                console.error('Error saving admin settings:', e);
+                showMessage('Error saving admin settings', 'error');
+            }
+        }
+        
+        // Reset admin form
+        function resetAdminForm() {
+            if (confirm('Are you sure you want to reset all admin settings to defaults?')) {
+                // Clear localStorage
+                const keys = Object.keys(localStorage).filter(key => key.startsWith('tm_'));
+                keys.forEach(key => localStorage.removeItem(key));
+                
+                // Reset form values to defaults
+                if (document.getElementById('tool-web-search')) {
+                    document.getElementById('tool-web-search').checked = true;
+                }
+                if (document.getElementById('web-search-context')) {
+                    document.getElementById('web-search-context').value = 'medium';
+                }
+                
+                showMessage('Admin settings reset to defaults.', 'success');
+            }
+        }
+        
+        // Announcement functions (from original admin page)
+        function saveAnnouncement() {
+            const announcementText = document.getElementById('announcement-text').value.trim();
+            localStorage.setItem('announcement', announcementText);
+            
+            // Trigger storage event for other pages to update
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'announcement',
+                newValue: announcementText
+            }));
+            
+            showMessage('Announcement saved successfully!', 'success');
+        }
+        
+        function clearAnnouncement() {
+            document.getElementById('announcement-text').value = '';
+            localStorage.removeItem('announcement');
+            
+            // Trigger storage event for other pages to update
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'announcement',
+                newValue: ''
+            }));
+            
+            showMessage('Announcement cleared successfully!', 'success');
+        }
+        
+        // Show message function
+        function showMessage(message, type = 'success') {
+            const container = document.getElementById('message-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            
+            container.appendChild(messageDiv);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }, 5000);
+        }
+    </script>
+    
+    <!-- Left sidebar panel -->
+    <aside id="left-panel" class="left-panel" aria-hidden="true">
+        <div class="left-panel-inner">
+            <div class="left-panel-header">
+                <button id="btn-new-chat" class="new-chat-btn" type="button" onclick="window.location.href='home.html'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    New chat
+                </button>
+                <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="left-panel-content">
+                <!-- Bottom Menu Section -->
+                <div class="panel-bottom-menu">
+                    <a href="home.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Home</span>
+                    </a>
+                    <a href="profile.html" class="menu-item profile-item">
+                        <span class="profile-thumb" aria-hidden="true"></span>
+                        <span>Profile</span>
+                    </a>
+                    <a href="settings.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/>
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        <span>Settings</span>
+                    </a>
+                    <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script>
+        // Initialize left panel toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('left-panel-toggle');
+            const closeBtn = document.getElementById('left-panel-close');
+            const panel = document.getElementById('left-panel');
+            
+            if (toggleBtn && panel) {
+                toggleBtn.addEventListener('click', function() {
+                    panel.classList.toggle('open');
+                    toggleBtn.setAttribute('aria-expanded', panel.classList.contains('open'));
+                    panel.setAttribute('aria-hidden', !panel.classList.contains('open'));
+                    document.body.classList.toggle('panel-open', panel.classList.contains('open'));
+                });
+            }
+            
+            if (closeBtn && panel) {
+                closeBtn.addEventListener('click', function() {
+                    panel.classList.remove('open');
+                    toggleBtn.setAttribute('aria-expanded', 'false');
+                    panel.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('panel-open');
+                });
+            }
+        });
+    </script>
+    
+    </div> <!-- End settings-content -->
+</body>
+</html>

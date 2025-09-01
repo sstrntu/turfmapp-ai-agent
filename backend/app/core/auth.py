@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Dict, Any
 from datetime import datetime
 
 import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models.user import User, UserRole
-from ..models.auth import PublicUser
+from ..database import execute_query_one
 
 # Security scheme
 security = HTTPBearer()
 
 
-async def verify_supabase_token(token: str) -> Optional[PublicUser]:
+async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
     """Verify Supabase JWT token and return user info"""
     supabase_url = os.getenv("SUPABASE_URL")
     if not supabase_url:
@@ -36,21 +33,20 @@ async def verify_supabase_token(token: str) -> Optional[PublicUser]:
                 return None
                 
             data = resp.json()
-            return PublicUser(
-                id=data.get("id", ""),
-                email=data.get("email", ""),
-                name=(data.get("user_metadata", {}) or {}).get("full_name"),
-                avatar_url=(data.get("user_metadata", {}) or {}).get("avatar_url"),
-            )
+            return {
+                "id": data.get("id", ""),
+                "email": data.get("email", ""),
+                "name": (data.get("user_metadata", {}) or {}).get("full_name"),
+                "avatar_url": (data.get("user_metadata", {}) or {}).get("avatar_url"),
+            }
     except Exception:
         return None
 
 
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-    db: Annotated[Session, Depends(get_db)]
-) -> User:
-    """Get current authenticated user"""
+async def get_current_user_supabase(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]
+) -> Dict[str, Any]:
+    """Get current authenticated user using Supabase directly"""
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -65,33 +61,42 @@ async def get_current_user(
             detail="Invalid authentication token"
         )
 
-    # Get user from database
-    user = db.query(User).filter(User.id == public_user.id).first()
+    # Get user from our database
+    query = """
+        SELECT id, email, name, avatar_url, role, status, created_at, updated_at, last_login_at
+        FROM turfmapp_agent.users 
+        WHERE id = $1
+    """
+    user = await execute_query_one(query, public_user["id"])
+    
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
 
+    user_dict = dict(user)
+
     # Check if user is active
-    if user.status != "active":
+    if user_dict.get("status") != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is not active"
         )
 
     # Update last login time
-    user.last_login_at = datetime.utcnow()
-    db.commit()
+    update_query = "UPDATE turfmapp_agent.users SET last_login_at = NOW() WHERE id = $1"
+    await execute_query_one(update_query, user_dict["id"])
+    user_dict["last_login_at"] = datetime.utcnow()
 
-    return user
+    return user_dict
 
 
-async def get_current_admin_user(
-    current_user: Annotated[User, Depends(get_current_user)]
-) -> User:
+async def get_current_admin_user_supabase(
+    current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
+) -> Dict[str, Any]:
     """Get current user and verify admin privileges"""
-    if current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+    if current_user.get("role") not in ["admin", "super_admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required"
@@ -99,11 +104,11 @@ async def get_current_admin_user(
     return current_user
 
 
-async def get_current_super_admin_user(
-    current_user: Annotated[User, Depends(get_current_user)]
-) -> User:
+async def get_current_super_admin_user_supabase(
+    current_user: Annotated[Dict[str, Any], Depends(get_current_user_supabase)]
+) -> Dict[str, Any]:
     """Get current user and verify super admin privileges"""
-    if current_user.role != UserRole.SUPER_ADMIN:
+    if current_user.get("role") != "super_admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super admin privileges required"
@@ -112,10 +117,9 @@ async def get_current_super_admin_user(
 
 
 # Optional user dependency (doesn't raise error if not authenticated)
-async def get_current_user_optional(
-    db: Annotated[Session, Depends(get_db)],
+async def get_current_user_optional_supabase(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
-) -> Optional[User]:
+) -> Optional[Dict[str, Any]]:
     """Get current user if authenticated, otherwise return None"""
     if not credentials:
         return None
@@ -125,9 +129,15 @@ async def get_current_user_optional(
         if not public_user:
             return None
 
-        user = db.query(User).filter(User.id == public_user.id).first()
-        if user and user.status == "active":
-            return user
+        query = """
+            SELECT id, email, name, avatar_url, role, status, created_at, updated_at, last_login_at
+            FROM turfmapp_agent.users 
+            WHERE id = $1
+        """
+        user = await execute_query_one(query, public_user["id"])
+        
+        if user and dict(user).get("status") == "active":
+            return dict(user)
     except Exception:
         pass
 
