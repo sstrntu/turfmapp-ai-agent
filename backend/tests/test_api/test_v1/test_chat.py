@@ -14,7 +14,7 @@ from typing import Dict, Any, List
 from fastapi.testclient import TestClient
 from fastapi import status
 
-from app.api.v1.chat import _stringify_text
+from app.utils.chat_utils import stringify_text
 
 
 class TestChatEndpoints:
@@ -471,41 +471,41 @@ class TestChatEndpoints:
 class TestChatUtilityFunctions:
     """Test chat utility functions."""
 
-    def test_stringify_text_string_input(self) -> None:
+    def teststringify_text_string_input(self) -> None:
         """Test stringify_text with string input."""
-        result = _stringify_text("Hello, world!")
+        result = stringify_text("Hello, world!")
         assert result == "Hello, world!"
 
-    def test_stringify_text_dict_input(self) -> None:
+    def teststringify_text_dict_input(self) -> None:
         """Test stringify_text with dictionary input."""
         input_dict = {"text": "Hello from dict"}
-        result = _stringify_text(input_dict)
+        result = stringify_text(input_dict)
         assert result == "Hello from dict"
 
-    def test_stringify_text_dict_with_value(self) -> None:
+    def teststringify_text_dict_with_value(self) -> None:
         """Test stringify_text with dictionary containing value key."""
         input_dict = {"value": "Hello from value"}
-        result = _stringify_text(input_dict)
+        result = stringify_text(input_dict)
         assert result == "Hello from value"
 
-    def test_stringify_text_nested_dict(self) -> None:
+    def teststringify_text_nested_dict(self) -> None:
         """Test stringify_text with nested dictionary."""
         input_dict = {"text": {"value": "Nested hello"}}
-        result = _stringify_text(input_dict)
+        result = stringify_text(input_dict)
         assert result == "Nested hello"
 
-    def test_stringify_text_list_input(self) -> None:
+    def teststringify_text_list_input(self) -> None:
         """Test stringify_text with list input."""
         input_list = ["Hello", " ", "world", "!"]
-        result = _stringify_text(input_list)
+        result = stringify_text(input_list)
         assert result == "Hello world!"
 
-    def test_stringify_text_none_input(self) -> None:
+    def teststringify_text_none_input(self) -> None:
         """Test stringify_text with None input."""
-        result = _stringify_text(None)
+        result = stringify_text(None)
         assert result == ""
 
-    def test_stringify_text_complex_nested(self) -> None:
+    def teststringify_text_complex_nested(self) -> None:
         """Test stringify_text with complex nested structure."""
         complex_input = [
             {"text": "Hello"},
@@ -513,13 +513,13 @@ class TestChatUtilityFunctions:
             {"value": "world"},
             {"text": {"value": "!"}}
         ]
-        result = _stringify_text(complex_input)
+        result = stringify_text(complex_input)
         assert result == "Hello world!"
 
-    def test_stringify_text_fallback_json(self) -> None:
+    def teststringify_text_fallback_json(self) -> None:
         """Test stringify_text fallback to JSON serialization."""
         complex_dict = {"data": [1, 2, 3], "metadata": {"key": "value"}}
-        result = _stringify_text(complex_dict)
+        result = stringify_text(complex_dict)
         # Should be JSON string since no text/value keys
         parsed = json.loads(result)
         assert parsed["data"] == [1, 2, 3]

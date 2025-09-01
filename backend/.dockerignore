@@ -33,7 +33,6 @@ venv/
 uploads/
 fal_media/
 data/
-tests/
 SCHEMA_INFO.md
 supabase_schema.sql
 Dockerfile

@@ -195,15 +195,105 @@
                 return i - 1; // last consumed index
             }
 
+            // Add table parsing function
+            function parseTable(lines, startIndex) {
+                // Find table rows (lines with | separators)
+                let i = startIndex;
+                const tableRows = [];
+                
+                while (i < lines.length) {
+                    const line = lines[i].trim();
+                    if (!line || !line.includes('|')) break;
+                    
+                    // Skip separator rows (like |----|----|)
+                    if (!/^[\|\s\-:]+$/.test(line)) {
+                        // Split by | and clean up cells
+                        const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell);
+                        if (cells.length > 0) {
+                            tableRows.push(cells);
+                        }
+                    }
+                    i++;
+                }
+                
+                if (tableRows.length > 0) {
+                    const table = document.createElement('table');
+                    table.style.cssText = `
+                        border-collapse: collapse;
+                        margin: 10px 0;
+                        width: 100%;
+                        background: rgba(255,255,255,0.05);
+                        border-radius: 8px;
+                        overflow: hidden;
+                    `;
+                    
+                    // First row as header
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    headerRow.style.background = 'rgba(255,255,255,0.1)';
+                    
+                    tableRows[0].forEach(cellText => {
+                        const th = document.createElement('th');
+                        th.style.cssText = `
+                            padding: 8px 12px;
+                            text-align: left;
+                            border-bottom: 1px solid rgba(255,255,255,0.1);
+                            font-weight: 600;
+                        `;
+                        th.innerHTML = cellText;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+                    
+                    // Data rows
+                    if (tableRows.length > 1) {
+                        const tbody = document.createElement('tbody');
+                        for (let rowIndex = 1; rowIndex < tableRows.length; rowIndex++) {
+                            const tr = document.createElement('tr');
+                            tr.style.cssText = `
+                                border-bottom: 1px solid rgba(255,255,255,0.05);
+                            `;
+                            
+                            tableRows[rowIndex].forEach(cellText => {
+                                const td = document.createElement('td');
+                                td.style.cssText = `
+                                    padding: 8px 12px;
+                                    border-bottom: 1px solid rgba(255,255,255,0.05);
+                                `;
+                                td.innerHTML = cellText;
+                                tr.appendChild(td);
+                            });
+                            tbody.appendChild(tr);
+                        }
+                        table.appendChild(tbody);
+                    }
+                    
+                    root.appendChild(table);
+                }
+                
+                return i - 1; // last consumed index
+            }
+
             blocks.forEach(function(block){
                 const lines = block.split(/\n/).map(function(s){ return s.trim(); });
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
                     if (!line) continue;
+                    
+                    // Check for table (line contains |)
+                    if (line.includes('|') && !line.startsWith('//')) {
+                        i = parseTable(lines, i);
+                        continue;
+                    }
+                    
+                    // Check for lists
                     if (/^(?:[-*•]\s+|\d+[\.)]\s+)/.test(line)) {
                         i = parseList(lines, i);
                         continue;
                     }
+                    
+                    // Default to paragraph
                     appendParagraph(line);
                 }
             });

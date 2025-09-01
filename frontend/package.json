@@ -4,30 +4,12 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview --host",
-    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
-    "test": "echo 'No tests yet'"
+    "dev": "python3 -m http.server 3000 --directory public",
+    "build": "echo 'Static files - no build needed'",
+    "preview": "python3 -m http.server 3001 --directory public",
+    "lint": "echo 'Static HTML - no linting configured'",
+    "test": "echo 'Static HTML - no tests configured'"
   },
-  "dependencies": {
-    "@fortawesome/fontawesome-free": "^6.7.2",
-    "axios": "^1.7.2",
-    "mdb-react-ui-kit": "^8.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.7",
-    "typescript": "^5.5.4",
-    "vite": "^5.4.1"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }

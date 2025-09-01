@@ -17,6 +17,7 @@ from .api.v1.preferences import router as preferences_router_v1
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
+from .api.v1.agents import router as agents_router_v1
 
 from .database import get_supabase_config
 
@@ -68,6 +69,7 @@ app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
 # Additional v1 routes
 app.include_router(upload_router, prefix="/api/v1/uploads", tags=["uploads"])
 app.include_router(fal_tools_router, prefix="/api/v1/fal-tools", tags=["fal-tools"])
+app.include_router(agents_router_v1, prefix="/api/v1/agents", tags=["agents"])
 
 
 @app.on_event("startup")
