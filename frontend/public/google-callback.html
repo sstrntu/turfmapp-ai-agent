@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google OAuth Callback - TURFMAPP</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 50px auto; 
+            padding: 20px; 
+            text-align: center;
+        }
+        .loading { color: #007cba; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>Google Authentication</h1>
+    <div id="status" class="loading">Processing authentication...</div>
+    <div id="result"></div>
+
+    <!-- Include required scripts -->
+    <script src="scripts/supabase-client.js"></script>
+    <script src="scripts/google-services.js"></script>
+
+    <script>
+        async function handleGoogleCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+            
+            if (error) {
+                document.getElementById('status').innerHTML = 
+                    '<div class="error">❌ Google authentication failed</div>';
+                document.getElementById('result').innerHTML = 
+                    `<p>Error: ${error}</p><p><a href="test-google.html">← Back to test page</a></p>`;
+                return;
+            }
+            
+            if (!code) {
+                document.getElementById('status').innerHTML = 
+                    '<div class="error">❌ No authorization code received</div>';
+                document.getElementById('result').innerHTML = 
+                    '<p><a href="test-google.html">← Back to test page</a></p>';
+                return;
+            }
+            
+            // Check if user is authenticated with TURFMAPP first
+            if (!window.supabase.isSessionValid()) {
+                document.getElementById('status').innerHTML = 
+                    '<div class="error">❌ TURFMAPP authentication required</div>';
+                document.getElementById('result').innerHTML = `
+                    <p>You need to be logged into TURFMAPP before connecting Google services.</p>
+                    <p><a href="portal.html">← Login to TURFMAPP first</a></p>
+                    <p>Then return to: <a href="test-google.html">Google integration test</a></p>
+                `;
+                return;
+            }
+            
+            try {
+                // Handle the OAuth callback
+                const result = await GoogleServices.handleGoogleCallback(code, state);
+                
+                document.getElementById('status').innerHTML = 
+                    '<div class="success">✅ Google authentication successful!</div>';
+                
+                document.getElementById('result').innerHTML = `
+                    <p>Welcome, ${result.user_info.name || result.user_info.email}!</p>
+                    <p>You can now access Gmail, Google Drive, and Calendar.</p>
+                    <p><strong><a href="test-google.html">← Go back to test Google features</a></strong></p>
+                `;
+                
+            } catch (error) {
+                console.error('Callback error:', error);
+                
+                // Check if it's an authentication error
+                if (error.message.includes('Not authenticated') || error.message.includes('Invalid state')) {
+                    document.getElementById('status').innerHTML = 
+                        '<div class="error">❌ TURFMAPP session expired</div>';
+                    document.getElementById('result').innerHTML = `
+                        <p>Your TURFMAPP login session has expired.</p>
+                        <p><a href="portal.html">← Login to TURFMAPP again</a></p>
+                        <p>Then return to: <a href="test-google.html">Google integration test</a></p>
+                    `;
+                } else {
+                    document.getElementById('status').innerHTML = 
+                        '<div class="error">❌ Authentication processing failed</div>';
+                    document.getElementById('result').innerHTML = 
+                        `<p>Error: ${error.message}</p><p><a href="test-google.html">← Back to test page</a></p>`;
+                }
+            }
+        }
+        
+        // Process callback when page loads
+        document.addEventListener('DOMContentLoaded', handleGoogleCallback);
+    </script>
+</body>
+</html>

@@ -37,6 +37,7 @@ from pydantic import BaseModel, Field
 
 from ...core.simple_auth import get_current_user_from_token
 from ...services.enhanced_chat_service import EnhancedChatService
+from ...services.tool_manager import tool_manager
 from ...database import ConversationService
 
 router = APIRouter()
@@ -280,4 +281,13 @@ async def get_available_models():
             {"id": "o1-mini", "name": "O1 Mini", "description": "Reasoning optimized"},
             {"id": "o1-preview", "name": "O1 Preview", "description": "Latest reasoning model"}
         ]
+    }
+
+
+@router.get("/tools")
+async def get_available_tools():
+    """Get list of available tools for the chatbot"""
+    return {
+        "tools": tool_manager.get_available_tools(),
+        "descriptions": tool_manager.get_tool_descriptions()
     }

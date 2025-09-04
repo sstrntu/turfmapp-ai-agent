@@ -34,6 +34,7 @@ import httpx
 from ..database import ConversationService, UserService
 from ..utils.chat_utils import stringify_text, extract_sources_from_response, format_chat_history
 from ..api.v1.preferences import user_preferences
+from .tool_manager import tool_manager
 
 
 class EnhancedChatService:
@@ -147,6 +148,40 @@ class EnhancedChatService:
             "reasoning_effort": "medium"
         })
     
+    async def handle_tool_calls(self, user_id: str, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Handle tool calls from the AI assistant."""
+        tool_results = []
+        
+        for tool_call in tool_calls:
+            try:
+                tool_name = tool_call.get("function", {}).get("name")
+                tool_args = tool_call.get("function", {}).get("arguments", "{}")
+                
+                # Parse arguments
+                if isinstance(tool_args, str):
+                    tool_args = json.loads(tool_args)
+                
+                # Execute tool
+                result = await tool_manager.execute_tool(tool_name, user_id, **tool_args)
+                
+                tool_results.append({
+                    "tool_call_id": tool_call.get("id"),
+                    "tool_name": tool_name,
+                    "result": result
+                })
+                
+            except Exception as e:
+                tool_results.append({
+                    "tool_call_id": tool_call.get("id"),
+                    "tool_name": tool_call.get("function", {}).get("name"),
+                    "result": {
+                        "success": False,
+                        "error": f"Tool execution failed: {str(e)}"
+                    }
+                })
+        
+        return tool_results
+    
     async def call_responses_api(
         self, 
         messages: List[Dict[str, Any]], 
@@ -184,6 +219,7 @@ class EnhancedChatService:
         # Handle tools properly
         if "tools" in kwargs and kwargs["tools"]:
             tools = kwargs["tools"]
+            print(f"🔧 Processing tools in API call: {tools}")
             # Filter out invalid string-based tools
             if isinstance(tools, list) and tools:
                 if isinstance(tools[0], str):
@@ -192,6 +228,9 @@ class EnhancedChatService:
                     payload["tools"] = tools[:5]  # Limit to 5 tools
                     payload["tool_choice"] = kwargs.get("tool_choice", "auto")
                     payload["parallel_tool_calls"] = True
+                    print(f"🔧 Added tools to payload: {payload['tools']}")
+        else:
+            print(f"🔧 No tools provided in API call")
         
         # Add instructions for additional context
         instructions = []
@@ -199,6 +238,21 @@ class EnhancedChatService:
             instructions.append(kwargs["developer_instructions"])
         if "assistant_context" in kwargs and kwargs["assistant_context"]:
             instructions.append(kwargs["assistant_context"])
+        
+        # Add Gmail tool instructions if Gmail tools are available
+        if "tools" in payload and any(tool.get("function", {}).get("name") == "gmail" for tool in payload["tools"]):
+            gmail_instructions = """
+You have access to Gmail tools that can help users with their email. When users ask about their emails, use the Gmail tool to:
+- Search for emails: Use action "search" with appropriate queries
+- Find recent emails: Use action "find_recent" 
+- Read specific emails: Use action "read" with message_id
+- Analyze email patterns: Use action "analyze" with analysis_type
+- Summarize emails: Use action "summarize"
+
+Always use the Gmail tool when users ask about their emails, inbox, messages, or email-related tasks.
+"""
+            instructions.append(gmail_instructions)
+        
         if instructions:
             payload["instructions"] = "\n\n".join(instructions)
         
@@ -280,13 +334,40 @@ class EnhancedChatService:
             conversation_id, user_id, "user", message
         )
         
+        # Auto-detect if Gmail tools should be available
+        email_keywords = ["email", "gmail", "message", "inbox", "unread", "sent", "draft", "mail"]
+        should_include_gmail_tools = any(keyword in message.lower() for keyword in email_keywords)
+        
+        print(f"🔍 Email detection - Message: '{message}'")
+        print(f"🔍 Should include Gmail tools: {should_include_gmail_tools}")
+        print(f"🔍 Keywords found: {[kw for kw in email_keywords if kw in message.lower()]}")
+        
+        # Prepare tools for API call
+        tools_to_include = kwargs.get("tools", [])
+        if should_include_gmail_tools:
+            # Automatically include Gmail tools if user is asking about email
+            gmail_tools = tool_manager.get_available_tools()
+            
+            # Add Gmail tools to existing tools (don't replace them)
+            existing_tool_names = {tool.get("function", {}).get("name") for tool in tools_to_include if tool.get("type") == "function"}
+            for gmail_tool in gmail_tools:
+                tool_name = gmail_tool.get("function", {}).get("name")
+                if tool_name not in existing_tool_names:
+                    tools_to_include.append(gmail_tool)
+            
+            print(f"🔧 Auto-including Gmail tools for email-related query: {message[:50]}...")
+            print(f"🔧 Total tools to include: {len(tools_to_include)}")
+        else:
+            print(f"🔧 Not including Gmail tools - should_include: {should_include_gmail_tools}, existing_tools: {len(tools_to_include)}")
+        
         # Call API
         try:
             api_response = await self.call_responses_api(
                 messages=all_messages,
                 model=model,
                 include_reasoning=include_reasoning,
-                **{k: v for k, v in kwargs.items() if k not in ["model", "include_reasoning"]}
+                tools=tools_to_include,
+                **{k: v for k, v in kwargs.items() if k not in ["model", "include_reasoning", "tools"]}
             )
             
             # Extract assistant response from Responses API format
@@ -296,7 +377,122 @@ class EnhancedChatService:
             # Parse Responses API output with debugging for GPT-5-mini
             print(f"🔍 API Response for model {model}:", api_response)
             
-            assistant_content = stringify_text(api_response.get("output_text") or "")
+            # Check if there are any tool calls in the response
+            if "tool_calls" in api_response:
+                print(f"🔧 Tool calls found in response: {api_response['tool_calls']}")
+            else:
+                print(f"🔧 No tool calls found in response")
+            
+            # Check the output structure for function calls
+            output_items = api_response.get("output", [])
+            print(f"🔧 Output items: {len(output_items) if output_items else 0}")
+            
+            # Handle function calls from the API response
+            function_calls = []
+            for i, item in enumerate(output_items):
+                if isinstance(item, dict):
+                    item_type = item.get("type")
+                    print(f"🔧 Output item {i}: type={item_type}")
+                    if item_type == "function_call":
+                        print(f"🔧 Function call found: {item}")
+                        function_calls.append(item)
+                    elif item_type == "tool_call":
+                        print(f"🔧 Tool call found: {item}")
+                        function_calls.append(item)
+                    elif item_type == "message":
+                        content = item.get("content", [])
+                        print(f"🔧 Message content: {content}")
+            
+            # Process function calls if any were found
+            if function_calls:
+                print(f"🔧 Processing {len(function_calls)} function calls...")
+                
+                # Convert function calls to tool call format for processing
+                tool_calls = []
+                for func_call in function_calls:
+                    if func_call.get("status") == "completed":
+                        tool_calls.append({
+                            "id": func_call.get("call_id", func_call.get("id")),
+                            "function": {
+                                "name": func_call.get("name"),
+                                "arguments": func_call.get("arguments", "{}")
+                            }
+                        })
+                
+                if tool_calls:
+                    # Execute the tool calls
+                    tool_results = await self.handle_tool_calls(user_id, tool_calls)
+                    print(f"🔧 Tool execution results: {tool_results}")
+                    
+                    # Format tool results for AI response
+                    if tool_results:
+                        results_summary = []
+                        for result in tool_results:
+                            if result.get("result", {}).get("success", False):
+                                if result["tool_name"] == "gmail":
+                                    gmail_result = result["result"]
+                                    action = gmail_result.get("action")
+                                    
+                                    if action == "find_recent":
+                                        messages = gmail_result.get("messages", [])
+                                        results_summary.append(f"📧 **Latest Email Found:**\n")
+                                        if messages:
+                                            for msg in messages[:3]:  # Show top 3
+                                                from_addr = msg.get('from', 'Unknown')
+                                                subject = msg.get('subject', 'No subject')
+                                                snippet = msg.get('snippet', '')
+                                                date = msg.get('date', '')
+                                                
+                                                results_summary.append(f"**From:** {from_addr}")
+                                                results_summary.append(f"**Subject:** {subject}")
+                                                results_summary.append(f"**Date:** {date}")
+                                                if snippet:
+                                                    results_summary.append(f"**Preview:** {snippet[:200]}{'...' if len(snippet) > 200 else ''}")
+                                                results_summary.append("---")
+                                        else:
+                                            results_summary.append("No recent emails found.")
+                                    
+                                    elif action == "summarize":
+                                        summary = gmail_result.get("summary", "")
+                                        key_messages = gmail_result.get("key_messages", [])
+                                        
+                                        results_summary.append(f"📊 **Email Summary:**\n")
+                                        results_summary.append(summary)
+                                        
+                                        if key_messages:
+                                            results_summary.append("\n**Key Messages:**")
+                                            for msg in key_messages[:2]:  # Show top 2
+                                                from_addr = msg.get('from', 'Unknown')
+                                                subject = msg.get('subject', 'No subject')
+                                                snippet = msg.get('snippet', '')
+                                                
+                                                results_summary.append(f"\n• **From:** {from_addr}")
+                                                results_summary.append(f"  **Subject:** {subject}")
+                                                if snippet:
+                                                    results_summary.append(f"  **Content:** {snippet[:150]}{'...' if len(snippet) > 150 else ''}")
+                                    
+                                    elif action in ["search", "analyze"]:
+                                        messages = gmail_result.get("messages", [])
+                                        total_found = gmail_result.get("total_found", len(messages))
+                                        
+                                        results_summary.append(f"🔍 **Search Results:** Found {total_found} emails")
+                                        if messages:
+                                            results_summary.append("\n**Messages:**")
+                                            for msg in messages[:3]:
+                                                from_addr = msg.get('from', 'Unknown')
+                                                subject = msg.get('subject', 'No subject')
+                                                results_summary.append(f"• {from_addr} - {subject}")
+                        
+                        if results_summary:
+                            assistant_content = "\n".join(results_summary)
+                        else:
+                            assistant_content = "I was able to access your Gmail but didn't find any emails matching your request."
+                    else:
+                        assistant_content = "I tried to access your Gmail but encountered an issue. Please make sure you're authenticated with Google."
+            
+            # Only get default response text if we haven't set assistant_content from function calls
+            if not assistant_content:
+                assistant_content = stringify_text(api_response.get("output_text") or "")
             
             # Handle incomplete responses (like GPT-5-mini hitting token limit)
             status = api_response.get("status")

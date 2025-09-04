@@ -29,6 +29,9 @@ RUN SUPABASE_URL=https://test.supabase.co \
     SUPABASE_DB_URL=postgresql://test:test@localhost:5432/test \
     OPENAI_API_KEY=test-openai-key \
     SECRET_KEY=test-secret-key-for-docker-build \
+    GOOGLE_CLIENT_ID=test-google-client-id \
+    GOOGLE_CLIENT_SECRET=test-google-client-secret \
+    GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback \
     python -m pytest tests/test_api_ping/ -v --tb=short
 
 EXPOSE 8000

@@ -20,6 +20,7 @@ from .api.v1.fal_tools import router as fal_tools_router
 from .api.v1.agents import router as agents_router_v1
 from .api.v1.admin import router as admin_router_v1
 from .api.v1.settings import router as settings_router_v1
+from .api.v1.google_api import router as google_api_router_v1
 
 from .database import get_supabase_config
 
@@ -74,6 +75,10 @@ app.include_router(fal_tools_router, prefix="/api/v1/fal-tools", tags=["fal-tool
 app.include_router(agents_router_v1, prefix="/api/v1/agents", tags=["agents"])
 app.include_router(admin_router_v1, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(settings_router_v1, prefix="/api/v1/settings", tags=["settings"])
+app.include_router(google_api_router_v1, prefix="/api/v1/google", tags=["google-api"])
+
+# Direct Google OAuth callback route for frontend redirect
+app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oauth"])
 
 
 @app.on_event("startup")

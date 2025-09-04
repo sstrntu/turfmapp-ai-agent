@@ -1,7 +1,8 @@
 services:
   backend:
     build: ./backend
-    network_mode: host
+    ports:
+      - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - FAL_KEY=${FAL_KEY}
@@ -12,6 +13,9 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - BACKEND_CORS_ORIGINS=http://localhost:3005
       - FRONTEND_URL=http://localhost:3005
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/auth/callback
     volumes:
       - ./backend:/app
       - backend_data:/app/data
