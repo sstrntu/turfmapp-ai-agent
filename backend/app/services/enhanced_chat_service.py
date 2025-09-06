@@ -151,6 +151,157 @@ class EnhancedChatService:
             "reasoning_effort": "medium"
         })
     
+    async def _handle_google_mcp_request(
+        self,
+        user_message: str,
+        conversation_history: List[Dict[str, Any]],
+        user_id: str,
+        enabled_tools: Dict[str, bool],
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Handle Google MCP request directly without intelligent agents."""
+        try:
+            # Determine which tools to use based on enabled_tools
+            tools_to_use = []
+            if enabled_tools.get('gmail'):
+                # Use Gmail search as the primary tool
+                tools_to_use.append('gmail_recent')
+                if any(keyword in user_message.lower() for keyword in ['search', 'find', 'about', 'from']):
+                    tools_to_use = ['gmail_search']  # Use search instead if query seems like a search
+            
+            if enabled_tools.get('calendar'):
+                tools_to_use.append('calendar_upcoming')
+                
+            if enabled_tools.get('drive'):
+                tools_to_use.append('drive_list_files')
+            
+            if not tools_to_use:
+                return {"success": False, "response": "No Google tools were enabled."}
+            
+            print(f"🔧 Using Google MCP tools: {tools_to_use}")
+            
+            # Get Google MCP client
+            from .mcp_client_simple import google_mcp_client
+            
+            # Execute tools
+            tool_results = []
+            for tool_name in tools_to_use:
+                try:
+                    # Prepare parameters based on tool type
+                    params = {"user_id": user_id}
+                    
+                    if tool_name == 'gmail_search':
+                        # Extract search query from user message
+                        params["query"] = self._extract_gmail_search_query(user_message)
+                        params["max_results"] = 10
+                    elif tool_name == 'gmail_recent':
+                        params["max_results"] = 5
+                    elif tool_name == 'calendar_upcoming':
+                        params["max_results"] = 5
+                    elif tool_name == 'drive_list_files':
+                        params["max_results"] = 10
+                    
+                    print(f"🔧 Calling {tool_name} with params: {params}")
+                    result = await google_mcp_client.call_tool(tool_name, params)
+                    
+                    tool_results.append({
+                        "tool": tool_name,
+                        "success": result.get("success", False),
+                        "response": result.get("response", ""),
+                        "error": result.get("error")
+                    })
+                    
+                    print(f"🔧 Tool {tool_name} result: {result.get('success', False)}")
+                    
+                except Exception as e:
+                    print(f"❌ Error calling {tool_name}: {e}")
+                    tool_results.append({
+                        "tool": tool_name,
+                        "success": False,
+                        "response": "",
+                        "error": str(e)
+                    })
+            
+            # Combine successful results
+            successful_results = [r for r in tool_results if r["success"]]
+            
+            if not successful_results:
+                return {
+                    "success": False, 
+                    "response": "I couldn't retrieve data from your Google services. Please check your permissions and try again."
+                }
+            
+            # Format response
+            response_parts = []
+            tools_used = []
+            
+            for result in successful_results:
+                tool_name = result["tool"]
+                tools_used.append(tool_name)
+                
+                if result["response"]:
+                    if tool_name.startswith('gmail'):
+                        response_parts.append(f"📧 **Gmail**: {result['response']}")
+                    elif tool_name.startswith('calendar'):
+                        response_parts.append(f"📅 **Calendar**: {result['response']}")
+                    elif tool_name.startswith('drive'):
+                        response_parts.append(f"💾 **Drive**: {result['response']}")
+            
+            if not response_parts:
+                return {
+                    "success": False,
+                    "response": "The Google services returned empty results."
+                }
+            
+            final_response = "\n\n".join(response_parts)
+            
+            return {
+                "success": True,
+                "response": final_response,
+                "tools_used": tools_used,
+                "sources": []
+            }
+            
+        except Exception as e:
+            print(f"❌ Error in _handle_google_mcp_request: {e}")
+            return {
+                "success": False,
+                "response": f"Error accessing Google services: {str(e)}"
+            }
+    
+    def _extract_gmail_search_query(self, user_message: str) -> str:
+        """Extract search query from user message for Gmail search."""
+        message_lower = user_message.lower()
+        
+        # Look for common search patterns
+        search_patterns = [
+            r'emails? about (.+)',
+            r'find emails? (.+)',
+            r'search for (.+)',
+            r'emails? from (.+)',
+            r'messages? about (.+)',
+        ]
+        
+        import re
+        for pattern in search_patterns:
+            match = re.search(pattern, message_lower)
+            if match:
+                return match.group(1).strip()
+        
+        # Fallback: use the whole message but remove common prefixes
+        query = message_lower
+        prefixes_to_remove = [
+            'show me', 'find', 'search', 'get', 'emails about', 'messages about', 
+            'my emails', 'my messages', 'emails', 'messages'
+        ]
+        
+        for prefix in prefixes_to_remove:
+            if query.startswith(prefix):
+                query = query[len(prefix):].strip()
+                break
+        
+        return query[:100]  # Limit query length
+    
     async def handle_tool_calls(self, user_id: str, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the AI assistant with MCP integration."""
         tool_results = []
@@ -277,6 +428,28 @@ class EnhancedChatService:
                                 "parameters": func.get("parameters", {})
                             }
                             responses_api_tools.append(responses_tool)
+                        elif tool.get("type") == "web_search_preview":
+                            # Handle web search tools for Responses API
+                            web_search_tool = {
+                                "type": "web_search_preview",
+                                "user_location": tool.get("user_location", {"type": "approximate"}),
+                                "search_context_size": tool.get("search_context_size", "medium")
+                            }
+                            responses_api_tools.append(web_search_tool)
+                            print(f"🌐 Added web search tool to Responses API payload")
+                        elif tool.get("type") == "image_generation":
+                            # Handle image generation tools for Responses API
+                            image_gen_tool = {
+                                "type": "image_generation",
+                                "size": tool.get("size", "auto"),
+                                "quality": tool.get("quality", "auto"),
+                                "output_format": tool.get("output_format", "png"),
+                                "background": tool.get("background", "auto"),
+                                "moderation": tool.get("moderation", "auto"),
+                                "partial_images": tool.get("partial_images", 3)
+                            }
+                            responses_api_tools.append(image_gen_tool)
+                            print(f"🎨 Added image generation tool to Responses API payload")
                     
                     payload["tools"] = responses_api_tools
                     payload["tool_choice"] = kwargs.get("tool_choice", "auto")
@@ -423,81 +596,37 @@ For general knowledge questions, use web search or answer from your training dat
             conversation_id, user_id, "user", message
         )
         
-        # Use Master Agent for intelligent conversation orchestration
-        try:
-            print("🧠 Using Master Agent for intelligent conversation orchestration")
-            
-            master_result = await master_agent.process_user_request(
-                user_message=message,
-                conversation_history=formatted_history, 
-                user_id=user_id,
-                mcp_client=google_mcp_client
-            )
-            
-            if master_result.get("success"):
-                # Master agent successfully handled the query
-                assistant_content = master_result.get("response", "")
-                
-                # Save assistant message
-                await self.save_message_to_conversation(
-                    conversation_id, user_id, "assistant", assistant_content,
-                    {
-                        "agent_used": "master_agent",
-                        "intent": master_result.get("intent"),
-                        "tools_used": master_result.get("tools_used", []),
-                        "model": model
-                    }
-                )
-                
-                # Create response messages
-                user_message = {
-                    "id": str(uuid.uuid4()),
-                    "role": "user", 
-                    "content": message,
-                    "created_at": datetime.utcnow().isoformat()
-                }
-                
-                assistant_message = {
-                    "id": str(uuid.uuid4()),
-                    "role": "assistant",
-                    "content": assistant_content,
-                    "created_at": datetime.utcnow().isoformat()
-                }
-                
-                return {
-                    "conversation_id": conversation_id,
-                    "user_message": user_message,
-                    "assistant_message": assistant_message,
-                    "reasoning": None,
-                    "sources": []
-                }
-            else:
-                print("🧠 Master agent failed, falling back to context agent")
-                
-        except Exception as e:
-            print(f"❌ Master agent error: {e}")
-            print("🧠 Falling back to context agent")
+        # Check if Google MCP tools are explicitly requested
+        google_mcp_tools = None
+        if 'tools' in kwargs and kwargs['tools']:
+            for tool in kwargs['tools']:
+                if tool.get('type') == 'google_mcp':
+                    google_mcp_tools = tool.get('enabled_tools', {})
+                    break
         
-        # Fallback: Check if the conversation context agent should handle this query
-        if await conversation_context_agent.should_use_agent_for_query(message, formatted_history):
-            print("🤖 Using Conversation Context Agent for intelligent query handling")
+        if google_mcp_tools and any(google_mcp_tools.values()):
+            print(f"🔧 Google MCP tools explicitly requested: {google_mcp_tools}")
             
+            # Handle Google MCP tools directly
             try:
-                agent_result = await conversation_context_agent.handle_contextual_query(
-                    message, formatted_history, user_id, google_mcp_client
+                mcp_result = await self._handle_google_mcp_request(
+                    user_message=message,
+                    conversation_history=formatted_history,
+                    user_id=user_id,
+                    enabled_tools=google_mcp_tools,
+                    **kwargs
                 )
                 
-                if agent_result.get('success'):
-                    # Agent successfully handled the query
-                    assistant_content = agent_result.get('response', '')
+                if mcp_result.get("success"):
+                    assistant_content = mcp_result.get("response", "")
                     
                     # Save assistant message
                     await self.save_message_to_conversation(
                         conversation_id, user_id, "assistant", assistant_content,
                         {
-                            "agent_used": "conversation_context_agent",
-                            "service": agent_result.get('service'),
-                            "tool_used": agent_result.get('tool_used'),
+                            "google_mcp_used": True,
+                            "enabled_tools": google_mcp_tools,
+                            "tools_used": mcp_result.get("tools_used", []),
                             "model": model
                         }
                     )
@@ -522,78 +651,20 @@ For general knowledge questions, use web search or answer from your training dat
                         "user_message": user_message,
                         "assistant_message": assistant_message,
                         "reasoning": None,
-                        "sources": []
+                        "sources": mcp_result.get("sources", [])
                     }
-                elif agent_result.get('use_default_llm'):
-                    print("🤖 Context agent recommends using default LLM flow")
-                    # Continue with normal LLM processing below
                 else:
-                    print(f"🤖 Context agent failed: {agent_result.get('error', 'Unknown error')}")
-                    # Continue with normal LLM processing below
-                    
+                    print("❌ Google MCP failed, falling back to original behavior")
             except Exception as e:
-                print(f"❌ Context agent error: {e}")
-                # Continue with normal LLM processing below
+                print(f"❌ Google MCP error: {e}, falling back to original behavior")
+
+        # Use original behavior - direct API call like the original repo
+        print("🚀 Using original behavior - calling Responses API directly")
         
-        # Provide all available tools to the LLM and let it decide what to use
+        # Prepare tools for API call (from original repo logic - use web search tools if requested)
         tools_to_include = kwargs.get("tools", [])
         
-        # Get existing tool names to avoid duplicates
-        if tools_to_include is None:
-            tools_to_include = []
-            
-        existing_tool_names = {tool.get("function", {}).get("name") for tool in tools_to_include if tool.get("type") == "function"}
-        
-        # Check if this is a general knowledge question that shouldn't use Google tools
-        is_general_knowledge = self._is_general_knowledge_question(message)
-        
-        # Always include all MCP tools - let the LLM decide what to use
-        try:
-            print("🔧 Getting all MCP tools for LLM to choose from")
-            mcp_tools = await get_all_google_tools()
-            
-            if mcp_tools is None:
-                print("❌ get_all_google_tools() returned None")
-                mcp_tools = []
-            elif not isinstance(mcp_tools, list):
-                print(f"❌ get_all_google_tools() returned non-list: {type(mcp_tools)}")
-                mcp_tools = []
-            
-            print(f"🔧 Available MCP tools count: {len(mcp_tools)}")
-            
-            # Add MCP tools - filter out Google tools for general knowledge questions
-            for mcp_tool in mcp_tools:
-                if not isinstance(mcp_tool, dict):
-                    continue
-                    
-                tool_name = mcp_tool.get("name")
-                if tool_name and tool_name not in existing_tool_names:
-                    # Skip Google tools for general knowledge questions
-                    if is_general_knowledge and tool_name.startswith(('gmail_', 'drive_', 'calendar_')):
-                        print(f"🔧 Skipping Google tool '{tool_name}' for general knowledge question")
-                        continue
-                        
-                    # Convert MCP tool format to OpenAI function format
-                    openai_tool = {
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "description": mcp_tool.get("description"),
-                            "parameters": mcp_tool.get("inputSchema")
-                        }
-                    }
-                    tools_to_include.append(openai_tool)
-                    existing_tool_names.add(tool_name)
-            
-            print(f"🔧 Included {len([t for t in tools_to_include if t.get('function', {}).get('name', '').startswith(('gmail_', 'drive_', 'calendar_'))])} Google MCP tools")
-            
-        except Exception as e:
-            print(f"❌ Failed to get MCP tools: {e}")
-            print("⚠️  Google services unavailable due to MCP client failure")
-        
-        print(f"🔧 Total tools available to LLM: {len(tools_to_include)}")
-        
-        # Call API
+        # Call API directly (original repo behavior)
         try:
             api_response = await self.call_responses_api(
                 messages=all_messages,
@@ -603,17 +674,13 @@ For general knowledge questions, use web search or answer from your training dat
                 **{k: v for k, v in kwargs.items() if k not in ["model", "include_reasoning", "tools"]}
             )
             
-            # Extract assistant response from Responses API format
+            # Extract assistant response from Responses API format (original repo logic)
             assistant_content = ""
             reasoning = None
+            sources = []  # Initialize sources list
             
-            # Parse Responses API output with debugging
-            print(f"🔍 API Response for model {model} (keys only): {api_response.keys()}")
-            print(f"🔍 API Response content: {api_response.get('content', 'No content field')}")
-            print(f"🔍 API Response output: {api_response.get('output', 'No output field')}")
-            if 'choices' in api_response:
-                print(f"🔍 API Response choices: {api_response.get('choices', [])}")
-            print(f"🔍 Full API Response: {api_response}")
+            # Parse Responses API output with debugging for GPT-5-mini
+            print(f"🔍 API Response for model {model}:", api_response)
             
             # Check if there are any tool calls in the response
             if "tool_calls" in api_response:
@@ -624,9 +691,8 @@ For general knowledge questions, use web search or answer from your training dat
             # Check the output structure for function calls
             output_items = api_response.get("output", [])
             print(f"🔧 Output items: {len(output_items) if output_items else 0}")
-            print(f"🔧 Full API response structure: {api_response.keys()}")
             
-            # Handle function calls from the API response
+            # Handle function calls from the API response (original repo logic)
             function_calls = []
             for i, item in enumerate(output_items):
                 if isinstance(item, dict):
@@ -641,271 +707,103 @@ For general knowledge questions, use web search or answer from your training dat
                     elif item_type == "message":
                         content = item.get("content", [])
                         print(f"🔧 Message content: {content}")
-            
-            # Process function calls if any were found
-            if function_calls:
-                print(f"🔧 Processing {len(function_calls)} function calls...")
-                
-                # Convert function calls to tool call format for processing
-                tool_calls = []
-                for func_call in function_calls:
-                    if func_call.get("status") == "completed":
-                        tool_calls.append({
-                            "id": func_call.get("call_id", func_call.get("id")),
-                            "function": {
-                                "name": func_call.get("name"),
-                                "arguments": func_call.get("arguments", "{}")
-                            }
-                        })
-                
-                if tool_calls:
-                    # Execute the tool calls
-                    tool_results = await self.handle_tool_calls(user_id, tool_calls)
-                    print(f"🔧 Tool execution results: {tool_results}")
-                    
-                    # Format tool results for AI response
-                    if tool_results:
-                        results_summary = []
-                        for result in tool_results:
-                            tool_result = result.get("result", {})
-                            tool_name = result.get("tool_name", "Tool")
-                            
-                            # All tools now return formatted responses in the "response" field
-                            if "response" in tool_result:
-                                results_summary.append(tool_result["response"])
-                            elif tool_result.get("success"):
-                                # Fallback for tools that don't provide formatted responses
-                                results_summary.append(f"✅ {tool_name} executed successfully")
-                            else:
-                                # Handle errors
-                                error_msg = tool_result.get("error", "Unknown error")
-                                results_summary.append(f"❌ {tool_name} failed: {error_msg}")
                         
-                        if results_summary:
-                            assistant_content = "\n".join(results_summary)
-                        else:
-                            assistant_content = "I attempted to use tools to help with your request, but didn't find the expected results."
-                    else:
-                        assistant_content = "I tried to access your Gmail but encountered an issue. Please make sure you're authenticated with Google."
+                        # Extract text from message content and collect annotations
+                        if content and isinstance(content, list):
+                            for content_item in content:
+                                if isinstance(content_item, dict) and content_item.get("type") == "output_text":
+                                    text = content_item.get("text", "")
+                                    if text:
+                                        assistant_content = text
+                                        print(f"🔧 Extracted message text: {text[:100]}...")
+                                        
+                                        # Extract sources from annotations (URL citations)
+                                        annotations = content_item.get("annotations", [])
+                                        if annotations:
+                                            print(f"🔧 Found {len(annotations)} annotations")
+                                            for annotation in annotations:
+                                                if annotation.get("type") == "url_citation":
+                                                    url = annotation.get("url", "")
+                                                    title = annotation.get("title", "")
+                                                    if url:
+                                                        # Extract domain for favicon
+                                                        from urllib.parse import urlparse
+                                                        try:
+                                                            parsed = urlparse(url)
+                                                            domain = parsed.netloc
+                                                            
+                                                            source = {
+                                                                "url": url,
+                                                                "title": title if title else domain,
+                                                                "site": domain,
+                                                                "favicon": f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+                                                            }
+                                                            sources.append(source)
+                                                            print(f"🔧 Added source: {domain}")
+                                                        except Exception as e:
+                                                            print(f"❌ Failed to parse URL {url}: {e}")
+                                        break
             
             # Only get default response text if we haven't set assistant_content from function calls
             if not assistant_content:
-                assistant_content = stringify_text(api_response.get("output_text") or "")
+                assistant_content = self.stringify_text(api_response.get("output_text") or "")
             
             # Handle incomplete responses (like GPT-5-mini hitting token limit)
             status = api_response.get("status")
             if status == "incomplete":
-                incomplete_reason = api_response.get("incomplete_details", {}).get("reason", "unknown")
-                print(f"⚠️ Incomplete response for {model}: {incomplete_reason}")
-                
-                if incomplete_reason == "max_output_tokens":
-                    # Try to extract partial content from the output array
-                    output_items = api_response.get("output", [])
-                    if isinstance(output_items, list):
-                        # Look for any text content in the output items
-                        text_parts = []
-                        web_searches = []
-                        
-                        for item in output_items:
-                            if not isinstance(item, dict):
-                                continue
-                            
-                            item_type = item.get("type")
-                            if item_type == "output_text":
-                                text_parts.append(stringify_text(item.get("text", "")))
-                            elif item_type == "web_search_call" and item.get("status") == "completed":
-                                # Extract search query to show what was being researched
-                                query = item.get("action", {}).get("query", "")
-                                if query:
-                                    web_searches.append(query)
-                        
-                        if text_parts:
-                            assistant_content = "".join(text_parts)
-                        elif web_searches:
-                            # If no text but web searches were performed, create a helpful message
-                            assistant_content = f"I was researching your question about: {', '.join(web_searches[:3])}... but my response was cut off due to length. Please try asking a more specific question."
+                assistant_content += "\n\n*[Response was truncated due to length limits]*"
             
-            if not assistant_content:
-                # Try alternative response formats for different models
-                output_items = api_response.get("output", [])
-                
-                # GPT-5-mini might use different response format
-                if model == "gpt-5-mini" and not output_items:
-                    # Check for choices format (similar to chat completions)
-                    choices = api_response.get("choices", [])
-                    if choices and isinstance(choices, list):
-                        first_choice = choices[0]
-                        if isinstance(first_choice, dict):
-                            # Try message.content format
-                            message = first_choice.get("message", {})
-                            if isinstance(message, dict):
-                                assistant_content = stringify_text(message.get("content", ""))
-                            # Try text format
-                            if not assistant_content:
-                                assistant_content = stringify_text(first_choice.get("text", ""))
-                
-                # Standard output parsing for other models
-                if not assistant_content and isinstance(output_items, list):
-                    parts = []
-                    for item in output_items:
-                        if not isinstance(item, dict):
-                            continue
-                        item_type = item.get("type")
-                        if item_type == "output_text":
-                            parts.append(stringify_text(item.get("text")))
-                            continue
-                        if item_type == "message":
-                            for block in item.get("content", []) or []:
-                                if not isinstance(block, dict):
-                                    continue
-                                block_type = block.get("type")
-                                if block_type == "output_text":
-                                    parts.append(stringify_text(block.get("text")))
-                    assistant_content = "".join(parts)
+            # Extract reasoning if available
+            if include_reasoning and "reasoning" in api_response:
+                reasoning = api_response["reasoning"]
             
-            # Extract reasoning if available (from working version)
-            if include_reasoning:
-                reasoning_data = api_response.get("reasoning", {})
-                if isinstance(reasoning_data, dict):
-                    reasoning = reasoning_data.get("summary", "")
-            
-            # Ensure content is not empty
-            if not assistant_content:
-                assistant_content = "I received your message but couldn't generate a proper response. Please try again."
-            else:
-                assistant_content = stringify_text(assistant_content)
-            
-            # Extract sources from content (URLs) - restored from working version
-            sources = []
-            if isinstance(assistant_content, str) and assistant_content:
-                import re
-                from urllib.parse import urlparse
-                
-                raw_urls = re.findall(r"https?://[^\s)]+", assistant_content)
-                print(f"🔍 Found {len(raw_urls)} URLs in content")
-                seen = set()
-                for u in raw_urls:
-                    cleaned = u.rstrip('.,);]')
-                    if cleaned in seen:
-                        continue
-                    seen.add(cleaned)
-                    try:
-                        parsed = urlparse(cleaned)
-                        if parsed.scheme in {"http", "https"} and parsed.netloc:
-                            # Try multiple favicon services for better reliability
-                            favicon_urls = [
-                                f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64",
-                                f"https://favicon.io/favicon/{parsed.netloc}/64",
-                                f"https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url={parsed.netloc}&size=64"
-                            ]
-                            
-                            sources.append({
-                                "url": cleaned,
-                                "site": parsed.netloc,
-                                "favicon": favicon_urls[0],  # Use first one as primary
-                                "favicon_fallbacks": favicon_urls[1:],  # Store fallbacks
-                            })
-                    except Exception:
-                        continue
-                        
-                if sources:
-                    sources = sources[:8]
-                    print(f"✅ Extracted {len(sources)} sources: {[s['site'] for s in sources]}")
-                    
-                    # Enrich sources with thumbnails (Open Graph images)
-                    try:
-                        async with httpx.AsyncClient(timeout=httpx.Timeout(2.0, connect=1.0)) as _client:
-                            sem = asyncio.Semaphore(3)
-                            async def enrich(s: dict) -> None:
-                                try:
-                                    async with sem:
-                                        r = await _client.get(s["url"], follow_redirects=True, headers={"User-Agent": "Mozilla/5.0"})
-                                    if r.status_code >= 200 and r.status_code < 400:
-                                        html = r.text[:120000]
-                                        t = re.search(r"<title[^>]*>([\s\S]*?)</title>", html, re.IGNORECASE)
-                                        if t:
-                                            title_val = re.sub(r"\s+", " ", t.group(1).strip())
-                                            s["title"] = title_val
-                                        m = re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
-                                        if not m:
-                                            m = re.search(r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
-                                        if m:
-                                            img_url = m.group(1)
-                                            if img_url:
-                                                if img_url.startswith('//'):
-                                                    img_url = f"https:{img_url}"
-                                                elif img_url.startswith('/'):
-                                                    from urllib.parse import urljoin
-                                                    img_url = urljoin(s["url"], img_url)
-                                                s["thumbnail"] = img_url
-                                except Exception:
-                                    return
-                            await asyncio.gather(*(enrich(s) for s in sources[:3]))
-                    except Exception:
-                        pass
-                else:
-                    sources = []
-                    print("ℹ️ No sources found in content")
-            
-            # Save assistant message
-            await self.save_message_to_conversation(
-                conversation_id, 
-                user_id, 
-                "assistant", 
-                assistant_content,
-                {
-                    "sources": sources,
-                    "model": model,
-                    "api_response": api_response
-                }
-            )
-            
-            # Create response messages in working format
-            user_message = {
-                "id": str(uuid.uuid4()),
-                "role": "user", 
-                "content": message,
-                "created_at": datetime.utcnow().isoformat()
-            }
-            
-            assistant_message = {
-                "id": str(uuid.uuid4()),
-                "role": "assistant",
-                "content": assistant_content,
-                "created_at": datetime.utcnow().isoformat()
-            }
-            
-            # Debug logging for response
-            print(f"🔍 Final response sources: {sources}")
-            print(f"🔍 Sources type: {type(sources)}")
-            print(f"🔍 Sources length: {len(sources) if sources else 'None'}")
-            
-            return {
-                "conversation_id": conversation_id,
-                "user_message": user_message,
-                "assistant_message": assistant_message,
-                "reasoning": reasoning,
-                "sources": sources
-            }
+            print(f"🔍 Final assistant content length: {len(assistant_content) if assistant_content else 0}")
             
         except Exception as e:
-            # Save error message for debugging
-            error_message = f"I apologize, but I encountered an error processing your request: {str(e)}"
-            await self.save_message_to_conversation(
-                conversation_id, 
-                user_id, 
-                "assistant", 
-                error_message,
-                {"error": str(e)}
-            )
-            
-            return {
-                "conversation_id": conversation_id,
-                "user_message": {"role": "user", "content": message},
-                "assistant_message": {"role": "assistant", "content": error_message},
-                "sources": [],
-                "error": str(e)
+            print(f"❌ API call failed: {e}")
+            assistant_content = f"I apologize, but I encountered an error while processing your request: {str(e)}"
+            reasoning = None
+        
+        # Save assistant message
+        await self.save_message_to_conversation(
+            conversation_id, user_id, "assistant", assistant_content,
+            {
+                "model": model,
+                "include_reasoning": include_reasoning,
+                "original_api_used": True
             }
+        )
+        
+        # Create response messages
+        user_message = {
+            "id": str(uuid.uuid4()),
+            "role": "user", 
+            "content": message,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        assistant_message = {
+            "id": str(uuid.uuid4()),
+            "role": "assistant",
+            "content": assistant_content,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        return {
+            "conversation_id": conversation_id,
+            "user_message": user_message,
+            "assistant_message": assistant_message,
+            "reasoning": reasoning,
+            "sources": sources
+        }
+    
+    def stringify_text(self, text) -> str:
+        """Helper method to stringify text."""
+        if isinstance(text, str):
+            return text
+        elif isinstance(text, list):
+            return "".join(str(item) for item in text)
+        return str(text)
     
     async def get_conversation_list(self, user_id: str) -> List[Dict[str, Any]]:
         """Get list of conversations for a user."""
