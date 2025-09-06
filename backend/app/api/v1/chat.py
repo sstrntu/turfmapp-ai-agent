@@ -287,7 +287,54 @@ async def get_available_models():
 @router.get("/tools")
 async def get_available_tools():
     """Get list of available tools for the chatbot"""
-    return {
-        "tools": tool_manager.get_available_tools(),
-        "descriptions": tool_manager.get_tool_descriptions()
-    }
+    try:
+        # Get traditional tools from tool manager
+        traditional_tools = tool_manager.get_available_tools()
+        traditional_descriptions = tool_manager.get_tool_descriptions()
+        
+        # Get MCP tools for Google services
+        from ...services.mcp_client_simple import get_all_google_tools
+        mcp_tools = await get_all_google_tools()
+        
+        # Convert MCP tools to the expected format
+        mcp_descriptions = {}
+        mcp_tool_list = []
+        
+        for mcp_tool in mcp_tools:
+            tool_name = mcp_tool.get("name")
+            tool_desc = mcp_tool.get("description")
+            
+            # Convert to OpenAI function format
+            openai_tool = {
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "description": tool_desc,
+                    "parameters": mcp_tool.get("inputSchema")
+                }
+            }
+            
+            mcp_tool_list.append(openai_tool)
+            mcp_descriptions[tool_name] = tool_desc
+        
+        # Combine both tool sets
+        all_tools = traditional_tools + mcp_tool_list
+        all_descriptions = {**traditional_descriptions, **mcp_descriptions}
+        
+        return {
+            "tools": all_tools,
+            "descriptions": all_descriptions,
+            "mcp_tools_count": len(mcp_tools),
+            "traditional_tools_count": len(traditional_tools)
+        }
+        
+    except Exception as e:
+        # Fallback to traditional tools only
+        print(f"❌ Failed to get MCP tools: {e}")
+        return {
+            "tools": tool_manager.get_available_tools(),
+            "descriptions": tool_manager.get_tool_descriptions(),
+            "mcp_tools_count": 0,
+            "traditional_tools_count": len(tool_manager.get_available_tools()),
+            "error": f"MCP tools unavailable: {str(e)}"
+        }

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Gmail Account Management - TURFMAPP</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }
+        .primary { background: #007cba; color: white; }
+        .success { background: #28a745; color: white; }
+        .warning { background: #ffc107; color: black; }
+        .error { background: #dc3545; color: white; }
+        .secondary { background: #6c757d; color: white; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .account-item { 
+            border: 1px solid #eee; padding: 15px; margin: 10px 0; border-radius: 5px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .account-info { flex-grow: 1; }
+        .account-actions button { margin: 0 5px; }
+        .primary-badge { background: #28a745; color: white; padding: 3px 8px; border-radius: 10px; font-size: 12px; }
+        input[type="text"] { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+        .account-selector { margin: 10px 0; }
+        select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>Multi-Gmail Account Management</h1>
+    
+    <div class="section">
+        <h2>Account Status</h2>
+        <div id="account-status" class="status">Loading...</div>
+        <button id="add-account-btn" class="primary" onclick="addGoogleAccount()">
+            + Add Another Gmail Account
+        </button>
+        <button class="secondary" onclick="refreshAccountList()">🔄 Refresh</button>
+    </div>
+
+    <div class="section">
+        <h2>Connected Accounts</h2>
+        <div id="accounts-list">Loading accounts...</div>
+    </div>
+
+    <div class="section">
+        <h2>Test Multi-Account Gmail</h2>
+        
+        <div class="account-selector">
+            <label for="account-select">Select Account:</label>
+            <select id="account-select">
+                <option value="">Primary Account (Default)</option>
+            </select>
+        </div>
+        
+        <button class="primary" onclick="testGmailWithAccount()">Test Gmail with Selected Account</button>
+        <button class="warning" onclick="testAllAccounts()">Test All Accounts</button>
+        
+        <div id="gmail-results" style="margin-top: 20px;"></div>
+    </div>
+
+    <!-- Include required scripts -->
+    <script src="scripts/supabase-client.js"></script>
+
+    <script>
+        let currentUser = null;
+        let userAccounts = [];
+
+        // Initialize and check auth status
+        async function init() {
+            try {
+                // Check if user is authenticated with TURFMAPP
+                const session = await window.supabase.getSession();
+                if (!session) {
+                    document.getElementById('account-status').innerHTML = 
+                        '<div class="error">Please login to TURFMAPP first: <a href="/portal.html">Login</a></div>';
+                    return;
+                }
+
+                currentUser = session.user;
+                await refreshAccountList();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('account-status').innerHTML = 
+                    `<div class="error">Initialization failed: ${error.message}</div>`;
+            }
+        }
+
+        async function refreshAccountList() {
+            try {
+                const session = await window.supabase.getSession();
+                const response = await fetch('/api/v1/google/auth/status', {
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                userAccounts = data.data.accounts || [];
+                
+                updateAccountStatus(data.data);
+                displayAccounts(userAccounts);
+                updateAccountSelector(userAccounts);
+                
+            } catch (error) {
+                console.error('Error refreshing accounts:', error);
+                document.getElementById('account-status').innerHTML = 
+                    `<div class="error">Error loading accounts: ${error.message}</div>`;
+            }
+        }
+
+        function updateAccountStatus(statusData) {
+            const statusDiv = document.getElementById('account-status');
+            const totalAccounts = statusData.total_accounts || 0;
+            
+            if (totalAccounts > 0) {
+                statusDiv.innerHTML = 
+                    `<div class="success">✅ ${totalAccounts} Google account${totalAccounts > 1 ? 's' : ''} connected</div>
+                     <div>Primary Account: <strong>${statusData.primary_account || 'None'}</strong></div>`;
+            } else {
+                statusDiv.innerHTML = 
+                    '<div class="warning">⚠ No Google accounts connected</div>';
+            }
+        }
+
+        function displayAccounts(accounts) {
+            const accountsList = document.getElementById('accounts-list');
+            
+            if (accounts.length === 0) {
+                accountsList.innerHTML = '<p>No Google accounts connected. Add your first account above.</p>';
+                return;
+            }
+
+            const accountsHtml = accounts.map(account => `
+                <div class="account-item">
+                    <div class="account-info">
+                        <div>
+                            <strong>${account.email}</strong> 
+                            ${account.is_primary ? '<span class="primary-badge">PRIMARY</span>' : ''}
+                        </div>
+                        <div style="color: #666; font-size: 14px;">
+                            ${account.name} 
+                            ${account.nickname ? `(${account.nickname})` : ''}
+                        </div>
+                        <div style="color: #999; font-size: 12px;">
+                            Connected: ${new Date(account.connected_at * 1000).toLocaleDateString()}
+                        </div>
+                    </div>
+                    <div class="account-actions">
+                        ${!account.is_primary ? 
+                            `<button class="success" onclick="setPrimaryAccount('${account.email}')">Set Primary</button>` : 
+                            '<span style="color: #28a745;">Primary</span>'
+                        }
+                        <button class="secondary" onclick="setNickname('${account.email}')">Set Nickname</button>
+                        <button class="error" onclick="disconnectAccount('${account.email}')">Disconnect</button>
+                    </div>
+                </div>
+            `).join('');
+
+            accountsList.innerHTML = accountsHtml;
+        }
+
+        function updateAccountSelector(accounts) {
+            const selector = document.getElementById('account-select');
+            
+            // Clear existing options except the first one
+            selector.innerHTML = '<option value="">Primary Account (Default)</option>';
+            
+            accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.email;
+                option.textContent = `${account.email} ${account.nickname ? `(${account.nickname})` : ''}`;
+                selector.appendChild(option);
+            });
+        }
+
+        async function addGoogleAccount() {
+            try {
+                const session = await window.supabase.getSession();
+                const response = await fetch('/api/v1/google/auth/url?add_account=true', {
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = data.data.auth_url;
+                } else {
+                    alert('Failed to get auth URL: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function setPrimaryAccount(email) {
+            try {
+                const session = await window.supabase.getSession();
+                const response = await fetch(`/api/v1/google/accounts/${encodeURIComponent(email)}/set-primary`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert(`${email} is now your primary account`);
+                    await refreshAccountList();
+                } else {
+                    alert('Failed to set primary: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function setNickname(email) {
+            const nickname = prompt(`Enter a nickname for ${email} (e.g., "Work", "Personal"):`);
+            if (!nickname) return;
+
+            try {
+                const session = await window.supabase.getSession();
+                const formData = new FormData();
+                formData.append('nickname', nickname);
+
+                const response = await fetch(`/api/v1/google/accounts/${encodeURIComponent(email)}/nickname`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert(`Nickname "${nickname}" set for ${email}`);
+                    await refreshAccountList();
+                } else {
+                    alert('Failed to set nickname: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function disconnectAccount(email) {
+            if (!confirm(`Are you sure you want to disconnect ${email}?`)) return;
+
+            try {
+                const session = await window.supabase.getSession();
+                const response = await fetch(`/api/v1/google/accounts/${encodeURIComponent(email)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert(`${email} has been disconnected`);
+                    await refreshAccountList();
+                } else {
+                    alert('Failed to disconnect: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function testGmailWithAccount() {
+            const selectedAccount = document.getElementById('account-select').value;
+            const resultsDiv = document.getElementById('gmail-results');
+            
+            resultsDiv.innerHTML = '<div class="status">Testing Gmail access...</div>';
+
+            try {
+                const session = await window.supabase.getSession();
+                let url = '/api/v1/google/gmail/messages?max_results=3';
+                if (selectedAccount) {
+                    url += `&account=${encodeURIComponent(selectedAccount)}`;
+                }
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${session.access_token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.messages && data.messages.length > 0) {
+                    const messagesHtml = data.messages.map(msg => `
+                        <div style="border: 1px solid #eee; padding: 10px; margin: 5px 0; border-radius: 3px;">
+                            <strong>From:</strong> ${msg.from}<br>
+                            <strong>Subject:</strong> ${msg.subject}<br>
+                            <strong>Date:</strong> ${msg.date}<br>
+                            <div style="color: #666; font-size: 14px; margin-top: 5px;">
+                                ${msg.snippet.substring(0, 100)}...
+                            </div>
+                        </div>
+                    `).join('');
+
+                    resultsDiv.innerHTML = `
+                        <div class="success">✅ Gmail Test Successful</div>
+                        <div><strong>Account:</strong> ${selectedAccount || 'Primary Account'}</div>
+                        <div><strong>Found ${data.messages.length} messages:</strong></div>
+                        ${messagesHtml}
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="warning">⚠ No messages found</div>
+                        <div>Account: ${selectedAccount || 'Primary Account'}</div>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">❌ Gmail Test Failed</div>
+                    <div>Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function testAllAccounts() {
+            if (userAccounts.length === 0) {
+                alert('No accounts to test');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('gmail-results');
+            resultsDiv.innerHTML = '<div class="status">Testing all accounts...</div>';
+
+            let results = [];
+            
+            for (const account of userAccounts) {
+                try {
+                    const session = await window.supabase.getSession();
+                    const response = await fetch(`/api/v1/google/gmail/messages?max_results=1&account=${encodeURIComponent(account.email)}`, {
+                        headers: {
+                            'Authorization': `Bearer ${session.access_token}`
+                        }
+                    });
+
+                    const data = await response.json();
+                    results.push({
+                        account: account.email,
+                        success: data.messages && data.messages.length > 0,
+                        message: data.messages && data.messages.length > 0 ? 
+                            `${data.messages.length} messages found` : 
+                            'No messages found',
+                        isPrimary: account.is_primary
+                    });
+                } catch (error) {
+                    results.push({
+                        account: account.email,
+                        success: false,
+                        message: error.message,
+                        isPrimary: account.is_primary
+                    });
+                }
+            }
+
+            const resultsHtml = results.map(result => `
+                <div style="border: 1px solid #eee; padding: 10px; margin: 5px 0; border-radius: 3px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong>${result.account}</strong>
+                        ${result.isPrimary ? '<span class="primary-badge">PRIMARY</span>' : ''}
+                    </div>
+                    <div class="${result.success ? 'success' : 'error'}" style="margin-top: 5px; padding: 5px; border-radius: 3px;">
+                        ${result.success ? '✅' : '❌'} ${result.message}
+                    </div>
+                </div>
+            `).join('');
+
+            resultsDiv.innerHTML = `
+                <div class="success">📧 Multi-Account Test Complete</div>
+                <div><strong>Tested ${results.length} accounts:</strong></div>
+                ${resultsHtml}
+            `;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -9,17 +9,11 @@ from pydantic import BaseModel
 
 from ...core.auth import get_current_user_supabase
 from typing import Dict, Any
-from ...services.google_oauth import google_oauth_service
+from ...services.google_oauth import google_oauth_service, GoogleTokens, GoogleAccount
+from ...services.google_db import google_accounts_db
 
 
 router = APIRouter()
-
-
-class GoogleTokens(BaseModel):
-    """Model for storing Google OAuth tokens."""
-    access_token: str
-    refresh_token: Optional[str] = None
-    expires_at: Optional[float] = None
 
 
 class GoogleAuthResponse(BaseModel):
@@ -35,22 +29,30 @@ class GoogleCallbackRequest(BaseModel):
     state: Optional[str] = None
 
 
-# In-memory token storage (in production, use database)
-user_google_tokens: Dict[str, GoogleTokens] = {}
+# Database storage now used instead of in-memory storage
 
 
 @router.get("/auth/url", response_model=GoogleAuthResponse)
 async def get_google_auth_url(
+    add_account: bool = Query(False, description="Whether to add another account or replace primary"),
     current_user: Dict[str, Any] = Depends(get_current_user_supabase)
 ):
-    """Get Google OAuth authorization URL."""
+    """Get Google OAuth authorization URL for new account or additional account."""
     try:
-        auth_url = google_oauth_service.get_authorization_url(state=current_user["id"])
+        user_id_str = str(current_user["id"])
+        
+        # Create state with user_id and action indicator
+        state_data = f"{user_id_str}|{'add' if add_account else 'primary'}"
+        
+        auth_url = google_oauth_service.get_authorization_url(state=state_data)
         
         return GoogleAuthResponse(
             success=True,
-            message="Authorization URL generated",
-            data={"auth_url": auth_url}
+            message="Authorization URL generated for " + ("additional account" if add_account else "primary account"),
+            data={
+                "auth_url": auth_url,
+                "action": "add_account" if add_account else "set_primary"
+            }
         )
         
     except Exception as e:
@@ -99,13 +101,22 @@ async def handle_google_callback(
         print(f"  - current_user id: {current_user.get('id')}")
         print(f"  - current_user: {current_user}")
         
-        # Verify state matches current user (convert UUID to string for comparison)
-        current_user_id = str(current_user["id"])
-        if request.state != current_user_id:
-            print(f"❌ State mismatch: '{request.state}' != '{current_user_id}'")
-            raise HTTPException(status_code=400, detail=f"Invalid state parameter. Expected: {current_user_id}, Got: {request.state}")
+        # Parse state to get user_id and action
+        try:
+            state_parts = request.state.split("|")
+            state_user_id = state_parts[0]
+            action = state_parts[1] if len(state_parts) > 1 else "primary"
+        except:
+            state_user_id = request.state  # Backward compatibility
+            action = "primary"
         
-        print(f"✅ State validation passed: {request.state}")
+        # Verify state matches current user
+        current_user_id = str(current_user["id"])
+        if state_user_id != current_user_id:
+            print(f"❌ State mismatch: '{state_user_id}' != '{current_user_id}'")
+            raise HTTPException(status_code=400, detail=f"Invalid state parameter. Expected: {current_user_id}, Got: {state_user_id}")
+        
+        print(f"✅ State validation passed: {state_user_id}, action: {action}")
         
         # Exchange code for tokens
         token_data = await google_oauth_service.exchange_code_for_tokens(request.code, request.state)
@@ -113,23 +124,50 @@ async def handle_google_callback(
         if not token_data:
             raise HTTPException(status_code=400, detail="Failed to exchange code for tokens")
         
-        # Store tokens for the user (ensure string key for consistency)
+        # Get user info
+        user_info = token_data['user_info']
+        user_email = user_info.get('email', '')
+        user_name = user_info.get('name', '')
+        user_picture = user_info.get('picture', '')
+        
         user_id_str = str(current_user["id"])
-        user_google_tokens[user_id_str] = GoogleTokens(
-            access_token=token_data['access_token'],
-            refresh_token=token_data['refresh_token'],
-            expires_at=token_data['expires_in']
+        
+        # Get existing accounts to determine if this should be primary
+        existing_accounts = await google_accounts_db.get_user_google_accounts(user_id_str)
+        
+        # Create Google account object
+        import time
+        google_account = GoogleAccount(
+            email=user_email,
+            name=user_name,
+            picture=user_picture,
+            tokens=GoogleTokens(
+                access_token=token_data['access_token'],
+                refresh_token=token_data['refresh_token'],
+                expires_at=token_data['expires_in']
+            ),
+            is_primary=(action == "primary" or len(existing_accounts) == 0),
+            connected_at=time.time()
         )
         
-        print(f"✅ Stored Google tokens for user {user_id_str}")
-        print(f"🔧 Token storage keys: {list(user_google_tokens.keys())}")
+        # Save to database
+        await google_accounts_db.save_google_account(user_id_str, google_account)
+        
+        # Get updated accounts list
+        updated_accounts = await google_accounts_db.get_user_google_accounts(user_id_str)
+        
+        print(f"✅ Stored Google account {user_email} for user {user_id_str}")
+        print(f"🔧 User now has {len(updated_accounts)} Google accounts")
         
         return GoogleAuthResponse(
             success=True,
-            message="Google authentication successful",
+            message=f"Google account {user_email} connected successfully",
             data={
-                "user_info": token_data['user_info'],
-                "has_tokens": True
+                "user_info": user_info,
+                "account_email": user_email,
+                "is_primary": google_account.is_primary,
+                "total_accounts": len(updated_accounts),
+                "action": action
             }
         )
         
@@ -145,30 +183,52 @@ async def get_google_auth_status(
 ):
     """Check if user has valid Google tokens."""
     user_id_str = str(current_user["id"])
-    has_tokens = user_id_str in user_google_tokens
-    tokens = user_google_tokens.get(user_id_str) if has_tokens else None
+    
+    # Get accounts from database
+    accounts = await google_accounts_db.get_user_google_accounts(user_id_str)
+    primary_account = await google_accounts_db.get_primary_account(user_id_str)
     
     return GoogleAuthResponse(
         success=True,
         message="Auth status retrieved",
         data={
-            "has_tokens": has_tokens,
-            "expires_at": tokens.expires_at if tokens else None
+            "has_tokens": len(accounts) > 0,
+            "expires_at": primary_account.tokens.expires_at if primary_account else None,
+            "accounts": [
+                {
+                    "email": acc.email,
+                    "name": acc.name,
+                    "nickname": acc.nickname,
+                    "is_primary": acc.is_primary,
+                    "connected_at": acc.connected_at
+                }
+                for acc in accounts.values()
+            ],
+            "primary_account": primary_account.email if primary_account else None,
+            "total_accounts": len(accounts)
         }
     )
 
 
-def get_user_google_credentials(user_id: str):
-    """Get Google credentials for a user."""
-    print(f"🔍 Looking for tokens for user_id: '{user_id}' (type: {type(user_id)})")
-    print(f"🔍 Available token keys: {list(user_google_tokens.keys())}")
+async def get_user_google_credentials(user_id: str, account_email: str = None):
+    """Get Google credentials for a user, optionally for a specific account."""
+    print(f"🔍 Looking for tokens for user_id: '{user_id}', account: '{account_email}'")
     
-    tokens = user_google_tokens.get(user_id)
-    if not tokens:
-        print(f"❌ No tokens found for user {user_id}")
-        raise HTTPException(status_code=401, detail="Google authentication required")
-    
-    print(f"✅ Found tokens for user {user_id}")
+    if account_email:
+        # Specific account requested
+        account = await google_accounts_db.get_account_by_email(user_id, account_email)
+        if not account:
+            raise HTTPException(status_code=404, detail=f"Google account {account_email} not found")
+        tokens = account.tokens
+        print(f"✅ Found specific account {account_email}")
+    else:
+        # Use primary account
+        primary_account = await google_accounts_db.get_primary_account(user_id)
+        if not primary_account:
+            print(f"❌ No Google accounts found for user {user_id}")
+            raise HTTPException(status_code=401, detail="Google authentication required. Please connect your Google account in Settings.")
+        tokens = primary_account.tokens
+        print(f"✅ Using primary account {primary_account.email}")
     
     return google_oauth_service.get_credentials_from_token(
         access_token=tokens.access_token,
@@ -185,7 +245,7 @@ async def get_gmail_messages(
 ):
     """Get Gmail messages for the authenticated user."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         messages = await google_oauth_service.get_gmail_messages(
             credentials=credentials,
             query=query,
@@ -207,7 +267,7 @@ async def get_gmail_message(
 ):
     """Get full content of a specific Gmail message."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         message = await google_oauth_service.get_gmail_message_content(
             credentials=credentials,
             message_id=message_id
@@ -230,7 +290,7 @@ async def get_drive_files(
 ):
     """Get Google Drive files for the authenticated user."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         files = await google_oauth_service.get_drive_files(
             credentials=credentials,
             query=query,
@@ -254,7 +314,7 @@ async def get_calendar_events(
 ):
     """Get Google Calendar events for the authenticated user."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         events = await google_oauth_service.get_calendar_events(
             credentials=credentials,
             calendar_id=calendar_id,
@@ -311,7 +371,7 @@ async def create_folder_structure(
 ):
     """Create nested folder structure in user's Drive."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         folder_id = await google_oauth_service.create_folder_structure(
             credentials, folder_path, root_folder
         )
@@ -337,7 +397,7 @@ async def upload_file_to_drive(
 ):
     """Upload file to specific folder in user's Drive."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         
         # Read file content
         file_content = await file.read()
@@ -362,7 +422,7 @@ async def delete_file_from_drive(
 ):
     """Delete file from user's Drive."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         result = await google_oauth_service.delete_file_from_drive(credentials, file_id)
         
         return result
@@ -380,7 +440,7 @@ async def list_files_in_folder(
 ):
     """List files in specific folder path."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         result = await google_oauth_service.list_files_in_folder(credentials, folder_path)
         
         return result
@@ -398,7 +458,7 @@ async def check_folder_exists(
 ):
     """Check if folder path exists in user's Drive."""
     try:
-        credentials = get_user_google_credentials(current_user["id"])
+        credentials = await get_user_google_credentials(current_user["id"])
         # Create a basic exists check by trying to find the folder
         try:
             folder_id = await google_oauth_service.create_folder_structure(credentials, folder_path)
@@ -410,3 +470,106 @@ async def check_folder_exists(
         raise  
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to check folder: {str(e)}")
+
+
+# Multi-Account Management Endpoints
+
+@router.get("/accounts", response_model=GoogleAuthResponse)
+async def list_google_accounts(
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase)
+):
+    """List all connected Google accounts for the user."""
+    user_id_str = str(current_user["id"])
+    accounts = await google_accounts_db.get_user_google_accounts(user_id_str)
+    
+    return GoogleAuthResponse(
+        success=True,
+        message=f"Found {len(accounts)} connected accounts",
+        data={
+            "accounts": [
+                {
+                    "email": acc.email,
+                    "name": acc.name,
+                    "picture": acc.picture,
+                    "nickname": acc.nickname,
+                    "is_primary": acc.is_primary,
+                    "connected_at": acc.connected_at
+                }
+                for acc in accounts.values()
+            ],
+            "total_accounts": len(accounts)
+        }
+    )
+
+
+@router.post("/accounts/{account_email}/set-primary", response_model=GoogleAuthResponse)
+async def set_primary_account(
+    account_email: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase)
+):
+    """Set a specific account as the primary account."""
+    user_id_str = str(current_user["id"])
+    
+    # Set primary account in database
+    success = await google_accounts_db.set_primary_account(user_id_str, account_email)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Account {account_email} not found")
+    
+    return GoogleAuthResponse(
+        success=True,
+        message=f"Account {account_email} set as primary",
+        data={"primary_account": account_email}
+    )
+
+
+@router.put("/accounts/{account_email}/nickname", response_model=GoogleAuthResponse)
+async def set_account_nickname(
+    account_email: str,
+    nickname: str = Form(...),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase)
+):
+    """Set a nickname/label for a Google account."""
+    user_id_str = str(current_user["id"])
+    
+    # Update nickname in database
+    success = await google_accounts_db.update_account_nickname(user_id_str, account_email, nickname)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Account {account_email} not found")
+    
+    return GoogleAuthResponse(
+        success=True,
+        message=f"Nickname '{nickname}' set for {account_email}",
+        data={
+            "account": account_email,
+            "nickname": nickname
+        }
+    )
+
+
+@router.delete("/accounts/{account_email}", response_model=GoogleAuthResponse)
+async def disconnect_google_account(
+    account_email: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase)
+):
+    """Disconnect a specific Google account."""
+    user_id_str = str(current_user["id"])
+    
+    # Delete account from database
+    success = await google_accounts_db.delete_google_account(user_id_str, account_email)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Account {account_email} not found")
+    
+    # Get remaining accounts to see if we need to set a new primary
+    remaining_accounts = await google_accounts_db.get_user_google_accounts(user_id_str)
+    
+    return GoogleAuthResponse(
+        success=True,
+        message=f"Account {account_email} disconnected",
+        data={
+            "disconnected_account": account_email,
+            "remaining_accounts": len(remaining_accounts)
+        }
+    )

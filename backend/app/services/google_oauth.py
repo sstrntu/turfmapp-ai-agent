@@ -4,6 +4,7 @@ import io
 import json
 import os
 from typing import Optional, Dict, Any
+from pydantic import BaseModel
 
 import httpx
 from google.oauth2.credentials import Credentials
@@ -13,6 +14,24 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
 from ..models.auth import PublicUser
+
+
+class GoogleTokens(BaseModel):
+    """Model for storing Google OAuth tokens."""
+    access_token: str
+    refresh_token: Optional[str] = None
+    expires_at: Optional[float] = None
+
+
+class GoogleAccount(BaseModel):
+    """Model for storing Google account information."""
+    email: str
+    name: str
+    picture: Optional[str] = None
+    tokens: GoogleTokens
+    nickname: Optional[str] = None  # User-defined label like "Work", "Personal"
+    is_primary: bool = False
+    connected_at: float
 
 
 class GoogleOAuthService:
@@ -190,12 +209,14 @@ class GoogleOAuthService:
                 msg = service.users().messages().get(
                     userId='me',
                     id=message['id'],
-                    format='metadata',
-                    metadataHeaders=['From', 'Subject', 'Date']
+                    format='full'  # Get full message content including body
                 ).execute()
                 
                 headers = msg.get('payload', {}).get('headers', [])
                 header_dict = {h['name']: h['value'] for h in headers}
+                
+                # Extract email body content
+                body_content = self._extract_email_body(msg.get('payload', {}))
                 
                 message_details.append({
                     'id': message['id'],
@@ -203,7 +224,8 @@ class GoogleOAuthService:
                     'from': header_dict.get('From', ''),
                     'subject': header_dict.get('Subject', ''),
                     'date': header_dict.get('Date', ''),
-                    'snippet': msg.get('snippet', '')
+                    'snippet': msg.get('snippet', ''),
+                    'body': body_content  # Include full body content
                 })
             
             return {
@@ -214,6 +236,65 @@ class GoogleOAuthService:
         except HttpError as e:
             print(f"Error getting Gmail messages: {e}")
             return {'error': str(e), 'messages': []}
+    
+    def _extract_email_body(self, payload: Dict[str, Any]) -> str:
+        """Extract email body content from Gmail API payload."""
+        body_content = ""
+        
+        def decode_base64url(data: str) -> str:
+            """Decode base64url encoded data."""
+            try:
+                import base64
+                # Add padding if needed
+                missing_padding = len(data) % 4
+                if missing_padding:
+                    data += '=' * (4 - missing_padding)
+                # Replace URL-safe characters
+                data = data.replace('-', '+').replace('_', '/')
+                return base64.b64decode(data).decode('utf-8')
+            except Exception as e:
+                print(f"Error decoding base64url: {e}")
+                return ""
+        
+        def extract_text_from_part(part: Dict[str, Any]) -> str:
+            """Extract text content from a message part."""
+            mime_type = part.get('mimeType', '')
+            body = part.get('body', {})
+            
+            if mime_type == 'text/plain':
+                data = body.get('data', '')
+                if data:
+                    return decode_base64url(data)
+            elif mime_type == 'text/html':
+                data = body.get('data', '')
+                if data:
+                    # For HTML, we'll take it but prefer plain text
+                    html_content = decode_base64url(data)
+                    # Basic HTML tag removal for readability
+                    import re
+                    text_content = re.sub(r'<[^>]+>', '', html_content)
+                    text_content = re.sub(r'\s+', ' ', text_content).strip()
+                    return text_content
+            elif mime_type.startswith('multipart/'):
+                # Recursive extraction for multipart messages
+                parts = part.get('parts', [])
+                content_parts = []
+                for subpart in parts:
+                    subpart_content = extract_text_from_part(subpart)
+                    if subpart_content:
+                        content_parts.append(subpart_content)
+                return '\n'.join(content_parts)
+            
+            return ""
+        
+        # Start extraction from the main payload
+        body_content = extract_text_from_part(payload)
+        
+        # If no content found, try to get snippet as fallback
+        if not body_content.strip():
+            body_content = payload.get('snippet', '')
+        
+        return body_content.strip()
     
     async def get_gmail_message_content(self, credentials: Credentials, message_id: str) -> Dict[str, Any]:
         """Get full content of a Gmail message."""
@@ -416,17 +497,27 @@ class GoogleOAuthService:
             return {'success': False, 'error': str(e), 'files': []}
     
     # Calendar API methods
-    async def get_calendar_events(self, credentials: Credentials, calendar_id: str = 'primary', max_results: int = 10) -> Dict[str, Any]:
+    async def get_calendar_events(self, credentials: Credentials, calendar_id: str = 'primary', max_results: int = 10, upcoming_only: bool = True) -> Dict[str, Any]:
         """Get Google Calendar events for the authenticated user."""
         try:
             service = build('calendar', 'v3', credentials=credentials)
             
-            events_result = service.events().list(
-                calendarId=calendar_id,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
+            # Build query parameters
+            query_params = {
+                'calendarId': calendar_id,
+                'maxResults': max_results,
+                'singleEvents': True,
+                'orderBy': 'startTime'
+            }
+            
+            # Add time filtering for upcoming events only
+            if upcoming_only:
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc).isoformat()
+                query_params['timeMin'] = now
+                print(f"🗓️ Filtering calendar events from: {now}")
+            
+            events_result = service.events().list(**query_params).execute()
             
             return {
                 'events': events_result.get('items', []),

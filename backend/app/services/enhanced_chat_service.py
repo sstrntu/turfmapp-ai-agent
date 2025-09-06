@@ -35,6 +35,9 @@ from ..database import ConversationService, UserService
 from ..utils.chat_utils import stringify_text, extract_sources_from_response, format_chat_history
 from ..api.v1.preferences import user_preferences
 from .tool_manager import tool_manager
+from .mcp_client_simple import google_mcp_client, get_all_google_tools
+from .conversation_context_agent import conversation_context_agent
+from .master_agent import master_agent
 
 
 class EnhancedChatService:
@@ -149,7 +152,7 @@ class EnhancedChatService:
         })
     
     async def handle_tool_calls(self, user_id: str, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Handle tool calls from the AI assistant."""
+        """Handle tool calls from the AI assistant with MCP integration."""
         tool_results = []
         
         for tool_call in tool_calls:
@@ -161,8 +164,44 @@ class EnhancedChatService:
                 if isinstance(tool_args, str):
                     tool_args = json.loads(tool_args)
                 
-                # Execute tool
-                result = await tool_manager.execute_tool(tool_name, user_id, **tool_args)
+                # Check if this is a Google MCP tool
+                google_tools = [
+                    "gmail_search", "gmail_get_message", "gmail_recent", "gmail_important",
+                    "drive_list_files", "drive_create_folder", "drive_list_folder_files",
+                    "calendar_list_events", "calendar_upcoming_events"
+                ]
+                
+                if tool_name in google_tools:
+                    # Use MCP client for Google services
+                    print(f"🔧 Using MCP client for tool: {tool_name}")
+                    print(f"🔧 Tool arguments: {tool_args}")
+                    print(f"🔧 User ID: {user_id}")
+                    try:
+                        # Ensure MCP client is connected
+                        await google_mcp_client.connect()
+                        
+                        # Add user_id to arguments for MCP
+                        tool_args["user_id"] = user_id
+                        print(f"🔧 Final tool arguments: {tool_args}")
+                        
+                        # Execute via MCP
+                        result = await google_mcp_client.call_tool(tool_name, tool_args)
+                        
+                        print(f"🔧 MCP result for {tool_name}: {result}")
+                        
+                    except Exception as e:
+                        print(f"❌ MCP tool execution failed for {tool_name}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        result = {
+                            "success": False,
+                            "error": f"MCP tool execution failed: {str(e)}"
+                        }
+                
+                else:
+                    # Use traditional tool manager for non-Google tools
+                    print(f"🔧 Using traditional tool manager for: {tool_name}")
+                    result = await tool_manager.execute_tool(tool_name, user_id, **tool_args)
                 
                 tool_results.append({
                     "tool_call_id": tool_call.get("id"),
@@ -171,9 +210,10 @@ class EnhancedChatService:
                 })
                 
             except Exception as e:
+                print(f"❌ Tool execution failed for {tool_name}: {e}")
                 tool_results.append({
                     "tool_call_id": tool_call.get("id"),
-                    "tool_name": tool_call.get("function", {}).get("name"),
+                    "tool_name": tool_call.get("function", {}).get("name", "unknown"),
                     "result": {
                         "success": False,
                         "error": f"Tool execution failed: {str(e)}"
@@ -216,7 +256,7 @@ class EnhancedChatService:
         elif model not in ["gpt-5-mini"]:
             payload["temperature"] = 0.7
         
-        # Handle tools properly
+        # Handle tools properly - Responses API format
         if "tools" in kwargs and kwargs["tools"]:
             tools = kwargs["tools"]
             print(f"🔧 Processing tools in API call: {tools}")
@@ -225,33 +265,82 @@ class EnhancedChatService:
                 if isinstance(tools[0], str):
                     print(f"⚠️ Removing invalid tools format: {tools}")
                 else:
-                    payload["tools"] = tools[:5]  # Limit to 5 tools
+                    # Convert from Chat Completions format to Responses API format
+                    responses_api_tools = []
+                    for tool in tools[:5]:  # Limit to 5 tools
+                        if tool.get("type") == "function":
+                            func = tool.get("function", {})
+                            responses_tool = {
+                                "type": "function",
+                                "name": func.get("name"),
+                                "description": func.get("description"),
+                                "parameters": func.get("parameters", {})
+                            }
+                            responses_api_tools.append(responses_tool)
+                    
+                    payload["tools"] = responses_api_tools
                     payload["tool_choice"] = kwargs.get("tool_choice", "auto")
                     payload["parallel_tool_calls"] = True
-                    print(f"🔧 Added tools to payload: {payload['tools']}")
+                    print(f"🔧 Added tools to payload (Responses API format): {payload['tools']}")
         else:
             print(f"🔧 No tools provided in API call")
         
         # Add instructions for additional context
         instructions = []
+        
+        # Add critical tool usage rule at the top
+        instructions.append("""
+CRITICAL TOOL USAGE RULE:
+- Gmail, Drive, and Calendar tools are ONLY for personal data (emails, files, calendar events)
+- NEVER use these tools for general knowledge questions, sports scores, news, weather, or any non-personal data
+- For general knowledge questions, use web search or answer from your training data
+- Examples of what NOT to use Google tools for: "Who is the top scorer?", "What's the weather?", "Latest news"
+""")
+        
         if "developer_instructions" in kwargs and kwargs["developer_instructions"]:
             instructions.append(kwargs["developer_instructions"])
         if "assistant_context" in kwargs and kwargs["assistant_context"]:
             instructions.append(kwargs["assistant_context"])
         
-        # Add Gmail tool instructions if Gmail tools are available
-        if "tools" in payload and any(tool.get("function", {}).get("name") == "gmail" for tool in payload["tools"]):
-            gmail_instructions = """
-You have access to Gmail tools that can help users with their email. When users ask about their emails, use the Gmail tool to:
-- Search for emails: Use action "search" with appropriate queries
-- Find recent emails: Use action "find_recent" 
-- Read specific emails: Use action "read" with message_id
-- Analyze email patterns: Use action "analyze" with analysis_type
-- Summarize emails: Use action "summarize"
+        # Add Google service tool instructions if available
+        google_tools_available = any(tool.get("name", "").startswith(("gmail_", "drive_", "calendar_")) for tool in payload.get("tools", []))
+        if google_tools_available:
+            google_instructions = f"""
+You have access to Google service tools (Gmail, Drive, Calendar) that can help users with their personal data.
 
-Always use the Gmail tool when users ask about their emails, inbox, messages, or email-related tasks.
+CRITICAL RULE: These tools are ONLY for personal data (emails, files, calendar events). NEVER use these tools for general knowledge questions, sports scores, news, weather, or any non-personal data queries.
+
+Gmail tools (ONLY for personal emails):
+- gmail_recent: Get recent Gmail messages
+- gmail_search: Search Gmail messages with query parameters  
+- gmail_get_message: Get full content of a specific Gmail message
+- gmail_important: Get important/starred Gmail messages
+
+Drive tools (ONLY for personal files):
+- drive_list_files: List files in Google Drive
+- drive_create_folder: Create folder structure in Google Drive
+- drive_list_folder_files: List files in a specific Drive folder
+
+Calendar tools (ONLY for personal schedule):
+- calendar_list_events: List Google Calendar events
+- calendar_upcoming_events: Get upcoming calendar events
+
+Examples of when to use Google tools:
+- "Show me my recent emails"
+- "What files do I have in my Drive?"
+- "What's on my calendar today?"
+- "Find emails from John"
+
+Examples of when NOT to use Google tools:
+- "Who is the top scorer in J1?" (general knowledge - use web search instead)
+- "Who is the top J2 scorer in 2025 season?" (general knowledge - use web search instead)
+- "What is the capital of France?" (general knowledge)
+- "Tell me about the latest news" (general knowledge - use web search instead)
+- "What's the weather like?" (general knowledge - use web search instead)
+
+For general knowledge questions, use web search or answer from your training data.
 """
-            instructions.append(gmail_instructions)
+            instructions.append(google_instructions)
         
         if instructions:
             payload["instructions"] = "\n\n".join(instructions)
@@ -334,31 +423,175 @@ Always use the Gmail tool when users ask about their emails, inbox, messages, or
             conversation_id, user_id, "user", message
         )
         
-        # Auto-detect if Gmail tools should be available
-        email_keywords = ["email", "gmail", "message", "inbox", "unread", "sent", "draft", "mail"]
-        should_include_gmail_tools = any(keyword in message.lower() for keyword in email_keywords)
+        # Use Master Agent for intelligent conversation orchestration
+        try:
+            print("🧠 Using Master Agent for intelligent conversation orchestration")
+            
+            master_result = await master_agent.process_user_request(
+                user_message=message,
+                conversation_history=formatted_history, 
+                user_id=user_id,
+                mcp_client=google_mcp_client
+            )
+            
+            if master_result.get("success"):
+                # Master agent successfully handled the query
+                assistant_content = master_result.get("response", "")
+                
+                # Save assistant message
+                await self.save_message_to_conversation(
+                    conversation_id, user_id, "assistant", assistant_content,
+                    {
+                        "agent_used": "master_agent",
+                        "intent": master_result.get("intent"),
+                        "tools_used": master_result.get("tools_used", []),
+                        "model": model
+                    }
+                )
+                
+                # Create response messages
+                user_message = {
+                    "id": str(uuid.uuid4()),
+                    "role": "user", 
+                    "content": message,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+                
+                assistant_message = {
+                    "id": str(uuid.uuid4()),
+                    "role": "assistant",
+                    "content": assistant_content,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+                
+                return {
+                    "conversation_id": conversation_id,
+                    "user_message": user_message,
+                    "assistant_message": assistant_message,
+                    "reasoning": None,
+                    "sources": []
+                }
+            else:
+                print("🧠 Master agent failed, falling back to context agent")
+                
+        except Exception as e:
+            print(f"❌ Master agent error: {e}")
+            print("🧠 Falling back to context agent")
         
-        print(f"🔍 Email detection - Message: '{message}'")
-        print(f"🔍 Should include Gmail tools: {should_include_gmail_tools}")
-        print(f"🔍 Keywords found: {[kw for kw in email_keywords if kw in message.lower()]}")
+        # Fallback: Check if the conversation context agent should handle this query
+        if await conversation_context_agent.should_use_agent_for_query(message, formatted_history):
+            print("🤖 Using Conversation Context Agent for intelligent query handling")
+            
+            try:
+                agent_result = await conversation_context_agent.handle_contextual_query(
+                    message, formatted_history, user_id, google_mcp_client
+                )
+                
+                if agent_result.get('success'):
+                    # Agent successfully handled the query
+                    assistant_content = agent_result.get('response', '')
+                    
+                    # Save assistant message
+                    await self.save_message_to_conversation(
+                        conversation_id, user_id, "assistant", assistant_content,
+                        {
+                            "agent_used": "conversation_context_agent",
+                            "service": agent_result.get('service'),
+                            "tool_used": agent_result.get('tool_used'),
+                            "model": model
+                        }
+                    )
+                    
+                    # Create response messages
+                    user_message = {
+                        "id": str(uuid.uuid4()),
+                        "role": "user", 
+                        "content": message,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    assistant_message = {
+                        "id": str(uuid.uuid4()),
+                        "role": "assistant",
+                        "content": assistant_content,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    
+                    return {
+                        "conversation_id": conversation_id,
+                        "user_message": user_message,
+                        "assistant_message": assistant_message,
+                        "reasoning": None,
+                        "sources": []
+                    }
+                elif agent_result.get('use_default_llm'):
+                    print("🤖 Context agent recommends using default LLM flow")
+                    # Continue with normal LLM processing below
+                else:
+                    print(f"🤖 Context agent failed: {agent_result.get('error', 'Unknown error')}")
+                    # Continue with normal LLM processing below
+                    
+            except Exception as e:
+                print(f"❌ Context agent error: {e}")
+                # Continue with normal LLM processing below
         
-        # Prepare tools for API call
+        # Provide all available tools to the LLM and let it decide what to use
         tools_to_include = kwargs.get("tools", [])
-        if should_include_gmail_tools:
-            # Automatically include Gmail tools if user is asking about email
-            gmail_tools = tool_manager.get_available_tools()
+        
+        # Get existing tool names to avoid duplicates
+        if tools_to_include is None:
+            tools_to_include = []
             
-            # Add Gmail tools to existing tools (don't replace them)
-            existing_tool_names = {tool.get("function", {}).get("name") for tool in tools_to_include if tool.get("type") == "function"}
-            for gmail_tool in gmail_tools:
-                tool_name = gmail_tool.get("function", {}).get("name")
-                if tool_name not in existing_tool_names:
-                    tools_to_include.append(gmail_tool)
+        existing_tool_names = {tool.get("function", {}).get("name") for tool in tools_to_include if tool.get("type") == "function"}
+        
+        # Check if this is a general knowledge question that shouldn't use Google tools
+        is_general_knowledge = self._is_general_knowledge_question(message)
+        
+        # Always include all MCP tools - let the LLM decide what to use
+        try:
+            print("🔧 Getting all MCP tools for LLM to choose from")
+            mcp_tools = await get_all_google_tools()
             
-            print(f"🔧 Auto-including Gmail tools for email-related query: {message[:50]}...")
-            print(f"🔧 Total tools to include: {len(tools_to_include)}")
-        else:
-            print(f"🔧 Not including Gmail tools - should_include: {should_include_gmail_tools}, existing_tools: {len(tools_to_include)}")
+            if mcp_tools is None:
+                print("❌ get_all_google_tools() returned None")
+                mcp_tools = []
+            elif not isinstance(mcp_tools, list):
+                print(f"❌ get_all_google_tools() returned non-list: {type(mcp_tools)}")
+                mcp_tools = []
+            
+            print(f"🔧 Available MCP tools count: {len(mcp_tools)}")
+            
+            # Add MCP tools - filter out Google tools for general knowledge questions
+            for mcp_tool in mcp_tools:
+                if not isinstance(mcp_tool, dict):
+                    continue
+                    
+                tool_name = mcp_tool.get("name")
+                if tool_name and tool_name not in existing_tool_names:
+                    # Skip Google tools for general knowledge questions
+                    if is_general_knowledge and tool_name.startswith(('gmail_', 'drive_', 'calendar_')):
+                        print(f"🔧 Skipping Google tool '{tool_name}' for general knowledge question")
+                        continue
+                        
+                    # Convert MCP tool format to OpenAI function format
+                    openai_tool = {
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "description": mcp_tool.get("description"),
+                            "parameters": mcp_tool.get("inputSchema")
+                        }
+                    }
+                    tools_to_include.append(openai_tool)
+                    existing_tool_names.add(tool_name)
+            
+            print(f"🔧 Included {len([t for t in tools_to_include if t.get('function', {}).get('name', '').startswith(('gmail_', 'drive_', 'calendar_'))])} Google MCP tools")
+            
+        except Exception as e:
+            print(f"❌ Failed to get MCP tools: {e}")
+            print("⚠️  Google services unavailable due to MCP client failure")
+        
+        print(f"🔧 Total tools available to LLM: {len(tools_to_include)}")
         
         # Call API
         try:
@@ -374,8 +607,13 @@ Always use the Gmail tool when users ask about their emails, inbox, messages, or
             assistant_content = ""
             reasoning = None
             
-            # Parse Responses API output with debugging for GPT-5-mini
-            print(f"🔍 API Response for model {model}:", api_response)
+            # Parse Responses API output with debugging
+            print(f"🔍 API Response for model {model} (keys only): {api_response.keys()}")
+            print(f"🔍 API Response content: {api_response.get('content', 'No content field')}")
+            print(f"🔍 API Response output: {api_response.get('output', 'No output field')}")
+            if 'choices' in api_response:
+                print(f"🔍 API Response choices: {api_response.get('choices', [])}")
+            print(f"🔍 Full API Response: {api_response}")
             
             # Check if there are any tool calls in the response
             if "tool_calls" in api_response:
@@ -386,6 +624,7 @@ Always use the Gmail tool when users ask about their emails, inbox, messages, or
             # Check the output structure for function calls
             output_items = api_response.get("output", [])
             print(f"🔧 Output items: {len(output_items) if output_items else 0}")
+            print(f"🔧 Full API response structure: {api_response.keys()}")
             
             # Handle function calls from the API response
             function_calls = []
@@ -428,65 +667,24 @@ Always use the Gmail tool when users ask about their emails, inbox, messages, or
                     if tool_results:
                         results_summary = []
                         for result in tool_results:
-                            if result.get("result", {}).get("success", False):
-                                if result["tool_name"] == "gmail":
-                                    gmail_result = result["result"]
-                                    action = gmail_result.get("action")
-                                    
-                                    if action == "find_recent":
-                                        messages = gmail_result.get("messages", [])
-                                        results_summary.append(f"📧 **Latest Email Found:**\n")
-                                        if messages:
-                                            for msg in messages[:3]:  # Show top 3
-                                                from_addr = msg.get('from', 'Unknown')
-                                                subject = msg.get('subject', 'No subject')
-                                                snippet = msg.get('snippet', '')
-                                                date = msg.get('date', '')
-                                                
-                                                results_summary.append(f"**From:** {from_addr}")
-                                                results_summary.append(f"**Subject:** {subject}")
-                                                results_summary.append(f"**Date:** {date}")
-                                                if snippet:
-                                                    results_summary.append(f"**Preview:** {snippet[:200]}{'...' if len(snippet) > 200 else ''}")
-                                                results_summary.append("---")
-                                        else:
-                                            results_summary.append("No recent emails found.")
-                                    
-                                    elif action == "summarize":
-                                        summary = gmail_result.get("summary", "")
-                                        key_messages = gmail_result.get("key_messages", [])
-                                        
-                                        results_summary.append(f"📊 **Email Summary:**\n")
-                                        results_summary.append(summary)
-                                        
-                                        if key_messages:
-                                            results_summary.append("\n**Key Messages:**")
-                                            for msg in key_messages[:2]:  # Show top 2
-                                                from_addr = msg.get('from', 'Unknown')
-                                                subject = msg.get('subject', 'No subject')
-                                                snippet = msg.get('snippet', '')
-                                                
-                                                results_summary.append(f"\n• **From:** {from_addr}")
-                                                results_summary.append(f"  **Subject:** {subject}")
-                                                if snippet:
-                                                    results_summary.append(f"  **Content:** {snippet[:150]}{'...' if len(snippet) > 150 else ''}")
-                                    
-                                    elif action in ["search", "analyze"]:
-                                        messages = gmail_result.get("messages", [])
-                                        total_found = gmail_result.get("total_found", len(messages))
-                                        
-                                        results_summary.append(f"🔍 **Search Results:** Found {total_found} emails")
-                                        if messages:
-                                            results_summary.append("\n**Messages:**")
-                                            for msg in messages[:3]:
-                                                from_addr = msg.get('from', 'Unknown')
-                                                subject = msg.get('subject', 'No subject')
-                                                results_summary.append(f"• {from_addr} - {subject}")
+                            tool_result = result.get("result", {})
+                            tool_name = result.get("tool_name", "Tool")
+                            
+                            # All tools now return formatted responses in the "response" field
+                            if "response" in tool_result:
+                                results_summary.append(tool_result["response"])
+                            elif tool_result.get("success"):
+                                # Fallback for tools that don't provide formatted responses
+                                results_summary.append(f"✅ {tool_name} executed successfully")
+                            else:
+                                # Handle errors
+                                error_msg = tool_result.get("error", "Unknown error")
+                                results_summary.append(f"❌ {tool_name} failed: {error_msg}")
                         
                         if results_summary:
                             assistant_content = "\n".join(results_summary)
                         else:
-                            assistant_content = "I was able to access your Gmail but didn't find any emails matching your request."
+                            assistant_content = "I attempted to use tools to help with your request, but didn't find the expected results."
                     else:
                         assistant_content = "I tried to access your Gmail but encountered an issue. Please make sure you're authenticated with Google."
             
