@@ -36,8 +36,6 @@ from ..utils.chat_utils import stringify_text, extract_sources_from_response, fo
 from ..api.v1.preferences import user_preferences
 from .tool_manager import tool_manager
 from .mcp_client_simple import google_mcp_client, get_all_google_tools
-from .conversation_context_agent import conversation_context_agent
-from .master_agent import master_agent
 
 
 class EnhancedChatService:
@@ -622,9 +620,20 @@ Respond as if you're having a natural conversation with the user."""
         
         # Convert messages to conversation context string (Responses API format)
         conversation_context = ""
-        for msg in messages:
+        
+        # Add conversation history
+        for i, msg in enumerate(messages[:-1]):  # All but the last message
             role = msg["role"].title()
             conversation_context += f"{role}: {msg['content']}\n\n"
+        
+        # Emphasize the current user question
+        if messages:
+            current_msg = messages[-1]
+            if current_msg.get("role") == "user":
+                conversation_context += f"CURRENT USER QUESTION: {current_msg['content']}\n\n"
+            else:
+                role = current_msg["role"].title()
+                conversation_context += f"{role}: {current_msg['content']}\n\n"
         
         # Build payload for Responses API
         # GPT-5-mini needs more tokens for web search and reasoning
@@ -702,6 +711,13 @@ CRITICAL TOOL USAGE RULE:
 - NEVER use these tools for general knowledge questions, sports scores, news, weather, or any non-personal data
 - For general knowledge questions, use web search or answer from your training data
 - Examples of what NOT to use Google tools for: "Who is the top scorer?", "What's the weather?", "Latest news"
+
+CONVERSATION CONTEXT RULES:
+1. The current user question is marked as "CURRENT USER QUESTION:" - THIS is what you must respond to
+2. Use conversation history for context, but ALWAYS address the current question directly
+3. Never return a previous answer when asked a new question, even if they seem similar
+4. For time-sensitive data (sports scores, news, weather), always perform fresh searches regardless of history
+5. If the current question asks about personal data (emails, calendar, files), use the appropriate tools even if similar questions were asked before
 """)
         
         if "developer_instructions" in kwargs and kwargs["developer_instructions"]:
@@ -709,6 +725,13 @@ CRITICAL TOOL USAGE RULE:
         if "assistant_context" in kwargs and kwargs["assistant_context"]:
             instructions.append(kwargs["assistant_context"])
         
+        # Add web search tool instructions if available
+        web_search_available = any(tool.get("type") == "web_search_preview" for tool in payload.get("tools", []))
+        if web_search_available:
+            web_search_instructions = """
+You have tools available. Use them when they would provide better, more current information than your training data. Use web search for current information: sports scores, news, weather, current season data, latest facts, or when users ask 'who is', 'what is the latest', 'this season', 'this year'."""
+            instructions.append(web_search_instructions)
+
         # Add Google service tool instructions if available
         google_tools_available = any(tool.get("name", "").startswith(("gmail_", "drive_", "calendar_")) for tool in payload.get("tools", []))
         if google_tools_available:
@@ -819,8 +842,8 @@ For general knowledge questions, use web search or answer from your training dat
         model = kwargs.get("model", preferences.get("model", "gpt-4o"))
         include_reasoning = kwargs.get("include_reasoning", preferences.get("include_reasoning", False))
         
-        # Format messages for API
-        formatted_history = format_chat_history(history, max_context=10)
+        # Format messages for API with smart context management
+        formatted_history = format_chat_history(history, max_context=20)
         
         # Add current user message
         current_message = {"role": "user", "content": message}
@@ -1032,6 +1055,7 @@ For general knowledge questions, use web search or answer from your training dat
             print(f"❌ API call failed: {e}")
             assistant_content = f"I apologize, but I encountered an error while processing your request: {str(e)}"
             reasoning = None
+            sources = []
         
         # Save assistant message
         await self.save_message_to_conversation(

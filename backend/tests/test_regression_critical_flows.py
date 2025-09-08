@@ -108,7 +108,6 @@ class TestAPIEndpointRegression:
         critical_endpoints = [
             "/healthz",
             "/api/v1/chat/health",
-            "/api/v1/agents/health",
         ]
         
         for endpoint in critical_endpoints:
