@@ -429,6 +429,7 @@ class SimplifiedGoogleMCPClient:
     async def _handle_calendar_tool(self, name: str, credentials, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle Google Calendar tool calls."""
         try:
+            print(f"🗓️ Handling calendar tool '{name}' with arguments: {arguments}")
             if name == "calendar_list_events":
                 calendar_id = arguments.get("calendar_id", "primary")
                 max_results = arguments.get("max_results", 10)
@@ -465,16 +466,22 @@ class SimplifiedGoogleMCPClient:
             
             elif name == "calendar_upcoming_events":
                 days = arguments.get("days", 7)
+                print(f"🗓️ Getting upcoming calendar events for {days} days")
                 
                 # Get only upcoming events (future events from now)
                 result = await google_oauth_service.get_calendar_events(
                     credentials=credentials, calendar_id="primary", max_results=10, upcoming_only=True
                 )
                 
+                print(f"🗓️ Calendar API result: {result}")
+                
                 if "error" in result:
+                    print(f"❌ Calendar API error: {result['error']}")
                     return {"success": False, "response": f"❌ Failed to get upcoming events: {result['error']}", "tool": name}
                 
                 events = result.get("events", [])
+                print(f"🗓️ Found {len(events)} calendar events")
+                
                 if not events:
                     response_text = f"📅 No upcoming events in the next {days} days."
                 else:
@@ -487,12 +494,16 @@ class SimplifiedGoogleMCPClient:
                         response_text += f"{i}. **{title}**\n"
                         response_text += f"   🕐 {start_date}\n\n"
                 
+                print(f"✅ Returning calendar response: {response_text[:100]}...")
                 return {"success": True, "response": response_text, "tool": name}
             
             else:
                 return {"success": False, "error": f"Unknown Calendar tool: {name}", "tool": name}
                 
         except Exception as e:
+            print(f"❌ Calendar tool exception: {str(e)}")
+            import traceback
+            print(f"❌ Calendar tool traceback: {traceback.format_exc()}")
             return {"success": False, "error": f"Calendar tool error: {str(e)}", "tool": name}
     
     async def get_available_tools_for_openai(self) -> List[Dict[str, Any]]:

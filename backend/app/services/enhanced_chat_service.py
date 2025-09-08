@@ -159,59 +159,204 @@ class EnhancedChatService:
         enabled_tools: Dict[str, bool],
         **kwargs
     ) -> Dict[str, Any]:
-        """Handle Google MCP request directly without intelligent agents."""
+        """Handle Google MCP request using AI-driven tool selection."""
         try:
-            # Determine which tools to use based on enabled_tools
-            tools_to_use = []
+            # Create function definitions for available tools based on enabled_tools
+            available_tools = []
+            
             if enabled_tools.get('gmail'):
-                # Use Gmail search as the primary tool
-                tools_to_use.append('gmail_recent')
-                if any(keyword in user_message.lower() for keyword in ['search', 'find', 'about', 'from']):
-                    tools_to_use = ['gmail_search']  # Use search instead if query seems like a search
+                # Gmail tools with rich descriptions
+                available_tools.extend([
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "gmail_recent",
+                            "description": "Get the most recent Gmail messages in chronological order. Use this when users ask about 'latest', 'recent', 'first', 'newest', or 'last' emails. Perfect for questions like 'what is my first email about?' or 'show me my latest message'. This tool retrieves emails by recency, not by search criteria.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "max_results": {
+                                        "type": "integer",
+                                        "description": "Number of emails to retrieve. Use 1 for 'first/latest/newest', 3-5 for 'recent emails', up to 10 for broader requests.",
+                                        "default": 5,
+                                        "minimum": 1,
+                                        "maximum": 50
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "type": "function", 
+                        "function": {
+                            "name": "gmail_search",
+                            "description": "Search Gmail messages using specific queries. Use this when users want to find emails about specific topics, from specific people, or containing certain keywords. Do NOT use for recent/latest emails - use gmail_recent instead. Perfect for 'find emails from John', 'emails about project', or 'messages containing meeting'.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "query": {
+                                        "type": "string",
+                                        "description": "Gmail search query. Extract the main search terms from user's request. For 'emails from John' use 'John', for 'about project deadline' use 'project deadline'."
+                                    },
+                                    "max_results": {
+                                        "type": "integer", 
+                                        "description": "Number of emails to retrieve",
+                                        "default": 10,
+                                        "minimum": 1,
+                                        "maximum": 50
+                                    }
+                                },
+                                "required": ["query"]
+                            }
+                        }
+                    }
+                ])
             
             if enabled_tools.get('calendar'):
-                tools_to_use.append('calendar_upcoming')
+                available_tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": "calendar_upcoming_events", 
+                        "description": "Get upcoming calendar events and meetings. Use for scheduling questions, meeting inquiries, or calendar requests.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "max_results": {"type": "integer", "default": 5}
+                            }
+                        }
+                    }
+                })
                 
             if enabled_tools.get('drive'):
-                tools_to_use.append('drive_list_files')
+                available_tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": "drive_list_files",
+                        "description": "List files in Google Drive. Use for file-related questions or document requests.",
+                        "parameters": {
+                            "type": "object", 
+                            "properties": {
+                                "max_results": {"type": "integer", "default": 10}
+                            }
+                        }
+                    }
+                })
             
-            if not tools_to_use:
-                return {"success": False, "response": "No Google tools were enabled."}
+            if not available_tools:
+                # Provide intelligent response based on what tools the user likely needs
+                message_lower = user_message.lower()
+                if any(keyword in message_lower for keyword in ['email', 'gmail', 'message', 'inbox']):
+                    return {
+                        "success": False, 
+                        "response": "I'd love to help you with your emails! To access your Gmail, please enable Gmail access by clicking the Gmail icon (📧) in the interface. Once connected, I can help you check your latest emails, search for specific messages, and summarize your inbox.",
+                        "suggested_tools": ["gmail"]
+                    }
+                elif any(keyword in message_lower for keyword in ['calendar', 'meeting', 'event', 'schedule']):
+                    return {
+                        "success": False,
+                        "response": "I can help you with your calendar! Please enable Calendar access by clicking the Calendar icon (📅) in the interface to check your upcoming meetings and events.",
+                        "suggested_tools": ["calendar"]
+                    }
+                elif any(keyword in message_lower for keyword in ['file', 'drive', 'document']):
+                    return {
+                        "success": False,
+                        "response": "I can help you with your files! Please enable Google Drive access by clicking the Drive icon (📁) in the interface to browse your documents and files.",
+                        "suggested_tools": ["drive"]
+                    }
+                else:
+                    return {"success": False, "response": "No Google tools were enabled. Please enable the tools you'd like to use (Gmail 📧, Calendar 📅, or Drive 📁) in the interface."}
             
-            print(f"🔧 Using Google MCP tools: {tools_to_use}")
+            # Use AI to select and call the appropriate tools
+            print(f"🤖 Using AI-driven tool selection with {len(available_tools)} available tools")
             
             # Get Google MCP client
             from .mcp_client_simple import google_mcp_client
             
-            # Execute tools
+            # Create system prompt for tool selection
+            tool_selection_prompt = f"""You are helping a user with their Google services (Gmail, Calendar, Drive).
+
+User question: "{user_message}"
+
+Available tools:
+{chr(10).join([f"- {tool['function']['name']}: {tool['function']['description']}" for tool in available_tools])}
+
+Select the most appropriate tool(s) and parameters to answer the user's question. Be precise with parameters:
+- For 'first/latest/newest' email questions: use gmail_recent with max_results=1
+- For 'recent emails' questions: use gmail_recent with max_results=3-5
+- For search questions: use gmail_search with appropriate query
+"""
+
+            # Let AI select tools using function calling
+            messages = [
+                {"role": "system", "content": tool_selection_prompt},
+                {"role": "user", "content": user_message}
+            ]
+            
+            tool_selection_result = await self.call_responses_api(
+                messages=messages,
+                tools=available_tools,
+                user_id=user_id
+            )
+            
+            print(f"🤖 Tool selection result: {tool_selection_result}")
+            
+            # Extract function calls from the response
+            import json
             tool_results = []
-            for tool_name in tools_to_use:
+            function_calls = []
+            
+            # Process API response to extract function calls
+            output_items = tool_selection_result.get("output", [])
+            for item in output_items:
+                if isinstance(item, dict):
+                    if item.get("type") in ["function_call", "tool_call"]:
+                        # Direct function call format
+                        function_calls.append({
+                            "function": {
+                                "name": item.get("name"),
+                                "arguments": json.loads(item.get("arguments", "{}")) if isinstance(item.get("arguments"), str) else item.get("arguments", {})
+                            }
+                        })
+                    elif item.get("type") == "message":
+                        content = item.get("content", [])
+                        for content_item in content:
+                            if content_item.get("type") == "tool_use":
+                                function_calls.append({
+                                    "function": {
+                                        "name": content_item.get("name"),
+                                        "arguments": content_item.get("input", {})
+                                    }
+                                })
+            
+            print(f"🤖 Function calls parsed: {function_calls}")
+            
+            print(f"🤖 Extracted {len(function_calls)} function calls")
+            
+            # Execute the selected tools
+            for func_call in function_calls:
                 try:
-                    # Prepare parameters based on tool type
-                    params = {"user_id": user_id}
+                    if isinstance(func_call.get("function"), dict):
+                        function_info = func_call["function"]
+                        tool_name = function_info.get("name")
+                        arguments = function_info.get("arguments", {})
+                    else:
+                        continue
                     
-                    if tool_name == 'gmail_search':
-                        # Extract search query from user message
-                        params["query"] = self._extract_gmail_search_query(user_message)
-                        params["max_results"] = 10
-                    elif tool_name == 'gmail_recent':
-                        params["max_results"] = 5
-                    elif tool_name == 'calendar_upcoming':
-                        params["max_results"] = 5
-                    elif tool_name == 'drive_list_files':
-                        params["max_results"] = 10
+                    # Prepare parameters for MCP call
+                    params = {"user_id": user_id}
+                    params.update(arguments)
                     
                     print(f"🔧 Calling {tool_name} with params: {params}")
                     result = await google_mcp_client.call_tool(tool_name, params)
                     
+                    print(f"🔧 Raw result from {tool_name}: {result}")
+                    
                     tool_results.append({
                         "tool": tool_name,
-                        "success": result.get("success", False),
-                        "response": result.get("response", ""),
-                        "error": result.get("error")
+                        "success": result.get("success", False) if isinstance(result, dict) else False,
+                        "response": result.get("response", "") if isinstance(result, dict) else str(result),
+                        "error": result.get("error") if isinstance(result, dict) else None
                     })
-                    
-                    print(f"🔧 Tool {tool_name} result: {result.get('success', False)}")
                     
                 except Exception as e:
                     print(f"❌ Error calling {tool_name}: {e}")
@@ -222,6 +367,29 @@ class EnhancedChatService:
                         "error": str(e)
                     })
             
+            # If no function calls were made, fall back to default behavior
+            if not function_calls and available_tools:
+                print("🔄 No function calls detected, using fallback logic")
+                # Default to gmail_recent for Gmail questions
+                if enabled_tools.get('gmail'):
+                    params = {"user_id": user_id, "max_results": 1 if 'first' in user_message.lower() else 5}
+                    try:
+                        result = await google_mcp_client.call_tool("gmail_recent", params)
+                        tool_results.append({
+                            "tool": "gmail_recent",
+                            "success": result.get("success", False) if isinstance(result, dict) else False,
+                            "response": result.get("response", "") if isinstance(result, dict) else str(result),
+                            "error": result.get("error") if isinstance(result, dict) else None
+                        })
+                    except Exception as e:
+                        print(f"❌ Fallback error: {e}")
+                        tool_results.append({
+                            "tool": "gmail_recent", 
+                            "success": False,
+                            "response": "",
+                            "error": str(e)
+                        })
+            
             # Combine successful results
             successful_results = [r for r in tool_results if r["success"]]
             
@@ -231,29 +399,94 @@ class EnhancedChatService:
                     "response": "I couldn't retrieve data from your Google services. Please check your permissions and try again."
                 }
             
-            # Format response
-            response_parts = []
+            # Collect data for AI analysis
             tools_used = []
+            collected_data = []
             
             for result in successful_results:
                 tool_name = result["tool"]
                 tools_used.append(tool_name)
                 
                 if result["response"]:
-                    if tool_name.startswith('gmail'):
-                        response_parts.append(f"📧 **Gmail**: {result['response']}")
-                    elif tool_name.startswith('calendar'):
-                        response_parts.append(f"📅 **Calendar**: {result['response']}")
-                    elif tool_name.startswith('drive'):
-                        response_parts.append(f"💾 **Drive**: {result['response']}")
+                    service_type = "Gmail" if tool_name.startswith('gmail') else \
+                                 "Calendar" if tool_name.startswith('calendar') else \
+                                 "Drive" if tool_name.startswith('drive') else "Unknown"
+                    collected_data.append({
+                        "service": service_type,
+                        "tool": tool_name,
+                        "data": result["response"]
+                    })
             
-            if not response_parts:
+            if not collected_data:
                 return {
                     "success": False,
                     "response": "The Google services returned empty results."
                 }
             
-            final_response = "\n\n".join(response_parts)
+            # Use AI to analyze and respond to the user's question with the collected data
+            try:
+                print(f"🤖 Starting AI analysis for user question: '{user_message}'")
+                print(f"🤖 Collected data items: {len(collected_data)}")
+                
+                analysis_prompt = f"""
+User Question: {user_message}
+
+Retrieved Data from Google Services:
+{chr(10).join([f"{item['service']}: {item['data']}" for item in collected_data])}
+
+Please analyze the retrieved data and provide a helpful, concise answer to the user's question. Focus on:
+1. Directly answering what the user asked
+2. Summarizing key information rather than listing raw data
+3. Being conversational and helpful
+4. Highlighting important dates, names, or action items if relevant
+
+Respond as if you're having a natural conversation with the user."""
+
+                # Call the responses API for analysis
+                analysis_messages = [
+                    {"role": "system", "content": analysis_prompt},
+                    {"role": "user", "content": "Please analyze and summarize this information to answer the user's question."}
+                ]
+                
+                print(f"🤖 Calling AI analysis API with {len(analysis_messages)} messages")
+                analysis_result = await self.call_responses_api(
+                    messages=analysis_messages,
+                    user_id=user_id
+                )
+                print(f"🤖 AI analysis result: {analysis_result}")
+                
+                # Extract the AI analysis text from the correct response field
+                if analysis_result and analysis_result.get("output"):
+                    # Handle the nested response structure: output[0]['content'][0]['text']
+                    output = analysis_result.get("output", [])
+                    if output and len(output) > 0:
+                        content = output[0].get("content", [])
+                        if content and len(content) > 0:
+                            final_response = content[0].get("text", "")
+                            print(f"✅ Successfully extracted AI analysis: {final_response}")
+                        else:
+                            final_response = ""
+                    else:
+                        final_response = ""
+                
+                if not final_response and analysis_result and analysis_result.get("output_text"):
+                    # Fallback for different API response formats
+                    final_response = analysis_result["output_text"]
+                
+                if not final_response:
+                    # Fallback to basic formatting if AI analysis fails
+                    response_parts = []
+                    for item in collected_data:
+                        response_parts.append(f"📧 **{item['service']}**: {item['data']}")
+                    final_response = "\n\n".join(response_parts)
+                    
+            except Exception as e:
+                print(f"❌ Error in AI analysis: {e}")
+                # Fallback to basic formatting
+                response_parts = []
+                for item in collected_data:
+                    response_parts.append(f"📧 **{item['service']}**: {item['data']}")
+                final_response = "\n\n".join(response_parts)
             
             return {
                 "success": True,
@@ -381,6 +614,7 @@ class EnhancedChatService:
         **kwargs
     ) -> Dict[str, Any]:
         """Call the OpenAI Responses API with proper format."""
+        print(f"📡 call_responses_api called with {len(messages)} messages, model={model}")
         headers = {
             "Authorization": f"Bearer {self.responses_api_key}",
             "Content-Type": "application/json"
@@ -535,6 +769,7 @@ For general knowledge questions, use web search or answer from your training dat
                     raise Exception(f"API request failed: {response.status_code} {response.text}")
                 
                 data = response.json()
+                print(f"📡 API response data: {data}")
                 
                 # Handle async responses (poll for completion)
                 status_val = data.get("status")
@@ -748,6 +983,40 @@ For general knowledge questions, use web search or answer from your training dat
             if not assistant_content:
                 assistant_content = self.stringify_text(api_response.get("output_text") or "")
             
+            # Extract sources from URLs in text content (like original repo)
+            if isinstance(assistant_content, str) and assistant_content and not sources:
+                import re
+                from urllib.parse import urlparse
+                
+                # Find URLs in the response text
+                raw_urls = re.findall(r"https?://[^\s)]+", assistant_content)
+                print(f"🔍 Found {len(raw_urls)} URLs in response text")
+                seen = set()
+                for u in raw_urls:
+                    cleaned = u.rstrip('.,);]')
+                    if cleaned in seen:
+                        continue
+                    seen.add(cleaned)
+                    try:
+                        parsed = urlparse(cleaned)
+                        if parsed.scheme in {"http", "https"} and parsed.netloc:
+                            source = {
+                                "url": cleaned,
+                                "title": parsed.netloc,
+                                "site": parsed.netloc,
+                                "favicon": f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64"
+                            }
+                            sources.append(source)
+                            print(f"🔧 Added URL source: {parsed.netloc}")
+                    except Exception as e:
+                        print(f"❌ Failed to parse URL {cleaned}: {e}")
+                        continue
+                
+                # Limit sources
+                if sources:
+                    sources = sources[:8]
+                    print(f"✅ Extracted {len(sources)} sources from URLs")
+            
             # Handle incomplete responses (like GPT-5-mini hitting token limit)
             status = api_response.get("status")
             if status == "incomplete":
@@ -770,7 +1039,8 @@ For general knowledge questions, use web search or answer from your training dat
             {
                 "model": model,
                 "include_reasoning": include_reasoning,
-                "original_api_used": True
+                "original_api_used": True,
+                "sources": sources
             }
         )
         

@@ -1,0 +1,109 @@
+# Multi-stage Dockerfile with comprehensive testing
+# Stage 1: Testing - Run all tests and coverage analysis
+FROM python:3.11-slim AS testing
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_NO_CACHE_DIR=on
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install requirements (including test dependencies)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r /app/requirements.txt
+
+# Install additional test dependencies
+RUN pip install pytest-cov pytest-mock pytest-asyncio coverage[toml]
+
+# Copy ALL source code and tests
+COPY app /app/app
+COPY tests /app/tests
+COPY run_tests.sh /app/run_tests.sh
+COPY TESTING_WORKFLOW.md /app/TESTING_WORKFLOW.md
+COPY .coveragerc /app/.coveragerc
+COPY pytest.ini /app/pytest.ini
+
+# Make scripts executable
+RUN chmod +x /app/run_tests.sh
+
+# 🧪 COMPREHENSIVE TEST EXECUTION - THIS IS WHERE THE MAGIC HAPPENS
+RUN echo "🚀 STARTING COMPREHENSIVE TEST SUITE..." && \
+    export SUPABASE_URL=https://test.supabase.co && \
+    export SUPABASE_ANON_KEY=test-anon-key && \
+    export SUPABASE_SERVICE_ROLE_KEY=test-service-key && \
+    export SUPABASE_DB_URL=postgresql://test:test@localhost:5432/test && \
+    export OPENAI_API_KEY=test-openai-key && \
+    export SECRET_KEY=test-secret-key-for-docker-build && \
+    export GOOGLE_CLIENT_ID=test-google-client-id && \
+    export GOOGLE_CLIENT_SECRET=test-google-client-secret && \
+    export GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback && \
+    echo "📋 PHASE 1: REGRESSION TESTS (Critical workflows must never break)" && \
+    python -m pytest tests/test_regression_critical_flows.py -v --tb=short --maxfail=1 && \
+    echo "✅ Phase 1 PASSED - Core functionality intact" && \
+    echo "📋 PHASE 2: UNIT TESTS (Individual component testing)" && \
+    python -m pytest tests/test_enhanced_chat_service_fixed.py tests/test_tool_manager.py tests/test_mcp_client_simple.py -v --tb=short && \
+    echo "✅ Phase 2 PASSED - Unit tests successful" && \
+    echo "📋 PHASE 3: INTEGRATION TESTS (Service interaction testing)" && \
+    python -m pytest tests/test_google_mcp_integration.py tests/test_enhanced_chat_additional.py -v --tb=short && \
+    echo "✅ Phase 3 PASSED - Integration tests successful" && \
+    echo "📋 PHASE 4: API & HEALTH TESTS (Endpoint functionality)" && \
+    python -m pytest tests/test_api_ping/ tests/test_simple.py tests/test_health.py -v --tb=short && \
+    echo "✅ Phase 4 PASSED - API tests successful" && \
+    echo "📋 PHASE 5: COVERAGE ANALYSIS (Ensuring code quality)" && \
+    python -m pytest tests/ --cov=app/services --cov-report=term-missing --cov-report=html --cov-fail-under=35 --tb=short && \
+    echo "✅ Phase 5 PASSED - Coverage requirements met" && \
+    echo "🎉 ALL TESTS PASSED! Code is safe for deployment." || \
+    (echo "❌ TESTS FAILED! Build terminated to prevent broken deployment." && exit 1)
+
+# Generate coverage report
+RUN python -m pytest tests/ --cov=app/services --cov-report=html --quiet
+
+# Stage 2: Production - Only include runtime dependencies
+FROM python:3.11-slim AS production
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_NO_CACHE_DIR=on
+
+WORKDIR /app
+
+# Install only runtime system dependencies
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install only runtime requirements
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r /app/requirements.txt
+
+# Copy ONLY application code (no tests in production)
+COPY app /app/app
+
+# Copy coverage report from testing stage (for monitoring)
+COPY --from=testing /app/htmlcov /app/coverage-report
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
+
+EXPOSE 8000
+
+# Production labels
+LABEL maintainer="TurfMapp Team" \
+      description="TurfMapp Backend - Production Ready" \
+      testing="Comprehensive test suite passed during build" \
+      coverage="35%+ code coverage verified" \
+      stage="production"
+
+# Run the application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
