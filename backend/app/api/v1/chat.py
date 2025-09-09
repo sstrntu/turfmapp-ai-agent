@@ -36,7 +36,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ...core.simple_auth import get_current_user_from_token
-from ...services.enhanced_chat_service import EnhancedChatService
+from ...services.chat_service import EnhancedChatService
 from ...services.tool_manager import tool_manager
 from ...database import ConversationService
 
@@ -293,7 +293,7 @@ async def get_available_tools():
         traditional_descriptions = tool_manager.get_tool_descriptions()
         
         # Get MCP tools for Google services
-        from ...services.mcp_client_simple import get_all_google_tools
+        from ...services.mcp_client import get_all_google_tools
         mcp_tools = await get_all_google_tools()
         
         # Convert MCP tools to the expected format

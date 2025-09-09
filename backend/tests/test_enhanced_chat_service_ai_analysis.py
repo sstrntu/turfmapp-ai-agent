@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any, List
 import json
 
-from app.services.enhanced_chat_service import EnhancedChatService
+from app.services.chat_service import EnhancedChatService
 
 
 class TestEnhancedChatServiceAIAnalysis:
@@ -62,8 +62,8 @@ class TestEnhancedChatServiceAIAnalysis:
         # Use a proper UUID format for user_id
         user_id = "550e8400-e29b-41d4-a716-446655440000"
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.return_value = mock_analysis_response
@@ -104,8 +104,8 @@ class TestEnhancedChatServiceAIAnalysis:
             ]
         }
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.return_value = mock_analysis_response
@@ -154,8 +154,8 @@ class TestEnhancedChatServiceAIAnalysis:
             ]
         }
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.return_value = mock_analysis_response
@@ -181,8 +181,8 @@ class TestEnhancedChatServiceAIAnalysis:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_gmail_tool_result)
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.side_effect = Exception("API failed")
@@ -206,8 +206,8 @@ class TestEnhancedChatServiceAIAnalysis:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_gmail_tool_result)
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.return_value = {
@@ -243,7 +243,7 @@ class TestEnhancedChatServiceAIAnalysis:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_gmail_tool_result)
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api, \
              patch('builtins.print') as mock_print:
             
@@ -308,8 +308,8 @@ class TestEnhancedChatServiceAIAnalysis:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_gmail_result)
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             # First call returns tool selection, second call returns analysis
@@ -338,8 +338,8 @@ class TestEnhancedChatServiceAIAnalysis:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_gmail_tool_result)
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.return_value = {
@@ -369,7 +369,7 @@ class TestEnhancedChatServiceAIAnalysis:
             "tool": "gmail_recent"
         })
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client', mock_client):
+        with patch('app.services.chat_service.google_mcp_client', mock_client):
             
             result = await chat_service._handle_google_mcp_request(
                 user_message="what's my latest email?",
@@ -388,7 +388,7 @@ class TestEnhancedChatServiceAIAnalysis:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value="unexpected string result")
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch('builtins.print') as mock_print:
             
             result = await chat_service._handle_google_mcp_request(
@@ -433,8 +433,8 @@ class TestEnhancedChatServiceAIAnalysis:
             ]
         }
         
-        with patch('app.services.mcp_client_simple.google_mcp_client', mock_client), \
-             patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.mcp_client.google_mcp_client', mock_client), \
+             patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api:
             
             mock_api.return_value = mock_analysis_response
@@ -477,7 +477,7 @@ class TestEnhancedChatServiceDebuggingImprovements:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_tool_result)
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api, \
              patch('builtins.print') as mock_print:
             
@@ -514,7 +514,7 @@ class TestEnhancedChatServiceDebuggingImprovements:
         mock_client = AsyncMock()
         mock_client.call_tool = AsyncMock(return_value=mock_tool_result)
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client', mock_client), \
+        with patch('app.services.chat_service.google_mcp_client', mock_client), \
              patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api, \
              patch('builtins.print') as mock_print:
             

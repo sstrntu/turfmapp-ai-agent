@@ -227,7 +227,7 @@ class TestMCPIntegration:
             }
         ]
         
-        with patch('app.services.mcp_client_simple.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
+        with patch('app.services.mcp_client.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
             mock_get_mcp.return_value = mock_mcp_tools
             
             all_tools = await tm.get_all_tools_with_mcp()
@@ -249,7 +249,7 @@ class TestMCPIntegration:
         mock_tool = MockTool("traditional_tool", "A traditional tool")
         tm.add_tool("traditional_tool", mock_tool)
         
-        with patch('app.services.mcp_client_simple.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
+        with patch('app.services.mcp_client.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
             mock_get_mcp.side_effect = Exception("MCP connection failed")
             
             all_tools = await tm.get_all_tools_with_mcp()
@@ -270,7 +270,7 @@ class TestMCPIntegration:
             {"name": "calendar_upcoming", "description": "Get upcoming calendar events"}
         ]
         
-        with patch('app.services.mcp_client_simple.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
+        with patch('app.services.mcp_client.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
             mock_get_mcp.return_value = mock_mcp_tools
             
             descriptions = await tm.get_all_descriptions_with_mcp()
@@ -287,7 +287,7 @@ class TestMCPIntegration:
         mock_tool = MockTool("traditional_tool", "A traditional tool")
         tm.add_tool("traditional_tool", mock_tool)
         
-        with patch('app.services.mcp_client_simple.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
+        with patch('app.services.mcp_client.get_all_google_tools', new_callable=AsyncMock) as mock_get_mcp:
             mock_get_mcp.side_effect = Exception("MCP connection failed")
             
             descriptions = await tm.get_all_descriptions_with_mcp()

@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 import json
 
-from app.services.enhanced_chat_service import EnhancedChatService
+from app.services.chat_service import EnhancedChatService
 
 
 class TestEnhancedChatServiceUserPreferences:
@@ -96,7 +96,7 @@ class TestEnhancedChatServiceDatabaseFallback:
         """Test successful database fallback."""
         chat_service = EnhancedChatService()
         
-        with patch('app.services.enhanced_chat_service.execute_query_one', new_callable=AsyncMock) as mock_execute:
+        with patch('app.services.chat_service.execute_query_one', new_callable=AsyncMock) as mock_execute:
             mock_execute.return_value = {"id": "test-result"}
             
             result = await chat_service.use_database_fallback("test_function", "arg1", "arg2")
@@ -109,7 +109,7 @@ class TestEnhancedChatServiceDatabaseFallback:
         """Test database fallback error handling."""
         chat_service = EnhancedChatService()
         
-        with patch('app.services.enhanced_chat_service.execute_query_one', new_callable=AsyncMock) as mock_execute:
+        with patch('app.services.chat_service.execute_query_one', new_callable=AsyncMock) as mock_execute:
             mock_execute.side_effect = Exception("Database error")
             
             # The method should handle errors gracefully
@@ -282,7 +282,7 @@ class TestEnhancedChatServiceMCPIntegration:
             "sources": []
         }
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client.call_tool', new_callable=AsyncMock) as mock_call:
+        with patch('app.services.chat_service.google_mcp_client.call_tool', new_callable=AsyncMock) as mock_call:
             mock_call.return_value = mock_mcp_response
             
             result = await chat_service._handle_google_mcp_request(
@@ -312,7 +312,7 @@ class TestEnhancedChatServiceMCPIntegration:
             {"success": True, "response": "💾 **Drive**: 3 files", "data": []}
         ]
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client.call_tool', new_callable=AsyncMock) as mock_call:
+        with patch('app.services.chat_service.google_mcp_client.call_tool', new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = mock_mcp_responses
             
             result = await chat_service._handle_google_mcp_request(
@@ -337,7 +337,7 @@ class TestEnhancedChatServiceMCPIntegration:
             "drive": False
         }
         
-        with patch('app.services.enhanced_chat_service.google_mcp_client.call_tool', new_callable=AsyncMock) as mock_call:
+        with patch('app.services.chat_service.google_mcp_client.call_tool', new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {
                 "success": True,
                 "response": "Found emails about project",

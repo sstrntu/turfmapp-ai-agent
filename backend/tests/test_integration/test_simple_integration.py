@@ -53,7 +53,7 @@ class TestSimpleChatIntegration:
         # Test with mock auth
         mock_auth.return_value = {"id": "user123", "email": "test@example.com"}
         
-        with patch('app.services.enhanced_chat_service.EnhancedChatService.process_chat_request') as mock_process:
+        with patch('app.services.chat_service.EnhancedChatService.process_chat_request') as mock_process:
             mock_process.return_value = {
                 "conversation_id": "conv123",
                 "user_message": {"role": "user", "content": "test"},
@@ -108,8 +108,8 @@ class TestSimpleChatIntegration:
             }
         ]
         
-        with patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_history') as mock_history, \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_list') as mock_list:
+        with patch('app.services.chat_service.EnhancedChatService.get_conversation_history') as mock_history, \
+             patch('app.services.chat_service.EnhancedChatService.get_conversation_list') as mock_list:
             
             mock_history.return_value = mock_messages
             mock_list.return_value = [{"id": "conv123", "title": "Test Conversation"}]

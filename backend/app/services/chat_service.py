@@ -26,8 +26,9 @@ from __future__ import annotations
 import os
 import asyncio
 import json
+import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import httpx
 
@@ -35,7 +36,10 @@ from ..database import ConversationService, UserService
 from ..utils.chat_utils import stringify_text, extract_sources_from_response, format_chat_history
 from ..api.v1.preferences import user_preferences
 from .tool_manager import tool_manager
-from .mcp_client_simple import google_mcp_client, get_all_google_tools
+from .mcp_client import google_mcp_client, get_all_google_tools
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 class EnhancedChatService:
@@ -59,7 +63,7 @@ class EnhancedChatService:
             else:
                 return method(*args, **kwargs)
         except Exception as e:
-            print(f"Database {func_name} failed: {e}, using fallback")
+            logger.warning(f"Database {func_name} failed: {e}, using fallback")
             return None
     
     async def get_conversation_history(self, conversation_id: str, user_id: str) -> List[Dict[str, Any]]:
@@ -97,7 +101,7 @@ class EnhancedChatService:
             if db_result:
                 return True
         except Exception as e:
-            print(f"Database save failed: {e}")
+            logger.error(f"Database save failed: {e}")
         
         # Use fallback storage
         if conversation_id not in self.fallback_conversations:
@@ -106,7 +110,7 @@ class EnhancedChatService:
         message = {
             "role": role,
             "content": content,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "metadata": metadata or {}
         }
         
@@ -126,14 +130,14 @@ class EnhancedChatService:
             if db_result:
                 return str(db_result.get("id", conversation_id))
         except Exception as e:
-            print(f"Database create conversation failed: {e}")
+            logger.debug(f"Database create conversation failed: {e}")
         
         # Use fallback storage
         self.fallback_conversation_metadata[conversation_id] = {
             "user_id": user_id,
             "title": title or "New Conversation",
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
         self.fallback_conversations[conversation_id] = []
@@ -265,10 +269,10 @@ class EnhancedChatService:
                     return {"success": False, "response": "No Google tools were enabled. Please enable the tools you'd like to use (Gmail 📧, Calendar 📅, or Drive 📁) in the interface."}
             
             # Use AI to select and call the appropriate tools
-            print(f"🤖 Using AI-driven tool selection with {len(available_tools)} available tools")
+            logger.debug(f"🤖 Using AI-driven tool selection with {len(available_tools)} available tools")
             
             # Get Google MCP client
-            from .mcp_client_simple import google_mcp_client
+            from .mcp_client import google_mcp_client
             
             # Create system prompt for tool selection
             tool_selection_prompt = f"""You are helping a user with their Google services (Gmail, Calendar, Drive).
@@ -296,7 +300,7 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                 user_id=user_id
             )
             
-            print(f"🤖 Tool selection result: {tool_selection_result}")
+            logger.debug(f"🤖 Tool selection result: {tool_selection_result}")
             
             # Extract function calls from the response
             import json
@@ -326,9 +330,9 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                                     }
                                 })
             
-            print(f"🤖 Function calls parsed: {function_calls}")
+            logger.debug(f"🤖 Function calls parsed: {function_calls}")
             
-            print(f"🤖 Extracted {len(function_calls)} function calls")
+            logger.debug(f"🤖 Extracted {len(function_calls)} function calls")
             
             # Execute the selected tools
             for func_call in function_calls:
@@ -344,10 +348,10 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                     params = {"user_id": user_id}
                     params.update(arguments)
                     
-                    print(f"🔧 Calling {tool_name} with params: {params}")
+                    logger.debug(f"🔧 Calling {tool_name} with params: {params}")
                     result = await google_mcp_client.call_tool(tool_name, params)
                     
-                    print(f"🔧 Raw result from {tool_name}: {result}")
+                    logger.debug(f"🔧 Raw result from {tool_name}: {result}")
                     
                     tool_results.append({
                         "tool": tool_name,
@@ -357,7 +361,7 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                     })
                     
                 except Exception as e:
-                    print(f"❌ Error calling {tool_name}: {e}")
+                    logger.error(f"❌ Error calling {tool_name}: {e}")
                     tool_results.append({
                         "tool": tool_name,
                         "success": False,
@@ -380,7 +384,7 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                             "error": result.get("error") if isinstance(result, dict) else None
                         })
                     except Exception as e:
-                        print(f"❌ Fallback error: {e}")
+                        logger.error(f"❌ Fallback error: {e}")
                         tool_results.append({
                             "tool": "gmail_recent", 
                             "success": False,
@@ -423,8 +427,8 @@ Select the most appropriate tool(s) and parameters to answer the user's question
             
             # Use AI to analyze and respond to the user's question with the collected data
             try:
-                print(f"🤖 Starting AI analysis for user question: '{user_message}'")
-                print(f"🤖 Collected data items: {len(collected_data)}")
+                logger.debug(f"🤖 Starting AI analysis for user question: '{user_message}'")
+                logger.debug(f"🤖 Collected data items: {len(collected_data)}")
                 
                 analysis_prompt = f"""
 User Question: {user_message}
@@ -446,12 +450,12 @@ Respond as if you're having a natural conversation with the user."""
                     {"role": "user", "content": "Please analyze and summarize this information to answer the user's question."}
                 ]
                 
-                print(f"🤖 Calling AI analysis API with {len(analysis_messages)} messages")
+                logger.debug(f"🤖 Calling AI analysis API with {len(analysis_messages)} messages")
                 analysis_result = await self.call_responses_api(
                     messages=analysis_messages,
                     user_id=user_id
                 )
-                print(f"🤖 AI analysis result: {analysis_result}")
+                logger.debug(f"🤖 AI analysis result: {analysis_result}")
                 
                 # Extract the AI analysis text from the correct response field
                 if analysis_result and analysis_result.get("output"):
@@ -461,7 +465,7 @@ Respond as if you're having a natural conversation with the user."""
                         content = output[0].get("content", [])
                         if content and len(content) > 0:
                             final_response = content[0].get("text", "")
-                            print(f"✅ Successfully extracted AI analysis: {final_response}")
+                            logger.info(f"✅ Successfully extracted AI analysis: {final_response}")
                         else:
                             final_response = ""
                     else:
@@ -479,7 +483,7 @@ Respond as if you're having a natural conversation with the user."""
                     final_response = "\n\n".join(response_parts)
                     
             except Exception as e:
-                print(f"❌ Error in AI analysis: {e}")
+                logger.error(f"❌ Error in AI analysis: {e}")
                 # Fallback to basic formatting
                 response_parts = []
                 for item in collected_data:
@@ -494,7 +498,7 @@ Respond as if you're having a natural conversation with the user."""
             }
             
         except Exception as e:
-            print(f"❌ Error in _handle_google_mcp_request: {e}")
+            logger.error(f"❌ Error in _handle_google_mcp_request: {e}")
             return {
                 "success": False,
                 "response": f"Error accessing Google services: {str(e)}"
@@ -555,24 +559,24 @@ Respond as if you're having a natural conversation with the user."""
                 
                 if tool_name in google_tools:
                     # Use MCP client for Google services
-                    print(f"🔧 Using MCP client for tool: {tool_name}")
-                    print(f"🔧 Tool arguments: {tool_args}")
-                    print(f"🔧 User ID: {user_id}")
+                    logger.debug(f"🔧 Using MCP client for tool: {tool_name}")
+                    logger.debug(f"🔧 Tool arguments: {tool_args}")
+                    logger.debug(f"🔧 User ID: {user_id}")
                     try:
                         # Ensure MCP client is connected
                         await google_mcp_client.connect()
                         
                         # Add user_id to arguments for MCP
                         tool_args["user_id"] = user_id
-                        print(f"🔧 Final tool arguments: {tool_args}")
+                        logger.debug(f"🔧 Final tool arguments: {tool_args}")
                         
                         # Execute via MCP
                         result = await google_mcp_client.call_tool(tool_name, tool_args)
                         
-                        print(f"🔧 MCP result for {tool_name}: {result}")
+                        logger.debug(f"🔧 MCP result for {tool_name}: {result}")
                         
                     except Exception as e:
-                        print(f"❌ MCP tool execution failed for {tool_name}: {e}")
+                        logger.error(f"❌ MCP tool execution failed for {tool_name}: {e}")
                         import traceback
                         traceback.print_exc()
                         result = {
@@ -582,7 +586,7 @@ Respond as if you're having a natural conversation with the user."""
                 
                 else:
                     # Use traditional tool manager for non-Google tools
-                    print(f"🔧 Using traditional tool manager for: {tool_name}")
+                    logger.debug(f"🔧 Using traditional tool manager for: {tool_name}")
                     result = await tool_manager.execute_tool(tool_name, user_id, **tool_args)
                 
                 tool_results.append({
@@ -592,7 +596,7 @@ Respond as if you're having a natural conversation with the user."""
                 })
                 
             except Exception as e:
-                print(f"❌ Tool execution failed for {tool_name}: {e}")
+                logger.error(f"❌ Tool execution failed for {tool_name}: {e}")
                 tool_results.append({
                     "tool_call_id": tool_call.get("id"),
                     "tool_name": tool_call.get("function", {}).get("name", "unknown"),
@@ -612,7 +616,7 @@ Respond as if you're having a natural conversation with the user."""
         **kwargs
     ) -> Dict[str, Any]:
         """Call the OpenAI Responses API with proper format."""
-        print(f"📡 call_responses_api called with {len(messages)} messages, model={model}")
+        logger.info(f"📡 call_responses_api called with {len(messages)} messages, model={model}")
         headers = {
             "Authorization": f"Bearer {self.responses_api_key}",
             "Content-Type": "application/json"
@@ -653,11 +657,11 @@ Respond as if you're having a natural conversation with the user."""
         # Handle tools properly - Responses API format
         if "tools" in kwargs and kwargs["tools"]:
             tools = kwargs["tools"]
-            print(f"🔧 Processing tools in API call: {tools}")
+            logger.debug(f"🔧 Processing tools in API call: {tools}")
             # Filter out invalid string-based tools
             if isinstance(tools, list) and tools:
                 if isinstance(tools[0], str):
-                    print(f"⚠️ Removing invalid tools format: {tools}")
+                    logger.debug(f"⚠️ Removing invalid tools format: {tools}")
                 else:
                     # Convert from Chat Completions format to Responses API format
                     responses_api_tools = []
@@ -679,7 +683,7 @@ Respond as if you're having a natural conversation with the user."""
                                 "search_context_size": tool.get("search_context_size", "medium")
                             }
                             responses_api_tools.append(web_search_tool)
-                            print(f"🌐 Added web search tool to Responses API payload")
+                            logger.debug(f"🌐 Added web search tool to Responses API payload")
                         elif tool.get("type") == "image_generation":
                             # Handle image generation tools for Responses API
                             image_gen_tool = {
@@ -692,14 +696,14 @@ Respond as if you're having a natural conversation with the user."""
                                 "partial_images": tool.get("partial_images", 3)
                             }
                             responses_api_tools.append(image_gen_tool)
-                            print(f"🎨 Added image generation tool to Responses API payload")
+                            logger.debug(f"🎨 Added image generation tool to Responses API payload")
                     
                     payload["tools"] = responses_api_tools
                     payload["tool_choice"] = kwargs.get("tool_choice", "auto")
                     payload["parallel_tool_calls"] = True
-                    print(f"🔧 Added tools to payload (Responses API format): {payload['tools']}")
+                    logger.debug(f"🔧 Added tools to payload (Responses API format): {payload['tools']}")
         else:
-            print(f"🔧 No tools provided in API call")
+            logger.debug(f"🔧 No tools provided in API call")
         
         # Add instructions for additional context
         instructions = []
@@ -792,7 +796,7 @@ For general knowledge questions, use web search or answer from your training dat
                     raise Exception(f"API request failed: {response.status_code} {response.text}")
                 
                 data = response.json()
-                print(f"📡 API response data: {data}")
+                logger.debug(f"📡 API response data: {data}")
                 
                 # Handle async responses (poll for completion)
                 status_val = data.get("status")
@@ -863,7 +867,7 @@ For general knowledge questions, use web search or answer from your training dat
                     break
         
         if google_mcp_tools and any(google_mcp_tools.values()):
-            print(f"🔧 Google MCP tools explicitly requested: {google_mcp_tools}")
+            logger.debug(f"🔧 Google MCP tools explicitly requested: {google_mcp_tools}")
             
             # Handle Google MCP tools directly
             try:
@@ -894,14 +898,14 @@ For general knowledge questions, use web search or answer from your training dat
                         "id": str(uuid.uuid4()),
                         "role": "user", 
                         "content": message,
-                        "created_at": datetime.utcnow().isoformat()
+                        "created_at": datetime.now(timezone.utc).isoformat()
                     }
                     
                     assistant_message = {
                         "id": str(uuid.uuid4()),
                         "role": "assistant",
                         "content": assistant_content,
-                        "created_at": datetime.utcnow().isoformat()
+                        "created_at": datetime.now(timezone.utc).isoformat()
                     }
                     
                     return {
@@ -912,12 +916,12 @@ For general knowledge questions, use web search or answer from your training dat
                         "sources": mcp_result.get("sources", [])
                     }
                 else:
-                    print("❌ Google MCP failed, falling back to original behavior")
+                    logger.warning("❌ Google MCP failed, falling back to original behavior")
             except Exception as e:
-                print(f"❌ Google MCP error: {e}, falling back to original behavior")
+                logger.error(f"❌ Google MCP error: {e}, falling back to original behavior")
 
         # Use original behavior - direct API call like the original repo
-        print("🚀 Using original behavior - calling Responses API directly")
+        logger.info("🚀 Using original behavior - calling Responses API directly")
         
         # Prepare tools for API call (from original repo logic - use web search tools if requested)
         tools_to_include = kwargs.get("tools", [])
@@ -938,33 +942,33 @@ For general knowledge questions, use web search or answer from your training dat
             sources = []  # Initialize sources list
             
             # Parse Responses API output with debugging for GPT-5-mini
-            print(f"🔍 API Response for model {model}:", api_response)
+            logger.debug(f"🔍 API Response for model {model}:", api_response)
             
             # Check if there are any tool calls in the response
             if "tool_calls" in api_response:
-                print(f"🔧 Tool calls found in response: {api_response['tool_calls']}")
+                logger.debug(f"🔧 Tool calls found in response: {api_response['tool_calls']}")
             else:
-                print(f"🔧 No tool calls found in response")
+                logger.debug(f"🔧 No tool calls found in response")
             
             # Check the output structure for function calls
             output_items = api_response.get("output", [])
-            print(f"🔧 Output items: {len(output_items) if output_items else 0}")
+            logger.debug(f"🔧 Output items: {len(output_items) if output_items else 0}")
             
             # Handle function calls from the API response (original repo logic)
             function_calls = []
             for i, item in enumerate(output_items):
                 if isinstance(item, dict):
                     item_type = item.get("type")
-                    print(f"🔧 Output item {i}: type={item_type}")
+                    logger.debug(f"🔧 Output item {i}: type={item_type}")
                     if item_type == "function_call":
-                        print(f"🔧 Function call found: {item}")
+                        logger.debug(f"🔧 Function call found: {item}")
                         function_calls.append(item)
                     elif item_type == "tool_call":
-                        print(f"🔧 Tool call found: {item}")
+                        logger.debug(f"🔧 Tool call found: {item}")
                         function_calls.append(item)
                     elif item_type == "message":
                         content = item.get("content", [])
-                        print(f"🔧 Message content: {content}")
+                        logger.debug(f"🔧 Message content: {content}")
                         
                         # Extract text from message content and collect annotations
                         if content and isinstance(content, list):
@@ -973,12 +977,12 @@ For general knowledge questions, use web search or answer from your training dat
                                     text = content_item.get("text", "")
                                     if text:
                                         assistant_content = text
-                                        print(f"🔧 Extracted message text: {text[:100]}...")
+                                        logger.debug(f"🔧 Extracted message text: {text[:100]}...")
                                         
                                         # Extract sources from annotations (URL citations)
                                         annotations = content_item.get("annotations", [])
                                         if annotations:
-                                            print(f"🔧 Found {len(annotations)} annotations")
+                                            logger.debug(f"🔧 Found {len(annotations)} annotations")
                                             for annotation in annotations:
                                                 if annotation.get("type") == "url_citation":
                                                     url = annotation.get("url", "")
@@ -997,9 +1001,9 @@ For general knowledge questions, use web search or answer from your training dat
                                                                 "favicon": f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
                                                             }
                                                             sources.append(source)
-                                                            print(f"🔧 Added source: {domain}")
+                                                            logger.debug(f"🔧 Added source: {domain}")
                                                         except Exception as e:
-                                                            print(f"❌ Failed to parse URL {url}: {e}")
+                                                            logger.error(f"❌ Failed to parse URL {url}: {e}")
                                         break
             
             # Only get default response text if we haven't set assistant_content from function calls
@@ -1013,7 +1017,7 @@ For general knowledge questions, use web search or answer from your training dat
                 
                 # Find URLs in the response text
                 raw_urls = re.findall(r"https?://[^\s)]+", assistant_content)
-                print(f"🔍 Found {len(raw_urls)} URLs in response text")
+                logger.debug(f"🔍 Found {len(raw_urls)} URLs in response text")
                 seen = set()
                 for u in raw_urls:
                     cleaned = u.rstrip('.,);]')
@@ -1030,15 +1034,15 @@ For general knowledge questions, use web search or answer from your training dat
                                 "favicon": f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64"
                             }
                             sources.append(source)
-                            print(f"🔧 Added URL source: {parsed.netloc}")
+                            logger.debug(f"🔧 Added URL source: {parsed.netloc}")
                     except Exception as e:
-                        print(f"❌ Failed to parse URL {cleaned}: {e}")
+                        logger.error(f"❌ Failed to parse URL {cleaned}: {e}")
                         continue
                 
                 # Limit sources
                 if sources:
                     sources = sources[:8]
-                    print(f"✅ Extracted {len(sources)} sources from URLs")
+                    logger.info(f"✅ Extracted {len(sources)} sources from URLs")
             
             # Handle incomplete responses (like GPT-5-mini hitting token limit)
             status = api_response.get("status")
@@ -1049,10 +1053,10 @@ For general knowledge questions, use web search or answer from your training dat
             if include_reasoning and "reasoning" in api_response:
                 reasoning = api_response["reasoning"]
             
-            print(f"🔍 Final assistant content length: {len(assistant_content) if assistant_content else 0}")
+            logger.debug(f"🔍 Final assistant content length: {len(assistant_content) if assistant_content else 0}")
             
         except Exception as e:
-            print(f"❌ API call failed: {e}")
+            logger.error(f"❌ API call failed: {e}")
             assistant_content = f"I apologize, but I encountered an error while processing your request: {str(e)}"
             reasoning = None
             sources = []
@@ -1073,14 +1077,14 @@ For general knowledge questions, use web search or answer from your training dat
             "id": str(uuid.uuid4()),
             "role": "user", 
             "content": message,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         assistant_message = {
             "id": str(uuid.uuid4()),
             "role": "assistant",
             "content": assistant_content,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         return {
@@ -1110,7 +1114,7 @@ For general knowledge questions, use web search or answer from your training dat
             if db_result:
                 return db_result
         except Exception as e:
-            print(f"Database get conversations failed: {e}")
+            logger.debug(f"Database get conversations failed: {e}")
         
         # Use fallback storage
         conversations = []
@@ -1137,7 +1141,7 @@ For general knowledge questions, use web search or answer from your training dat
             if db_result:
                 return True
         except Exception as e:
-            print(f"Database delete conversation failed: {e}")
+            logger.debug(f"Database delete conversation failed: {e}")
         
         # Use fallback storage
         if conversation_id in self.fallback_conversations:

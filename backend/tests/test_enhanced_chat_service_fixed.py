@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any, List
 import json
 
-from app.services.enhanced_chat_service import EnhancedChatService
+from app.services.chat_service import EnhancedChatService
 
 
 class TestEnhancedChatServiceCore:

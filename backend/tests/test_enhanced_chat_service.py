@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any, List
 
-from app.services.enhanced_chat_service import EnhancedChatService
+from app.services.chat_service import EnhancedChatService
 
 
 class TestEnhancedChatServiceCore:
@@ -114,7 +114,7 @@ class TestEnhancedChatServiceToolHandling:
             {"title": "Python Tutorial", "url": "https://python.org", "snippet": "Learn Python"}
         ]
         
-        with patch('app.services.enhanced_chat_service.web_search', new_callable=AsyncMock) as mock_search:
+        with patch('app.services.chat_service.web_search', new_callable=AsyncMock) as mock_search:
             mock_search.return_value = mock_search_results
             
             results = await chat_service.handle_tool_calls("user-123", tool_calls)
@@ -266,7 +266,7 @@ class TestEnhancedChatServiceErrorHandling:
         """Test handling of database connection failures."""
         chat_service = EnhancedChatService()
         
-        with patch('app.services.enhanced_chat_service.execute_query_one', new_callable=AsyncMock) as mock_execute:
+        with patch('app.services.chat_service.execute_query_one', new_callable=AsyncMock) as mock_execute:
             mock_execute.side_effect = Exception("Database connection failed")
             
             with pytest.raises(Exception, match="Database connection failed"):

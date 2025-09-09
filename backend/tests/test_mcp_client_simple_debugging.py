@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any
 import traceback
 
-from app.services.mcp_client_simple import SimplifiedGoogleMCPClient
+from app.services.mcp_client import SimplifiedGoogleMCPClient
 
 
 class TestMCPClientSimpleDebugging:
@@ -38,7 +38,7 @@ class TestMCPClientSimpleDebugging:
             ]
         }
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(return_value=mock_calendar_events)
@@ -80,7 +80,7 @@ class TestMCPClientSimpleDebugging:
         
         mock_error_result = {'error': 'Insufficient permissions'}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(return_value=mock_error_result)
@@ -102,7 +102,7 @@ class TestMCPClientSimpleDebugging:
     async def test_calendar_tool_exception_debugging(self, client, mock_credentials):
         """Test debugging logs when calendar tool throws exception."""
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(side_effect=Exception("API connection failed"))
@@ -139,7 +139,7 @@ class TestMCPClientSimpleDebugging:
             ]
         }
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(return_value=mock_calendar_events)
@@ -185,7 +185,7 @@ class TestMCPClientSimpleDebugging:
         
         mock_empty_result = {'events': []}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(return_value=mock_empty_result)
@@ -210,7 +210,7 @@ class TestMCPClientSimpleDebugging:
         
         mock_calendar_events = {'events': []}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(return_value=mock_calendar_events)
@@ -245,7 +245,7 @@ class TestMCPClientSimpleDebugging:
             'nextPageToken': 'token123'
         }
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_oauth, \
+        with patch('app.services.mcp_client.google_oauth_service') as mock_oauth, \
              patch('builtins.print') as mock_print:
             
             mock_oauth.get_calendar_events = AsyncMock(return_value=complex_result)
@@ -287,7 +287,7 @@ class TestMCPClientSimpleCalendarToolFixes:
         """Test that calendar tools are properly mapped in execute_google_tool."""
         
         # Mock credentials retrieval
-        with patch('app.services.mcp_client_simple.get_user_google_credentials') as mock_creds, \
+        with patch('app.services.mcp_client.get_user_google_credentials') as mock_creds, \
              patch.object(client, '_handle_calendar_tool', new_callable=AsyncMock) as mock_handler:
             
             mock_creds.return_value = Mock()
@@ -303,7 +303,7 @@ class TestMCPClientSimpleCalendarToolFixes:
     async def test_calendar_list_events_tool_mapping(self, client):
         """Test that list_events action maps correctly."""
         
-        with patch('app.services.mcp_client_simple.get_user_google_credentials') as mock_creds, \
+        with patch('app.services.mcp_client.get_user_google_credentials') as mock_creds, \
              patch.object(client, '_handle_calendar_tool', new_callable=AsyncMock) as mock_handler:
             
             mock_creds.return_value = Mock()

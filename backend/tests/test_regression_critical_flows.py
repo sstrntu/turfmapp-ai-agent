@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.enhanced_chat_service import EnhancedChatService
+from app.services.chat_service import EnhancedChatService
 
 
 client = TestClient(app)
@@ -87,7 +87,7 @@ class TestCriticalUserFlows:
     @pytest.mark.asyncio
     async def test_google_mcp_client_basic_connection(self):
         """CRITICAL: Google MCP client must initialize without errors."""
-        from app.services.mcp_client_simple import google_mcp_client
+        from app.services.mcp_client import google_mcp_client
         
         # Should not raise exceptions
         await google_mcp_client.connect()
@@ -203,9 +203,9 @@ class TestBreakingChangeDetection:
     def test_service_imports_still_work(self):
         """CRITICAL: Core service imports must not break."""
         try:
-            from app.services.enhanced_chat_service import EnhancedChatService
+            from app.services.chat_service import EnhancedChatService
             from app.services.tool_manager import tool_manager
-            from app.services.mcp_client_simple import google_mcp_client
+            from app.services.mcp_client import google_mcp_client
             
             # Should be able to instantiate
             chat_service = EnhancedChatService()

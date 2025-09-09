@@ -76,7 +76,7 @@ class ToolManager:
             traditional_tools = self.get_available_tools()
             
             # Get MCP tools
-            from .mcp_client_simple import get_all_google_tools
+            from .mcp_client import get_all_google_tools
             mcp_tools = await get_all_google_tools()
             
             # Convert MCP tools to OpenAI function format
@@ -107,7 +107,7 @@ class ToolManager:
             traditional_descriptions = self.get_tool_descriptions()
             
             # Get MCP tools
-            from .mcp_client_simple import get_all_google_tools
+            from .mcp_client import get_all_google_tools
             mcp_tools = await get_all_google_tools()
             
             # Extract MCP tool descriptions

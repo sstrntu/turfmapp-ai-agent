@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any, List
 
-from app.services.mcp_client_simple import (
+from app.services.mcp_client import (
     SimplifiedGoogleMCPClient, 
     google_mcp_client,
     get_mcp_client,
@@ -128,7 +128,7 @@ class TestToolExecution:
         """Test tool call when credentials fail."""
         client = SimplifiedGoogleMCPClient()
         
-        with patch('app.services.mcp_client_simple.get_user_google_credentials', new_callable=AsyncMock) as mock_creds:
+        with patch('app.services.mcp_client.get_user_google_credentials', new_callable=AsyncMock) as mock_creds:
             mock_creds.side_effect = Exception("Credentials not found")
             
             result = await client.call_tool("gmail_recent", {"user_id": "test-123"})
@@ -150,7 +150,7 @@ class TestToolExecution:
         ]
         
         for placeholder in placeholder_accounts:
-            with patch('app.services.mcp_client_simple.get_user_google_credentials', new_callable=AsyncMock) as mock_creds, \
+            with patch('app.services.mcp_client.get_user_google_credentials', new_callable=AsyncMock) as mock_creds, \
                  patch.object(client, '_handle_gmail_tool', new_callable=AsyncMock) as mock_handler:
                 
                 mock_creds.return_value = {"access_token": "fake-token"}
@@ -169,7 +169,7 @@ class TestToolExecution:
         """Test tool call with unexpected exception."""
         client = SimplifiedGoogleMCPClient()
         
-        with patch('app.services.mcp_client_simple.get_user_google_credentials', new_callable=AsyncMock) as mock_creds:
+        with patch('app.services.mcp_client.get_user_google_credentials', new_callable=AsyncMock) as mock_creds:
             mock_creds.side_effect = RuntimeError("Unexpected error")
             
             result = await client.call_tool("gmail_recent", {"user_id": "test-123"})
@@ -193,7 +193,7 @@ class TestGmailToolHandling:
             {"id": "msg2", "snippet": "Test message 2"}
         ]
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.get_gmail_messages.return_value = mock_messages
             
             result = await client._handle_gmail_tool("gmail_recent", mock_credentials, {
@@ -214,7 +214,7 @@ class TestGmailToolHandling:
             {"id": "msg2", "snippet": "Project update"}
         ]
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.search_gmail_messages.return_value = mock_messages
             
             result = await client._handle_gmail_tool("gmail_search", mock_credentials, {
@@ -233,7 +233,7 @@ class TestGmailToolHandling:
         mock_credentials = {"access_token": "fake-token"}
         mock_message = {"id": "msg123", "payload": {"body": {"data": "SGVsbG8gV29ybGQ="}}}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.get_gmail_message_by_id.return_value = mock_message
             
             result = await client._handle_gmail_tool("gmail_get_message", mock_credentials, {
@@ -250,7 +250,7 @@ class TestGmailToolHandling:
         
         mock_credentials = {"access_token": "fake-token"}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.get_gmail_messages.side_effect = Exception("Gmail API error")
             
             result = await client._handle_gmail_tool("gmail_recent", mock_credentials, {})
@@ -285,7 +285,7 @@ class TestDriveToolHandling:
             {"id": "file2", "name": "Spreadsheet1.xlsx"}
         ]
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.list_drive_files.return_value = mock_files
             
             result = await client._handle_drive_tool("drive_list_files", mock_credentials, {
@@ -303,7 +303,7 @@ class TestDriveToolHandling:
         mock_credentials = {"access_token": "fake-token"}
         mock_folder = {"id": "folder123", "name": "New Folder"}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.create_drive_folder_structure.return_value = mock_folder
             
             result = await client._handle_drive_tool("drive_create_folder", mock_credentials, {
@@ -320,7 +320,7 @@ class TestDriveToolHandling:
         
         mock_credentials = {"access_token": "fake-token"}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.list_drive_files.side_effect = Exception("Drive API error")
             
             result = await client._handle_drive_tool("drive_list_files", mock_credentials, {})
@@ -343,7 +343,7 @@ class TestCalendarToolHandling:
             {"id": "event2", "summary": "Client Call"}
         ]
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.list_calendar_events.return_value = mock_events
             
             result = await client._handle_calendar_tool("calendar_list_events", mock_credentials, {
@@ -364,7 +364,7 @@ class TestCalendarToolHandling:
             {"id": "event2", "summary": "Next Week's Review"}
         ]
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.get_upcoming_calendar_events.return_value = mock_events
             
             result = await client._handle_calendar_tool("calendar_upcoming_events", mock_credentials, {
@@ -381,7 +381,7 @@ class TestCalendarToolHandling:
         
         mock_credentials = {"access_token": "fake-token"}
         
-        with patch('app.services.mcp_client_simple.google_oauth_service') as mock_service:
+        with patch('app.services.mcp_client.google_oauth_service') as mock_service:
             mock_service.list_calendar_events.side_effect = Exception("Calendar API error")
             
             result = await client._handle_calendar_tool("calendar_list_events", mock_credentials, {})
@@ -554,7 +554,7 @@ class TestEdgeCasesAndErrorHandling:
         ]
         
         for tool_name, expected_method in test_cases:
-            with patch('app.services.mcp_client_simple.get_user_google_credentials', new_callable=AsyncMock) as mock_creds, \
+            with patch('app.services.mcp_client.get_user_google_credentials', new_callable=AsyncMock) as mock_creds, \
                  patch.object(client, expected_method, new_callable=AsyncMock) as mock_handler:
                 
                 mock_creds.return_value = {"access_token": "test-token"}
@@ -573,7 +573,7 @@ class TestEdgeCasesAndErrorHandling:
         # Valid account should be preserved
         valid_account = "real.user@gmail.com"
         
-        with patch('app.services.mcp_client_simple.get_user_google_credentials', new_callable=AsyncMock) as mock_creds, \
+        with patch('app.services.mcp_client.get_user_google_credentials', new_callable=AsyncMock) as mock_creds, \
              patch.object(client, '_handle_gmail_tool', new_callable=AsyncMock) as mock_handler:
             
             mock_creds.return_value = {"access_token": "test-token"}

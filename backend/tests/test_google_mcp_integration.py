@@ -9,8 +9,8 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any, List
 
-from app.services.mcp_client_simple import google_mcp_client
-from app.services.enhanced_chat_service import EnhancedChatService
+from app.services.mcp_client import google_mcp_client
+from app.services.chat_service import EnhancedChatService
 
 
 class TestGoogleMCPClient:

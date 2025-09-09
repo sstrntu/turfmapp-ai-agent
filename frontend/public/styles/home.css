@@ -1181,10 +1181,12 @@ p {
     display: block;
     width: 24px;   /* unify icon size with sound effect */
     height: 24px;
-    filter: grayscale(100%) brightness(80%);
+    filter: brightness(0) invert(1);  /* Make icons white */
 }
 .tool-btn:hover .icon-img,
-.tool-btn.active .icon-img { filter: grayscale(0%) brightness(100%); }
+.tool-btn.active .icon-img { 
+    filter: brightness(0) invert(1);  /* Keep icons white on hover/active */
+}
 
 /* Globe icon (svg-like via css) */
 .icon-globe {
