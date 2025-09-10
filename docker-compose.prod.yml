@@ -4,8 +4,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
-    ports:
-      - "9043"
     networks:
       - tmaiagent_network
       - shared_network
@@ -30,8 +28,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-    # ports:
-    #   - "9044:9044"
     networks:
       - tmaiagent_network
       - shared_network
