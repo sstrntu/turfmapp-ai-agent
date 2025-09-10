@@ -19,10 +19,10 @@ services:
       start_period: 40s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tm-ai-backend.rule=Host(`t6zidjOlyx.turfmapp.com`)"
-      - "traefik.http.routers.tm-ai-backend.entrypoints=web-secure"
-      - "traefik.http.routers.tm-ai-backend.tls.certresolver=cloudflare"
-      - "traefik.http.services.tm-ai-backend.loadbalancer.server.port=9043"
+      - "traefik.http.routers.tm-ai-agent-backend.rule=Host(`t6zidjOlyx.turfmapp.com`)"
+      - "traefik.http.routers.tm-ai-agent-backend.entrypoints=web-secure"
+      - "traefik.http.routers.tm-ai-agent-backend.tls.certresolver=cloudflare"
+      - "traefik.http.services.tm-ai-agent-backend.loadbalancer.server.port=9043"
       - "traefik.docker.network=shared_network"
 
   frontend:
@@ -41,10 +41,10 @@ services:
       - backend
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ladderice-web.rule=Host(`ai.turfmapp.com`)"
-      - "traefik.http.routers.ladderice-web.entrypoints=web-secure"
-      - "traefik.http.routers.ladderice-web.tls.certresolver=cloudflare"
-      - "traefik.http.services.ladderice-web.loadbalancer.server.port=9044"
+      - "traefik.http.routers.tm-ai-agent-frontend.rule=Host(`ai.turfmapp.com`)"
+      - "traefik.http.routers.tm-ai-agent-frontend.entrypoints=web-secure"
+      - "traefik.http.routers.tm-ai-agent-frontend.tls.certresolver=cloudflare"
+      - "traefik.http.services.tm-ai-agent-frontend.loadbalancer.server.port=9044"
       - "traefik.docker.network=shared_network"
 
 networks:
