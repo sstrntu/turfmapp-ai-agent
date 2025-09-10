@@ -1,0 +1,54 @@
+services:
+  backend:
+    container_name: tm-ai-agent-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "9043:9043"
+    networks:
+      - tmaiagent_network
+      - shared_network
+    env_file:
+      - ./backend/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9043/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tm-ai-backend.rule=Host(`t6zidjOlyx.turfmapp.com`)"
+      - "traefik.http.routers.tm-ai-backend.entrypoints=web-secure"
+      - "traefik.http.routers.tm-ai-backend.tls.certresolver=cloudflare"
+      - "traefik.http.services.tm-ai-backend.loadbalancer.server.port=9043"
+      - "traefik.docker.network=shared_network"
+
+  frontend:
+    container_name: tm-ai-agent-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "9044:9044"
+    networks:
+      - tmaiagent_network
+      - shared_network
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ladderice-web.rule=Host(`ai.turfmapp.com`)"
+      - "traefik.http.routers.ladderice-web.entrypoints=web-secure"
+      - "traefik.http.routers.ladderice-web.tls.certresolver=cloudflare"
+      - "traefik.http.services.ladderice-web.loadbalancer.server.port=9044"
+      - "traefik.docker.network=shared_network"
+
+networks:
+  tmaiagent_network:
+    driver: bridge
+  shared_network:
+    external: true
