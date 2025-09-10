@@ -30,8 +30,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-    ports:
-      - "9044:9044"
+    # ports:
+    #   - "9044:9044"
     networks:
       - tmaiagent_network
       - shared_network
@@ -44,7 +44,7 @@ services:
       - "traefik.http.routers.tm-ai-agent-frontend.rule=Host(`ai.turfmapp.com`)"
       - "traefik.http.routers.tm-ai-agent-frontend.entrypoints=web-secure"
       - "traefik.http.routers.tm-ai-agent-frontend.tls.certresolver=cloudflare"
-      - "traefik.http.services.tm-ai-agent-frontend.loadbalancer.server.port=9044"
+      - "traefik.http.services.tm-ai-agent-frontend.loadbalancer.server.port=80"
       - "traefik.docker.network=shared_network"
 
 networks:

@@ -17,7 +17,7 @@ RUN find /usr/share/nginx/html/ -type d -exec chmod 755 {} \;
 COPY nginx.prod.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
-EXPOSE 9044
+EXPOSE 80
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
