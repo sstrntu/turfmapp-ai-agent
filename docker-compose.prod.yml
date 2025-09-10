@@ -11,12 +11,12 @@ services:
       - shared_network
     env_file:
       - ./backend/.env
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:9043/healthz"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 40s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9043/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tm-ai-agent-backend.rule=Host(`t6zidjolyx.turfmapp.com`)"
