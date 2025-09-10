@@ -19,7 +19,7 @@ services:
       start_period: 40s
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tm-ai-agent-backend.rule=Host(`t6zidjOlyx.turfmapp.com`)"
+      - "traefik.http.routers.tm-ai-agent-backend.rule=Host(`t6zidjolyx.turfmapp.com`)"
       - "traefik.http.routers.tm-ai-agent-backend.entrypoints=web-secure"
       - "traefik.http.routers.tm-ai-agent-backend.tls.certresolver=cloudflare"
       - "traefik.http.services.tm-ai-agent-backend.loadbalancer.server.port=9043"
