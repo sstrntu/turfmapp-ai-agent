@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -64,7 +64,7 @@ class UserService:
         for field, value in user_data.dict(exclude_unset=True).items():
             setattr(user, field, value)
 
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(user)
         return user
@@ -90,7 +90,7 @@ class UserService:
             # Update existing preferences
             for field, value in preferences_data.dict(exclude_unset=True).items():
                 setattr(preferences, field, value)
-            preferences.updated_at = datetime.utcnow()
+            preferences.updated_at = datetime.now(timezone.utc)
 
         db.commit()
         db.refresh(preferences)
@@ -127,7 +127,7 @@ class UserService:
             raise NotFoundError(f"User with ID {user_id} not found")
 
         user.status = UserStatus.ACTIVE
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(user)
@@ -141,7 +141,7 @@ class UserService:
             raise NotFoundError(f"User with ID {user_id} not found")
 
         user.status = UserStatus.SUSPENDED
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(user)
@@ -156,7 +156,7 @@ class UserService:
 
         old_role = user.role
         user.role = role
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(user)

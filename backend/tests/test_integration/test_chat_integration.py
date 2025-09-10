@@ -38,8 +38,8 @@ class TestChatIntegration:
     
     @pytest.mark.asyncio
     @patch('app.core.simple_auth.get_current_user_from_token')
-    @patch('app.services.enhanced_chat_service.EnhancedChatService.call_responses_api')
-    @patch('app.services.enhanced_chat_service.EnhancedChatService.save_message_to_conversation')
+    @patch('app.services.chat_service.EnhancedChatService.call_responses_api')
+    @patch('app.services.chat_service.EnhancedChatService.save_message_to_conversation')
     async def test_chat_send_preserves_sources_metadata(
         self, 
         mock_save_message,
@@ -98,7 +98,7 @@ class TestChatIntegration:
     
     @pytest.mark.asyncio
     @patch('app.core.simple_auth.get_current_user_from_token')
-    @patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_history')
+    @patch('app.services.chat_service.EnhancedChatService.get_conversation_history')
     async def test_conversation_history_includes_metadata(
         self,
         mock_get_history,
@@ -179,7 +179,7 @@ class TestChatIntegration:
         mock_auth.return_value = mock_auth_user
         
         # Mock empty conversation history (conversation doesn't exist)
-        with patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_history', return_value=[]):
+        with patch('app.services.chat_service.EnhancedChatService.get_conversation_history', return_value=[]):
             response = client.get(
                 "/api/v1/chat/conversations/nonexistent-id",
                 headers={"Authorization": "Bearer test-token"}
@@ -190,7 +190,7 @@ class TestChatIntegration:
     
     @pytest.mark.asyncio
     @patch('app.core.simple_auth.get_current_user_from_token')
-    @patch('app.services.enhanced_chat_service.EnhancedChatService.call_responses_api')
+    @patch('app.services.chat_service.EnhancedChatService.call_responses_api')
     async def test_api_error_handling_preserves_conversation(
         self,
         mock_api_call,
@@ -204,8 +204,8 @@ class TestChatIntegration:
         mock_api_call.side_effect = Exception("OpenAI API error")
         
         # Mock conversation creation and saving
-        with patch('app.services.enhanced_chat_service.EnhancedChatService.create_conversation', return_value="conv-123"), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.save_message_to_conversation', return_value=True):
+        with patch('app.services.chat_service.EnhancedChatService.create_conversation', return_value="conv-123"), \
+             patch('app.services.chat_service.EnhancedChatService.save_message_to_conversation', return_value=True):
             
             response = client.post(
                 "/api/v1/chat/send",
@@ -328,9 +328,9 @@ class TestChatDataFlow:
         mock_client_instance.get.return_value = enrichment_response
         
         # Mock database operations
-        with patch('app.services.enhanced_chat_service.EnhancedChatService.create_conversation', return_value="conv-789"), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_history', return_value=[]), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.save_message_to_conversation', return_value=True):
+        with patch('app.services.chat_service.EnhancedChatService.create_conversation', return_value="conv-789"), \
+             patch('app.services.chat_service.EnhancedChatService.get_conversation_history', return_value=[]), \
+             patch('app.services.chat_service.EnhancedChatService.save_message_to_conversation', return_value=True):
             
             # Send message that should trigger sources extraction
             response = client.post(
@@ -407,11 +407,11 @@ class TestChatDataFlow:
                 if data["user_id"] == user_id
             ]
         
-        with patch('app.services.enhanced_chat_service.EnhancedChatService.create_conversation', side_effect=mock_create_conv), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.save_message_to_conversation', side_effect=mock_save_message), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_history', side_effect=mock_get_history), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.get_conversation_list', side_effect=mock_get_conversations), \
-             patch('app.services.enhanced_chat_service.EnhancedChatService.call_responses_api', return_value={"output_text": "Hello! How can I help?"}):
+        with patch('app.services.chat_service.EnhancedChatService.create_conversation', side_effect=mock_create_conv), \
+             patch('app.services.chat_service.EnhancedChatService.save_message_to_conversation', side_effect=mock_save_message), \
+             patch('app.services.chat_service.EnhancedChatService.get_conversation_history', side_effect=mock_get_history), \
+             patch('app.services.chat_service.EnhancedChatService.get_conversation_list', side_effect=mock_get_conversations), \
+             patch('app.services.chat_service.EnhancedChatService.call_responses_api', return_value={"output_text": "Hello! How can I help?"}):
             
             # 1. Send initial message (creates conversation)
             send_response = client.post(

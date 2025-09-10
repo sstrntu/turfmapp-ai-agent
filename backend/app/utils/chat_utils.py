@@ -104,20 +104,51 @@ def extract_sources_from_response(response_data: Dict[str, Any]) -> List[Dict[st
     return valid_sources
 
 
-def format_chat_history(messages: List[Dict[str, Any]], max_context: int = 10) -> List[Dict[str, Any]]:
-    """Format chat history for API consumption with context limiting."""
+def format_chat_history(messages: List[Dict[str, Any]], max_context: int = 20) -> List[Dict[str, Any]]:
+    """Format chat history for API consumption with intelligent context management.
+    
+    For large conversations (100+ messages), this preserves:
+    - First 2 messages (conversation start context)
+    - Recent messages within max_context limit
+    - Indicates when messages are omitted
+    """
     if not messages:
         return []
     
-    # Limit to most recent messages to avoid token limits
-    recent_messages = messages[-max_context:] if len(messages) > max_context else messages
+    # For conversations longer than max_context, use smart windowing
+    if len(messages) > max_context:
+        # Calculate how many recent messages to keep
+        recent_count = max_context - 3  # Reserve space for first messages + separator
+        
+        # Keep first 2 messages (for conversation establishment)
+        first_messages = messages[:2]
+        
+        # Keep most recent messages
+        recent_messages = messages[-recent_count:] if recent_count > 0 else []
+        
+        # Add context separator
+        omitted_count = len(messages) - len(first_messages) - len(recent_messages)
+        context_separator = {
+            "role": "system", 
+            "content": f"[Conversation continues... {omitted_count} messages omitted. Showing recent context:]"
+        }
+        
+        context_messages = first_messages + [context_separator] + recent_messages
+    else:
+        context_messages = messages
     
+    # Format messages for API
     formatted_messages = []
-    for msg in recent_messages:
+    for msg in context_messages:
         if isinstance(msg, dict) and msg.get("role") and msg.get("content"):
+            # Truncate very long messages to prevent token overflow
+            content = str(msg["content"])
+            if len(content) > 2000:  # Rough token limit per message
+                content = content[:1900] + "... [message truncated]"
+            
             formatted_messages.append({
                 "role": msg["role"],
-                "content": str(msg["content"])
+                "content": content
             })
     
     return formatted_messages

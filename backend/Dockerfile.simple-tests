@@ -1,0 +1,73 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_NO_CACHE_DIR=on
+
+WORKDIR /app
+
+# Install system dependencies for PostgreSQL
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install requirements
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install -r /app/requirements.txt
+
+# Copy application code, tests, and testing utilities
+COPY app /app/app
+COPY tests /app/tests
+COPY run_tests.sh /app/run_tests.sh
+COPY TESTING_WORKFLOW.md /app/TESTING_WORKFLOW.md
+COPY pytest.ini /app/pytest.ini
+COPY .coveragerc /app/.coveragerc
+
+# Make test script executable
+RUN chmod +x /app/run_tests.sh
+
+# 🧪 ESSENTIAL TESTS ONLY - Focus on regression and critical functionality
+RUN echo "🚀 Running essential test suite during Docker build..." && \
+    export SUPABASE_URL=https://test.supabase.co && \
+    export SUPABASE_ANON_KEY=test-anon-key && \
+    export SUPABASE_SERVICE_ROLE_KEY=test-service-key && \
+    export SUPABASE_DB_URL=postgresql://test:test@localhost:5432/test && \
+    export OPENAI_API_KEY=test-openai-key && \
+    export SECRET_KEY=test-secret-key-for-docker-build && \
+    export GOOGLE_CLIENT_ID=test-google-client-id && \
+    export GOOGLE_CLIENT_SECRET=test-google-client-secret && \
+    export GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback && \
+    echo "📋 Step 1: REGRESSION tests (Core workflows must never break)..." && \
+    python -m pytest tests/test_regression_critical_flows.py -v --tb=short --maxfail=5 && \
+    echo "✅ Regression tests PASSED" && \
+    echo "📋 Step 2: HEALTH and API tests (Essential endpoints)..." && \
+    python -m pytest tests/test_health.py tests/test_simple.py -v --tb=short && \
+    echo "✅ Health tests PASSED" && \
+    echo "📋 Step 3: Google MCP integration (If available)..." && \
+    python -m pytest tests/test_google_mcp_integration.py -v --tb=short && \
+    echo "✅ Integration tests PASSED" && \
+    echo "📋 Step 4: Tool manager tests (High coverage)..." && \
+    python -m pytest tests/test_tool_manager.py -v --tb=short && \
+    echo "✅ Tool manager tests PASSED" && \
+    echo "📋 Step 5: Basic coverage check..." && \
+    python -m pytest tests/test_regression_critical_flows.py tests/test_health.py tests/test_simple.py tests/test_google_mcp_integration.py tests/test_tool_manager.py --cov=app/services --cov-report=term-missing --cov-fail-under=25 --tb=short && \
+    echo "🎉 ALL ESSENTIAL TESTS PASSED! Build is safe." || \
+    (echo "❌ ESSENTIAL TESTS FAILED! Build aborted." && exit 1)
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8000/healthz', timeout=5)" || exit 1
+
+EXPOSE 8000
+
+# Production labels
+LABEL maintainer="TurfMapp Team" \
+      description="TurfMapp Backend with Essential Test Coverage" \
+      testing="Regression + Health + Integration + Tool Manager tests" \
+      coverage="25%+ code coverage verified" \
+      stage="production-ready"
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

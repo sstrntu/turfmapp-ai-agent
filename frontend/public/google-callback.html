@@ -32,18 +32,28 @@
             const error = urlParams.get('error');
             
             if (error) {
+                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
+                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
+                localStorage.removeItem('google-oauth-return-url');
+                localStorage.removeItem('google-oauth-return-context');
+                
                 document.getElementById('status').innerHTML = 
                     '<div class="error">❌ Google authentication failed</div>';
                 document.getElementById('result').innerHTML = 
-                    `<p>Error: ${error}</p><p><a href="test-google.html">← Back to test page</a></p>`;
+                    `<p>Error: ${error}</p><p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>`;
                 return;
             }
             
             if (!code) {
+                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
+                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
+                localStorage.removeItem('google-oauth-return-url');
+                localStorage.removeItem('google-oauth-return-context');
+                
                 document.getElementById('status').innerHTML = 
                     '<div class="error">❌ No authorization code received</div>';
                 document.getElementById('result').innerHTML = 
-                    '<p><a href="test-google.html">← Back to test page</a></p>';
+                    `<p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>`;
                 return;
             }
             
@@ -51,10 +61,15 @@
             if (!window.supabase.isSessionValid()) {
                 document.getElementById('status').innerHTML = 
                     '<div class="error">❌ TURFMAPP authentication required</div>';
+                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
+                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
+                localStorage.removeItem('google-oauth-return-url');
+                localStorage.removeItem('google-oauth-return-context');
+                
                 document.getElementById('result').innerHTML = `
                     <p>You need to be logged into TURFMAPP before connecting Google services.</p>
                     <p><a href="portal.html">← Login to TURFMAPP first</a></p>
-                    <p>Then return to: <a href="test-google.html">Google integration test</a></p>
+                    <p>Then return to: <a href="${returnUrl}">${returnContext === 'settings' ? 'Settings' : 'Google integration test'}</a></p>
                 `;
                 return;
             }
@@ -66,14 +81,38 @@
                 document.getElementById('status').innerHTML = 
                     '<div class="success">✅ Google authentication successful!</div>';
                 
+                // Determine where to redirect based on stored return URL or referrer
+                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
+                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
+                
+                // Clean up localStorage
+                localStorage.removeItem('google-oauth-return-url');
+                localStorage.removeItem('google-oauth-return-context');
+                
+                // Fallback to referrer check if localStorage wasn't set
+                if (returnUrl === 'test-google.html' && document.referrer.includes('settings.html')) {
+                    returnUrl = 'settings.html';
+                }
+                
                 document.getElementById('result').innerHTML = `
                     <p>Welcome, ${result.user_info.name || result.user_info.email}!</p>
                     <p>You can now access Gmail, Google Drive, and Calendar.</p>
-                    <p><strong><a href="test-google.html">← Go back to test Google features</a></strong></p>
+                    <p><strong><a href="${returnUrl}">← Go back to ${returnContext === 'settings' ? 'Settings' : 'test Google features'}</a></strong></p>
                 `;
+                
+                // Auto-redirect after 2 seconds
+                setTimeout(() => {
+                    window.location.href = returnUrl;
+                }, 2000);
                 
             } catch (error) {
                 console.error('Callback error:', error);
+                
+                // Get return URL info for error cases too
+                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
+                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
+                localStorage.removeItem('google-oauth-return-url');
+                localStorage.removeItem('google-oauth-return-context');
                 
                 // Check if it's an authentication error
                 if (error.message.includes('Not authenticated') || error.message.includes('Invalid state')) {
@@ -82,13 +121,13 @@
                     document.getElementById('result').innerHTML = `
                         <p>Your TURFMAPP login session has expired.</p>
                         <p><a href="portal.html">← Login to TURFMAPP again</a></p>
-                        <p>Then return to: <a href="test-google.html">Google integration test</a></p>
+                        <p>Then return to: <a href="${returnUrl}">${returnContext === 'settings' ? 'Settings' : 'Google integration test'}</a></p>
                     `;
                 } else {
                     document.getElementById('status').innerHTML = 
                         '<div class="error">❌ Authentication processing failed</div>';
                     document.getElementById('result').innerHTML = 
-                        `<p>Error: ${error.message}</p><p><a href="test-google.html">← Back to test page</a></p>`;
+                        `<p>Error: ${error.message}</p><p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>`;
                 }
             }
         }

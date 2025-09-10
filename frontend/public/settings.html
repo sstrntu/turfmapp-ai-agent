@@ -386,6 +386,7 @@
                     <!-- Tab Navigation -->
                     <div class="settings-tabs">
                         <button class="tab-button active" data-tab="settings">Settings</button>
+                        <button class="tab-button" data-tab="integrations">Integrations</button>
                         <button class="tab-button" data-tab="admin" id="admin-tab" style="display: none;">
                             Admin
                             <span class="admin-only-badge">Admin</span>
@@ -429,6 +430,98 @@
                                     <button type="button" id="save-settings" class="save-btn">Save Settings</button>
                                     <button type="button" id="delete-account" class="save-btn danger" style="background: rgba(245,101,101,0.2); border-color: rgba(245,101,101,0.3);">Delete Account</button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Integrations Tab Content -->
+                    <div id="integrations-tab" class="tab-content">
+                        <div class="profile-grid" style="row-gap: 18px;">
+                            
+                            <!-- Google Services Section -->
+                            <div class="form-row">
+                                <div class="label">Google Services</div>
+                                <div class="admin-note">Connect your Google accounts to unlock AI features</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 20px; margin-bottom: 15px;">
+                                <div id="google-status" class="admin-note" style="margin-bottom: 15px;">
+                                    Loading Google account status...
+                                </div>
+                                
+                                <div id="google-accounts-list" style="margin-bottom: 15px;">
+                                    <!-- Google accounts will be populated here -->
+                                </div>
+                                
+                                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button class="save-btn" onclick="addGoogleAccount()" id="add-google-btn">
+                                        + Add Google Account
+                                    </button>
+                                    <button class="save-btn" onclick="refreshGoogleStatus()" style="background: rgba(100,100,100,0.3);">
+                                        🔄 Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Gmail Integration -->
+                            <div class="form-row">
+                                <div class="label">Gmail Features</div>
+                                <div class="admin-note">AI can read and analyze your emails</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <div class="tool-checkbox">
+                                    <input type="checkbox" id="gmail-enabled" onchange="toggleGmailFeatures()">
+                                    <label for="gmail-enabled">Enable Gmail integration in chat</label>
+                                </div>
+                                <div class="admin-note" style="margin-left: 24px; font-size: 0.8rem; opacity: 0.7;">
+                                    Ask AI: "What are my latest emails?" or "Summarize my inbox"
+                                </div>
+                            </div>
+
+                            <!-- Google Drive Integration -->
+                            <div class="form-row">
+                                <div class="label">Google Drive Features</div>
+                                <div class="admin-note">AI can access and manage your files</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <div class="tool-checkbox">
+                                    <input type="checkbox" id="drive-enabled" onchange="toggleDriveFeatures()">
+                                    <label for="drive-enabled">Enable Google Drive integration in chat</label>
+                                </div>
+                                <div class="admin-note" style="margin-left: 24px; font-size: 0.8rem; opacity: 0.7;">
+                                    Ask AI: "Upload this to my Drive" or "Find files about project X"
+                                </div>
+                            </div>
+
+                            <!-- Google Calendar Integration -->
+                            <div class="form-row">
+                                <div class="label">Calendar Features</div>
+                                <div class="admin-note">AI can read your calendar events</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <div class="tool-checkbox">
+                                    <input type="checkbox" id="calendar-enabled" onchange="toggleCalendarFeatures()">
+                                    <label for="calendar-enabled">Enable Google Calendar integration in chat</label>
+                                </div>
+                                <div class="admin-note" style="margin-left: 24px; font-size: 0.8rem; opacity: 0.7;">
+                                    Ask AI: "What's on my calendar today?" or "Schedule a meeting"
+                                </div>
+                            </div>
+
+                            <!-- Test Google Services -->
+                            <div class="form-row">
+                                <div class="label">Test Connection</div>
+                                <div class="admin-note">Verify your Google integrations are working</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <button class="save-btn" onclick="testGoogleIntegrations()" id="test-google-btn" style="background: rgba(40,167,69,0.3);">
+                                    🧪 Test Google Integrations
+                                </button>
+                                <div id="google-test-results" style="margin-top: 10px;"></div>
                             </div>
                         </div>
                     </div>
@@ -1144,6 +1237,300 @@
                     toggleBtn.setAttribute('aria-expanded', 'false');
                     panel.setAttribute('aria-hidden', 'true');
                     document.body.classList.remove('panel-open');
+                });
+            }
+        });
+
+        // Google Account Management Functions
+        let googleAccountsData = [];
+
+        async function loadGoogleStatus() {
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/google/auth/status', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                googleAccountsData = data.data.accounts || [];
+                
+                updateGoogleStatusDisplay(data.data);
+                updateGoogleFeatureToggles(data.data);
+                
+            } catch (error) {
+                console.error('Error loading Google status:', error);
+                document.getElementById('google-status').innerHTML = 
+                    '<span style="color: #ff6b6b;">Error loading Google account status</span>';
+            }
+        }
+
+        function updateGoogleStatusDisplay(statusData) {
+            const statusElement = document.getElementById('google-status');
+            const accountsList = document.getElementById('google-accounts-list');
+            
+            const totalAccounts = statusData.total_accounts || 0;
+            
+            if (totalAccounts > 0) {
+                statusElement.innerHTML = `<span style="color: #28a745;">✅ ${totalAccounts} Google account${totalAccounts > 1 ? 's' : ''} connected</span>`;
+                
+                // Display accounts
+                const accountsHtml = statusData.accounts.map(account => `
+                    <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="color: var(--color-primary); font-weight: 500;">
+                                ${account.email} 
+                                ${account.is_primary ? '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">PRIMARY</span>' : ''}
+                            </div>
+                            <div style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">
+                                ${account.name} ${account.nickname ? `(${account.nickname})` : ''}
+                            </div>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.8rem;">
+                                Connected: ${new Date(account.connected_at * 1000).toLocaleDateString()}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            ${!account.is_primary ? 
+                                `<button class="save-btn" onclick="setPrimaryGoogleAccount('${account.email}')" style="font-size: 0.8rem; padding: 6px 12px;">Set Primary</button>` : 
+                                ''
+                            }
+                            <button class="save-btn" onclick="setGoogleNickname('${account.email}')" style="font-size: 0.8rem; padding: 6px 12px; background: rgba(100,100,100,0.3);">Nickname</button>
+                            <button class="save-btn" onclick="disconnectGoogleAccount('${account.email}')" style="font-size: 0.8rem; padding: 6px 12px; background: rgba(220,53,69,0.3);">Remove</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                accountsList.innerHTML = accountsHtml;
+            } else {
+                statusElement.innerHTML = '<span style="color: #ffc107;">⚠ No Google accounts connected</span>';
+                accountsList.innerHTML = `
+                    <div style="background: rgba(255,193,7,0.1); border-radius: 8px; padding: 15px; margin: 10px 0; text-align: center;">
+                        <div style="color: rgba(255,255,255,0.8); margin-bottom: 10px;">
+                            Connect your Google account to unlock powerful AI features:
+                        </div>
+                        <div style="color: rgba(255,255,255,0.6); font-size: 0.9rem;">
+                            📧 Gmail analysis • 📁 Google Drive access • 📅 Calendar integration
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateGoogleFeatureToggles(statusData) {
+            const hasAccounts = statusData.total_accounts > 0;
+            
+            // Enable/disable checkboxes based on account availability
+            document.getElementById('gmail-enabled').disabled = !hasAccounts;
+            document.getElementById('drive-enabled').disabled = !hasAccounts;
+            document.getElementById('calendar-enabled').disabled = !hasAccounts;
+            
+            // Load saved preferences (for now, default to enabled if accounts exist)
+            document.getElementById('gmail-enabled').checked = hasAccounts;
+            document.getElementById('drive-enabled').checked = hasAccounts;
+            document.getElementById('calendar-enabled').checked = hasAccounts;
+        }
+
+        async function addGoogleAccount() {
+            try {
+                // Store return URL information for callback
+                localStorage.setItem('google-oauth-return-url', 'settings.html');
+                localStorage.setItem('google-oauth-return-context', 'settings');
+                
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/google/auth/url?add_account=true', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Redirect to Google OAuth
+                    window.location.href = data.data.auth_url;
+                } else {
+                    showMessage('Failed to get Google auth URL: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function setPrimaryGoogleAccount(email) {
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/google/accounts/${encodeURIComponent(email)}/set-primary`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`${email} is now your primary account`, 'success');
+                    await loadGoogleStatus();
+                } else {
+                    showMessage('Failed to set primary: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function setGoogleNickname(email) {
+            const nickname = prompt(`Enter a nickname for ${email} (e.g., "Work", "Personal"):`);
+            if (!nickname) return;
+
+            try {
+                const token = GoogleAuth.getToken();
+                const formData = new FormData();
+                formData.append('nickname', nickname);
+
+                const response = await fetch(`/api/v1/google/accounts/${encodeURIComponent(email)}/nickname`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`Nickname "${nickname}" set for ${email}`, 'success');
+                    await loadGoogleStatus();
+                } else {
+                    showMessage('Failed to set nickname: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function disconnectGoogleAccount(email) {
+            if (!confirm(`Are you sure you want to disconnect ${email}?`)) return;
+
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/google/accounts/${encodeURIComponent(email)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(`${email} has been disconnected`, 'success');
+                    await loadGoogleStatus();
+                } else {
+                    showMessage('Failed to disconnect: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshGoogleStatus() {
+            document.getElementById('google-status').innerHTML = 'Refreshing...';
+            await loadGoogleStatus();
+        }
+
+        function toggleGmailFeatures() {
+            const enabled = document.getElementById('gmail-enabled').checked;
+            // Save preference to localStorage or backend
+            localStorage.setItem('gmail-features-enabled', enabled);
+            showMessage(`Gmail features ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        }
+
+        function toggleDriveFeatures() {
+            const enabled = document.getElementById('drive-enabled').checked;
+            localStorage.setItem('drive-features-enabled', enabled);
+            showMessage(`Google Drive features ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        }
+
+        function toggleCalendarFeatures() {
+            const enabled = document.getElementById('calendar-enabled').checked;
+            localStorage.setItem('calendar-features-enabled', enabled);
+            showMessage(`Google Calendar features ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        }
+
+        async function testGoogleIntegrations() {
+            const resultsDiv = document.getElementById('google-test-results');
+            const testBtn = document.getElementById('test-google-btn');
+            
+            testBtn.disabled = true;
+            testBtn.textContent = '🧪 Testing...';
+            resultsDiv.innerHTML = '<div class="admin-note">Testing Google integrations...</div>';
+
+            try {
+                const token = GoogleAuth.getToken();
+                const tests = [];
+
+                // Test Gmail
+                if (googleAccountsData.length > 0) {
+                    try {
+                        const response = await fetch('/api/v1/google/gmail/messages?max_results=1', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        tests.push({
+                            service: 'Gmail',
+                            status: data.messages ? 'success' : 'warning',
+                            message: data.messages && data.messages.length > 0 ? 
+                                `✅ Gmail: Found ${data.messages.length} messages` : 
+                                '⚠ Gmail: Connected but no messages found'
+                        });
+                    } catch (error) {
+                        tests.push({
+                            service: 'Gmail',
+                            status: 'error',
+                            message: `❌ Gmail: ${error.message}`
+                        });
+                    }
+
+                    // Test Google Drive
+                    try {
+                        const response = await fetch('/api/v1/google/drive/files?max_results=1', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        tests.push({
+                            service: 'Drive',
+                            status: 'success',
+                            message: data.files ? `✅ Google Drive: ${data.files.length} files accessible` : '✅ Google Drive: Connected'
+                        });
+                    } catch (error) {
+                        tests.push({
+                            service: 'Drive',
+                            status: 'error',
+                            message: `❌ Google Drive: ${error.message}`
+                        });
+                    }
+                } else {
+                    tests.push({
+                        service: 'All',
+                        status: 'warning',
+                        message: '⚠ No Google accounts connected - please add an account first'
+                    });
+                }
+
+                // Display results
+                const resultsHtml = tests.map(test => `
+                    <div style="padding: 8px; margin: 5px 0; border-radius: 4px; 
+                         background: ${test.status === 'success' ? 'rgba(40,167,69,0.2)' : 
+                                    test.status === 'warning' ? 'rgba(255,193,7,0.2)' : 'rgba(220,53,69,0.2)'};">
+                        ${test.message}
+                    </div>
+                `).join('');
+                
+                resultsDiv.innerHTML = resultsHtml;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<div style="color: #ff6b6b;">Test failed: ${error.message}</div>`;
+            } finally {
+                testBtn.disabled = false;
+                testBtn.textContent = '🧪 Test Google Integrations';
+            }
+        }
+
+        // Load Google status when integrations tab is first opened
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load Google status when switching to integrations tab
+            const integrationsTab = document.querySelector('[data-tab="integrations"]');
+            if (integrationsTab) {
+                integrationsTab.addEventListener('click', function() {
+                    setTimeout(loadGoogleStatus, 100); // Small delay to ensure tab is active
                 });
             }
         });

@@ -840,15 +840,90 @@
             }
         });
 
+        document.getElementById('image-gen-btn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            const isActive = this.classList.contains('active');
+            if (isActive) {
+                input.placeholder = 'Describe an image to generate...';
+                // Deactivate other tools
+                deactivateOtherTools('image-gen-btn');
+            } else {
+                input.placeholder = 'Type your message...';
+            }
+        });
+
         document.getElementById('web-search-btn')?.addEventListener('click', function() {
             this.classList.toggle('active');
             const isActive = this.classList.contains('active');
             if (isActive) {
                 input.placeholder = 'Search the web for...';
+                // Deactivate other Google tools
+                deactivateGoogleTools();
             } else {
                 input.placeholder = 'Type your message...';
             }
         });
+
+        // Google tool button handlers
+        document.getElementById('gmail-btn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            const isActive = this.classList.contains('active');
+            if (isActive) {
+                input.placeholder = 'Ask about your Gmail...';
+                // Deactivate other tools
+                deactivateOtherTools('gmail-btn');
+            } else {
+                input.placeholder = 'Type your message...';
+            }
+        });
+
+        document.getElementById('calendar-btn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            const isActive = this.classList.contains('active');
+            if (isActive) {
+                input.placeholder = 'Ask about your Calendar...';
+                // Deactivate other tools
+                deactivateOtherTools('calendar-btn');
+            } else {
+                input.placeholder = 'Type your message...';
+            }
+        });
+
+        document.getElementById('drive-btn')?.addEventListener('click', function() {
+            this.classList.toggle('active');
+            const isActive = this.classList.contains('active');
+            if (isActive) {
+                input.placeholder = 'Ask about your Drive files...';
+                // Deactivate other tools
+                deactivateOtherTools('drive-btn');
+            } else {
+                input.placeholder = 'Type your message...';
+            }
+        });
+
+        // Helper function to deactivate Google tools
+        function deactivateGoogleTools() {
+            ['gmail-btn', 'calendar-btn', 'drive-btn'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.setAttribute('aria-pressed', 'false');
+                }
+            });
+        }
+
+        // Helper function to deactivate other tools except the active one
+        function deactivateOtherTools(activeId) {
+            ['gmail-btn', 'calendar-btn', 'drive-btn', 'web-search-btn', 'image-gen-btn', 'sound-effects-btn'].forEach(id => {
+                if (id !== activeId) {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-pressed', 'false');
+                    }
+                }
+            });
+        }
 
         // File input handler
         fileInput?.addEventListener('change', function(e) {
@@ -927,7 +1002,7 @@
             };
         }
 
-        function buildToolsArray(settings, forceImageGen = false, forceWebSearch = false) {
+        function buildToolsArray(settings, forceImageGen = false, forceWebSearch = false, forceGoogleTools = {}) {
             const tools = [];
 
             // Web search tool
@@ -935,7 +1010,7 @@
                 tools.push({
                     type: 'web_search_preview',
                     user_location: { type: 'approximate' },
-                    search_context_size: settings.webSearchContext
+                    search_context_size: settings.webSearchContext || 'medium'
                 });
             }
 
@@ -944,7 +1019,7 @@
                 tools.push({
                     type: 'image_generation',
                     size: 'auto',
-                    quality: settings.imageQuality,
+                    quality: settings.imageQuality || 'auto',
                     output_format: 'png',
                     background: 'auto',
                     moderation: 'auto',
@@ -952,7 +1027,19 @@
                 });
             }
 
-            // MCP tool
+            // Google MCP tools - activate individually when buttons are clicked
+            if (forceGoogleTools.gmail || forceGoogleTools.calendar || forceGoogleTools.drive) {
+                tools.push({
+                    type: 'google_mcp',
+                    enabled_tools: {
+                        gmail: forceGoogleTools.gmail || false,
+                        calendar: forceGoogleTools.calendar || false,
+                        drive: forceGoogleTools.drive || false
+                    }
+                });
+            }
+
+            // Original MCP tool (from original repo)
             if (settings.toolMcp && settings.mcpServerLabel && settings.mcpConnectorId) {
                 tools.push({
                     type: 'mcp',
@@ -1360,8 +1447,15 @@
             // Check for special tool modes
             const imageGenBtn = document.getElementById('image-gen-btn');
             const webSearchBtn = document.getElementById('web-search-btn');
+            const gmailBtn = document.getElementById('gmail-btn');
+            const calendarBtn = document.getElementById('calendar-btn');
+            const driveBtn = document.getElementById('drive-btn');
+            
             const isImageGen = imageGenBtn?.classList.contains('active');
             const isWebSearch = webSearchBtn?.classList.contains('active');
+            const isGmail = gmailBtn?.classList.contains('active');
+            const isCalendar = calendarBtn?.classList.contains('active');
+            const isDrive = driveBtn?.classList.contains('active');
 
             appendMessage('user', value);
             input.value = '';
@@ -1374,7 +1468,12 @@
             var placeholder = createAssistantPlaceholder();
 
             // Make tools available by default; if user clicks the toggles, force-include those
-            const tools = buildToolsArray(settings, isImageGen, isWebSearch);
+            const googleTools = {
+                gmail: isGmail,
+                calendar: isCalendar,
+                drive: isDrive
+            };
+            const tools = buildToolsArray(settings, isImageGen, isWebSearch, googleTools);
             
             // Build enhanced system instructions to guide tool usage
             const systemInstructions = buildSystemInstructions(settings, isWebSearch);
@@ -1458,6 +1557,17 @@
                         // Reset tool button states
                         imageGenBtn?.classList.remove('active');
                         webSearchBtn?.classList.remove('active');
+                        gmailBtn?.classList.remove('active');
+                        calendarBtn?.classList.remove('active');
+                        driveBtn?.classList.remove('active');
+                        
+                        // Reset aria-pressed attributes
+                        imageGenBtn?.setAttribute('aria-pressed', 'false');
+                        webSearchBtn?.setAttribute('aria-pressed', 'false');
+                        gmailBtn?.setAttribute('aria-pressed', 'false');
+                        calendarBtn?.setAttribute('aria-pressed', 'false');
+                        driveBtn?.setAttribute('aria-pressed', 'false');
+                        
                         input.placeholder = 'Type your message...';
                     } else {
                         console.error('Invalid response format:', res);

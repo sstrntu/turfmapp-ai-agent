@@ -3,25 +3,25 @@ Tool Manager for Agentic Chatbot Integration
 
 This module manages all available tools that the agentic chatbot can use.
 It provides a unified interface for tool discovery, execution, and management.
+Now enhanced with MCP (Model Context Protocol) integration for Google services.
 """
 
 from __future__ import annotations
 
 from typing import Dict, Any, List, Optional
 import json
-
-from .gmail_tool import gmail_tool
-
+import asyncio
 
 class ToolManager:
-    """Manages all available tools for the agentic chatbot."""
+    """Manages all available tools for the agentic chatbot (non-Google services)."""
     
     def __init__(self):
+        # Traditional tools (non-Google services only)
+        # Google services are now handled via MCP
         self.tools = {
-            "gmail": gmail_tool,
-            # Add more tools here as they're created
-            # "calendar": calendar_tool,
-            # "drive": drive_tool,
+            # Add non-Google tools here as they're created
+            # "database": database_tool,
+            # "file_processing": file_processing_tool,
         }
     
     def get_available_tools(self) -> List[Dict[str, Any]]:
@@ -68,6 +68,67 @@ class ToolManager:
         """Remove a tool from the manager."""
         if name in self.tools:
             del self.tools[name]
+    
+    async def get_all_tools_with_mcp(self) -> List[Dict[str, Any]]:
+        """Get all available tools including MCP Google tools."""
+        try:
+            # Get traditional tools
+            traditional_tools = self.get_available_tools()
+            
+            # Get MCP tools
+            from .mcp_client import get_all_google_tools
+            mcp_tools = await get_all_google_tools()
+            
+            # Convert MCP tools to OpenAI function format
+            mcp_openai_tools = []
+            for mcp_tool in mcp_tools:
+                openai_tool = {
+                    "type": "function",
+                    "function": {
+                        "name": mcp_tool.get("name"),
+                        "description": mcp_tool.get("description"),
+                        "parameters": mcp_tool.get("inputSchema")
+                    }
+                }
+                mcp_openai_tools.append(openai_tool)
+            
+            # Combine both sets
+            return traditional_tools + mcp_openai_tools
+            
+        except Exception as e:
+            print(f"❌ Failed to get MCP tools in tool manager: {e}")
+            # Fallback to traditional tools only
+            return self.get_available_tools()
+    
+    async def get_all_descriptions_with_mcp(self) -> Dict[str, str]:
+        """Get descriptions of all available tools including MCP tools."""
+        try:
+            # Get traditional descriptions
+            traditional_descriptions = self.get_tool_descriptions()
+            
+            # Get MCP tools
+            from .mcp_client import get_all_google_tools
+            mcp_tools = await get_all_google_tools()
+            
+            # Extract MCP tool descriptions
+            mcp_descriptions = {}
+            for mcp_tool in mcp_tools:
+                tool_name = mcp_tool.get("name")
+                tool_desc = mcp_tool.get("description")
+                mcp_descriptions[tool_name] = tool_desc
+            
+            # Combine both sets
+            return {**traditional_descriptions, **mcp_descriptions}
+            
+        except Exception as e:
+            print(f"❌ Failed to get MCP tool descriptions: {e}")
+            # Fallback to traditional descriptions only
+            return self.get_tool_descriptions()
+    
+    def is_mcp_tool(self, tool_name: str) -> bool:
+        """Check if a tool is an MCP tool."""
+        mcp_tool_prefixes = ["gmail_", "drive_", "calendar_"]
+        return any(tool_name.startswith(prefix) for prefix in mcp_tool_prefixes)
 
 
 # Global instance
