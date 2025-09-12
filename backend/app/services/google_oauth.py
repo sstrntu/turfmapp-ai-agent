@@ -328,7 +328,7 @@ class GoogleOAuthService:
             results = service.files().list(
                 q=query,
                 pageSize=max_results,
-                fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size)"
+                fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, webViewLink, webContentLink, thumbnailLink)"
             ).execute()
             
             return {
@@ -339,6 +339,92 @@ class GoogleOAuthService:
         except HttpError as e:
             print(f"Error getting Drive files: {e}")
             return {'error': str(e), 'files': []}
+    
+    async def search_drive_files(self, credentials: Credentials, search_term: str = '', file_type: str = '', 
+                                year: str = '', max_results: int = 10) -> Dict[str, Any]:
+        """Advanced search for Google Drive files with filters for type, year, and content."""
+        try:
+            credentials = self.refresh_credentials_if_needed(credentials)
+            service = build('drive', 'v3', credentials=credentials)
+            
+            # Build search query
+            query_parts = []
+            
+            # Content/name search
+            if search_term:
+                query_parts.append(f"(fullText contains '{search_term}' OR name contains '{search_term}')")
+            
+            # File type filter
+            if file_type:
+                if file_type.lower() in ['photo', 'photos', 'image', 'images']:
+                    query_parts.append("mimeType contains 'image/'")
+                elif file_type.lower() in ['document', 'doc', 'docs']:
+                    query_parts.append("(mimeType contains 'document' OR mimeType contains 'pdf')")
+                elif file_type.lower() in ['video', 'videos']:
+                    query_parts.append("mimeType contains 'video/'")
+                elif file_type.lower() in ['folder', 'folders']:
+                    query_parts.append("mimeType = 'application/vnd.google-apps.folder'")
+                else:
+                    query_parts.append(f"mimeType contains '{file_type}'")
+            
+            # Year filter
+            if year:
+                start_date = f"{year}-01-01T00:00:00"
+                end_date = f"{int(year)+1}-01-01T00:00:00"
+                query_parts.append(f"modifiedTime >= '{start_date}' AND modifiedTime < '{end_date}'")
+            
+            # Exclude trashed files
+            query_parts.append("trashed=false")
+            
+            # Combine query parts
+            query = " AND ".join(query_parts) if query_parts else "trashed=false"
+            
+            print(f"🔍 Drive search query: {query}")
+            
+            results = service.files().list(
+                q=query,
+                pageSize=max_results,
+                fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, webViewLink, webContentLink, thumbnailLink, parents)",
+                orderBy="modifiedTime desc"
+            ).execute()
+            
+            return {
+                'files': results.get('files', []),
+                'nextPageToken': results.get('nextPageToken'),
+                'query': query
+            }
+            
+        except HttpError as e:
+            print(f"Error searching Drive files: {e}")
+            return {'error': str(e), 'files': []}
+    
+    async def search_drive_folders(self, credentials: Credentials, folder_name: str, max_results: int = 10) -> Dict[str, Any]:
+        """Search specifically for folders in Google Drive."""
+        try:
+            credentials = self.refresh_credentials_if_needed(credentials)
+            service = build('drive', 'v3', credentials=credentials)
+            
+            # Search for folders with the specified name
+            query = f"name contains '{folder_name}' AND mimeType = 'application/vnd.google-apps.folder' AND trashed=false"
+            
+            print(f"🔍 Drive folder search query: {query}")
+            
+            results = service.files().list(
+                q=query,
+                pageSize=max_results,
+                fields="nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, webViewLink, parents)",
+                orderBy="modifiedTime desc"
+            ).execute()
+            
+            return {
+                'folders': results.get('files', []),
+                'nextPageToken': results.get('nextPageToken'),
+                'query': query
+            }
+            
+        except HttpError as e:
+            print(f"Error searching Drive folders: {e}")
+            return {'error': str(e), 'folders': []}
     
     async def create_folder_structure(self, credentials: Credentials, folder_path: str, root_folder: str = "TURFMAPP") -> str:
         """Create nested folder structure in user's Drive (e.g., TURFMAPP/Projects/Client)."""
@@ -495,6 +581,27 @@ class GoogleOAuthService:
         except Exception as e:
             print(f"Error listing files in '{folder_path}': {e}")
             return {'success': False, 'error': str(e), 'files': []}
+    
+    async def get_shared_drives(self, credentials: Credentials, max_results: int = 10) -> Dict[str, Any]:
+        """Get shared drives (Team Drives) that the user has access to."""
+        try:
+            credentials = self.refresh_credentials_if_needed(credentials)
+            service = build('drive', 'v3', credentials=credentials)
+            
+            # List shared drives
+            results = service.drives().list(
+                pageSize=max_results,
+                fields="nextPageToken, drives(id, name, createdTime, capabilities, restrictions)"
+            ).execute()
+            
+            return {
+                'drives': results.get('drives', []),
+                'nextPageToken': results.get('nextPageToken')
+            }
+            
+        except HttpError as e:
+            print(f"Error getting shared drives: {e}")
+            return {'error': str(e), 'drives': []}
     
     # Calendar API methods
     async def get_calendar_events(self, credentials: Credentials, calendar_id: str = 'primary', max_results: int = 10, upcoming_only: bool = True) -> Dict[str, Any]:

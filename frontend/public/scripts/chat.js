@@ -39,7 +39,13 @@
         if (!list) return;
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'assistant') + ' message-initial';
-            bubble.textContent = text;
+            if (role === 'assistant') {
+                // Allow HTML rendering for assistant messages (for clickable links)
+                bubble.innerHTML = text;
+            } else {
+                // Keep user messages as text only for security
+                bubble.textContent = text;
+            }
             list.appendChild(bubble);
             
             // Animate message appearance
@@ -709,7 +715,7 @@
                 },
                 typewriterEffect(element, text, callback) {
                     let i = 0;
-                    const speed = 20; // milliseconds per character
+                    const speed = 10; // milliseconds per character (2x faster)
                     
                     // Add cursor
                     const cursor = document.createElement('span');
