@@ -82,7 +82,7 @@ class GoogleAccountsDB:
                 encrypted_access_token,
                 encrypted_refresh_token,
                 datetime.fromtimestamp(account_data.tokens.expires_at, tz=timezone.utc) if account_data.tokens.expires_at else None,
-                'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar'
+                'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/calendar.readonly'
                 )
                 
                 logger.info(f"Saved Google account {account_data.email} for user {user_id}")
