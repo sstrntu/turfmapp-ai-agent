@@ -230,19 +230,64 @@ class EnhancedChatService:
                 })
                 
             if enabled_tools.get('drive'):
-                available_tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": "drive_list_files",
-                        "description": "List files in Google Drive. Use for file-related questions or document requests.",
-                        "parameters": {
-                            "type": "object", 
-                            "properties": {
-                                "max_results": {"type": "integer", "default": 10}
+                available_tools.extend([
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "drive_list_files",
+                            "description": "List files in Google Drive. Use for file-related questions or document requests.",
+                            "parameters": {
+                                "type": "object", 
+                                "properties": {
+                                    "max_results": {"type": "integer", "default": 10}
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "drive_shared_drives",
+                            "description": "List shared drives (Team Drives) that the user has access to. Use when user asks about shared drives, team drives, or organizational drives.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "max_results": {"type": "integer", "default": 10}
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "drive_search",
+                            "description": "Advanced search for FILES (not folders) in Google Drive with filters for content, file type, and year. Perfect for queries like 'photos of Team A in 2022' or 'documents about project'. Returns clickable links to files. Do NOT use for folder searches - use drive_search_folders instead.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "search_term": {"type": "string", "description": "Search term to look for in file names and content"},
+                                    "file_type": {"type": "string", "description": "File type filter: 'photos/images', 'documents', 'videos', 'folders'"},
+                                    "year": {"type": "string", "description": "Year filter (e.g., '2022')"},
+                                    "max_results": {"type": "integer", "default": 10}
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "drive_search_folders",
+                            "description": "Search ONLY for folders/directories in Google Drive by name. Use when user asks for 'folder', 'directory', mentions a folder name, or when the item they're looking for is known to be a folder (like episode folders, project folders, etc). Returns clickable folder links. ALWAYS use this instead of drive_search when looking for folders.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "folder_name": {"type": "string", "description": "Name of the folder to search for"},
+                                    "max_results": {"type": "integer", "default": 10}
+                                }
                             }
                         }
                     }
-                })
+                ])
             
             if not available_tools:
                 # Provide intelligent response based on what tools the user likely needs
@@ -391,6 +436,43 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                             "response": "",
                             "error": str(e)
                         })
+                
+                # Default Drive fallback for Drive questions
+                elif enabled_tools.get('drive'):
+                    # Simple fallback logic like Gmail
+                    user_msg_lower = user_message.lower()
+                    
+                    # Detect folder search vs general file search
+                    if any(word in user_msg_lower for word in ['folder', 'directory']):
+                        # Extract potential folder name from the message (like Gmail extracts "first")
+                        words = [w for w in user_message.split() if w not in ['find', 'the', 'folder', 'directory', 'get', 'me']]
+                        folder_name = ' '.join(words) if words else ""
+                        
+                        params = {"user_id": user_id, "folder_name": folder_name, "max_results": 10}
+                        drive_tool = "drive_search_folders"
+                    else:
+                        # Default to file listing (like gmail_recent)
+                        params = {"user_id": user_id, "max_results": 10}
+                        drive_tool = "drive_list_files"
+                    
+                    print(f"🔄 Drive fallback: using {drive_tool}")
+                    
+                    try:
+                        result = await google_mcp_client.call_tool(drive_tool, params)
+                        tool_results.append({
+                            "tool": drive_tool,
+                            "success": result.get("success", False) if isinstance(result, dict) else False,
+                            "response": result.get("response", "") if isinstance(result, dict) else str(result),
+                            "error": result.get("error") if isinstance(result, dict) else None
+                        })
+                    except Exception as e:
+                        logger.error(f"❌ Drive fallback error: {e}")
+                        tool_results.append({
+                            "tool": drive_tool,
+                            "success": False,
+                            "response": "",
+                            "error": str(e)
+                        })
             
             # Combine successful results
             successful_results = [r for r in tool_results if r["success"]]
@@ -400,6 +482,16 @@ Select the most appropriate tool(s) and parameters to answer the user's question
                     "success": False, 
                     "response": "I couldn't retrieve data from your Google services. Please check your permissions and try again."
                 }
+            
+            # Special handling for folder searches - return directly without AI processing
+            for result in successful_results:
+                if result["tool"] == "drive_search_folders" and result.get("response"):
+                    logger.debug(f"🔄 Returning folder search result directly without AI analysis")
+                    return {
+                        "success": True,
+                        "response": result["response"],
+                        "tools_used": [result["tool"]]
+                    }
             
             # Collect data for AI analysis
             tools_used = []
@@ -441,6 +533,8 @@ Please analyze the retrieved data and provide a helpful, concise answer to the u
 2. Summarizing key information rather than listing raw data
 3. Being conversational and helpful
 4. Highlighting important dates, names, or action items if relevant
+
+CRITICAL: When URLs or links are provided in the data, you MUST include them EXACTLY as provided. NEVER truncate, shorten, or summarize URLs. Always show complete clickable links.
 
 Respond as if you're having a natural conversation with the user."""
 
@@ -553,7 +647,7 @@ Respond as if you're having a natural conversation with the user."""
                 # Check if this is a Google MCP tool
                 google_tools = [
                     "gmail_search", "gmail_get_message", "gmail_recent", "gmail_important",
-                    "drive_list_files", "drive_create_folder", "drive_list_folder_files",
+                    "drive_list_files", "drive_create_folder", "drive_list_folder_files", "drive_shared_drives", "drive_search", "drive_search_folders",
                     "calendar_list_events", "calendar_upcoming_events"
                 ]
                 
@@ -574,6 +668,12 @@ Respond as if you're having a natural conversation with the user."""
                         result = await google_mcp_client.call_tool(tool_name, tool_args)
                         
                         logger.debug(f"🔧 MCP result for {tool_name}: {result}")
+                        
+                        # Special debug logging for folder search
+                        if tool_name == "drive_search_folders" and result.get("success"):
+                            print(f"🔍 FOLDER SEARCH RESULT: {result.get('response', 'No response')[:500]}")
+                            if len(result.get('response', '')) > 500:
+                                print(f"🔍 FOLDER SEARCH (continued): {result.get('response', '')[500:]}")
                         
                     except Exception as e:
                         logger.error(f"❌ MCP tool execution failed for {tool_name}: {e}")
@@ -860,11 +960,20 @@ For general knowledge questions, use web search or answer from your training dat
         
         # Check if Google MCP tools are explicitly requested
         google_mcp_tools = None
+        print(f"🔍 DEBUG: kwargs keys: {list(kwargs.keys())}")
+        print(f"🔍 DEBUG: tools in kwargs: {'tools' in kwargs}")
+        if 'tools' in kwargs:
+            print(f"🔍 DEBUG: tools content: {kwargs['tools']}")
+        
         if 'tools' in kwargs and kwargs['tools']:
             for tool in kwargs['tools']:
+                print(f"🔍 DEBUG: Processing tool: {tool}")
                 if tool.get('type') == 'google_mcp':
                     google_mcp_tools = tool.get('enabled_tools', {})
+                    print(f"🔍 DEBUG: Found Google MCP tools: {google_mcp_tools}")
                     break
+        
+        print(f"🔍 DEBUG: Final google_mcp_tools: {google_mcp_tools}")
         
         if google_mcp_tools and any(google_mcp_tools.values()):
             logger.debug(f"🔧 Google MCP tools explicitly requested: {google_mcp_tools}")
