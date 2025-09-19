@@ -623,30 +623,48 @@
     <script src="scripts/google-auth.js"></script>
     <script src="scripts/ui.js"></script>
     <script src="scripts/chat.js"></script>
-    
+
     <!-- Settings JavaScript -->
     <script>
+        console.log('🔴 [SETTINGS] Settings script loading...');
+
         // Global state
         let currentUser = null;
         let isAdmin = false;
-        
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🟢 [SETTINGS] DOMContentLoaded fired - page loaded successfully!');
             try {
                 await initializeSettings();
             } catch (error) {
                 console.error('Error initializing settings:', error);
                 showMessage('Error loading settings. Please refresh the page.', 'error');
+                hideLoadingScreen();
             }
         });
         
         // Initialize settings page
         async function initializeSettings() {
-            // Ensure user is authenticated
-            if (!GoogleAuth.requireAuth()) {
+            console.log('🚀 [SETTINGS] Initializing settings page...');
+            console.log('🔍 [SETTINGS] GoogleAuth exists:', !!window.GoogleAuth);
+            console.log('🔍 [SETTINGS] Supabase exists:', !!window.supabase);
+
+            // Debug authentication state
+            console.log('🔍 [SETTINGS] isAuthenticated():', GoogleAuth.isAuthenticated());
+            console.log('🔍 [SETTINGS] getToken():', !!GoogleAuth.getToken());
+
+            // Ensure user is authenticated (now async)
+            const isAuth = await GoogleAuth.requireAuth();
+            console.log('🔍 [SETTINGS] requireAuth() result:', isAuth);
+
+            if (!isAuth) {
+                console.log('❌ [SETTINGS] Authentication failed, hiding loading screen');
                 hideLoadingScreen();
                 return;
             }
+
+            console.log('✅ [SETTINGS] Authentication passed, continuing initialization...');
 
             try {
                 // Load current user and check admin status first (before showing UI)

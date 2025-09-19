@@ -237,15 +237,83 @@ const GoogleAuth = {
      * Get current access token for API requests
      */
     getToken() {
-        const session = window.supabase?.session;
-        return session?.access_token || null;
+        try {
+            // First try to get from initialized Supabase client
+            if (window.supabase?.session) {
+                return window.supabase.session.access_token || null;
+            }
+
+            // Fallback: try to get from stored session
+            const encryptedSession = sessionStorage.getItem('sb-session-enc');
+            if (encryptedSession && window.supabase) {
+                // If we have Supabase client, use its decryption method
+                try {
+                    const sessionData = window.supabase._decryptSession(encryptedSession);
+                    return sessionData?.access_token || null;
+                } catch (e) {
+                    console.error('Error decrypting session for token:', e);
+                }
+            }
+
+            // Last resort: check legacy localStorage
+            const legacySession = localStorage.getItem('sb-session');
+            if (legacySession) {
+                try {
+                    const session = JSON.parse(legacySession);
+                    return session.access_token || null;
+                } catch (e) {
+                    console.error('Error parsing legacy session for token:', e);
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Error getting token:', error);
+            return null;
+        }
     },
 
     /**
      * Check if current user is authenticated
      */
     isAuthenticated() {
-        return window.supabase?.isSessionValid() || false;
+        try {
+            // First check if Supabase is initialized
+            if (!window.supabase) {
+                console.warn('Supabase not initialized yet, checking stored session...');
+
+                // Check if we have a session in sessionStorage
+                const encryptedSession = sessionStorage.getItem('sb-session-enc');
+                const sessionExpiry = sessionStorage.getItem('sb-session-exp');
+
+                if (encryptedSession && sessionExpiry) {
+                    const expiry = parseInt(sessionExpiry);
+                    const isValid = Date.now() < expiry;
+                    console.log('Found stored session, valid:', isValid);
+                    return isValid;
+                }
+
+                // Fallback: check legacy localStorage session
+                const legacySession = localStorage.getItem('sb-session');
+                if (legacySession) {
+                    try {
+                        const session = JSON.parse(legacySession);
+                        const isValid = session.expires_at ? Date.now() < session.expires_at : false;
+                        console.log('Found legacy session, valid:', isValid);
+                        return isValid;
+                    } catch (e) {
+                        console.error('Error parsing legacy session:', e);
+                    }
+                }
+
+                return false;
+            }
+
+            return window.supabase.isSessionValid() || false;
+        } catch (error) {
+            console.error('Error checking authentication:', error);
+            return false;
+        }
     },
 
     /**
@@ -303,12 +371,40 @@ const GoogleAuth = {
     /**
      * Ensure user is authenticated and redirect if not
      */
-    requireAuth() {
-        if (!this.isAuthenticated()) {
+    async requireAuth() {
+        try {
+            // Wait for Supabase to be initialized if it's not ready
+            if (!window.supabase && typeof window.initializeSupabase === 'function') {
+                console.log('⏳ [AUTH] Waiting for Supabase initialization...');
+                await window.initializeSupabase();
+            }
+
+            // Give it a moment to settle
+            let attempts = 0;
+            while (!window.supabase && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            console.log('🔍 [AUTH] Supabase ready:', !!window.supabase);
+            console.log('🔍 [AUTH] Session valid:', window.supabase?.isSessionValid());
+
+            const isAuth = this.isAuthenticated();
+            console.log('🔍 [AUTH] Final authentication result:', isAuth);
+
+            if (!isAuth) {
+                console.log('❌ [AUTH] Authentication failed, redirecting to portal');
+                window.location.href = '/portal.html';
+                return false;
+            }
+
+            console.log('✅ [AUTH] Authentication successful');
+            return true;
+        } catch (error) {
+            console.error('❌ [AUTH] Error in requireAuth:', error);
             window.location.href = '/portal.html';
             return false;
         }
-        return true;
     },
 
     /**

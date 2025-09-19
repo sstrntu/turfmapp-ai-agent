@@ -57,16 +57,20 @@ async function loadSupabaseConfig() {
  */
 class SupabaseClient {
     constructor(url, anonKey) {
+        console.log('🟠 [SUPABASE] SupabaseClient constructor called');
         this.url = url;
         this.anonKey = anonKey;
         this.session = null;
         this.user = null;
         this._refreshTimerId = null;
-        
+
+        console.log('🟠 [SUPABASE] Loading stored session...');
         // Initialize from stored session
         this.loadStoredSession();
+        console.log('🟠 [SUPABASE] Session loaded, scheduling refresh...');
         // Schedule refresh if a session exists
         this._scheduleRefresh();
+        console.log('🟠 [SUPABASE] SupabaseClient constructor complete');
     }
 
     /**
@@ -538,10 +542,17 @@ class SupabaseClient {
 let supabaseInitialized = false;
 
 async function initializeSupabase() {
-    if (supabaseInitialized) return window.supabase;
+    console.log('🔵 [SUPABASE] initializeSupabase called on:', window.location.href);
+    if (supabaseInitialized) {
+        console.log('🔵 [SUPABASE] Already initialized, returning existing client');
+        return window.supabase;
+    }
 
+    console.log('🔵 [SUPABASE] Loading config...');
     const config = await loadSupabaseConfig();
+    console.log('🔵 [SUPABASE] Creating SupabaseClient...');
     window.supabase = new SupabaseClient(config.url, config.anonKey);
+    console.log('🔵 [SUPABASE] SupabaseClient created successfully');
     supabaseInitialized = true;
     return window.supabase;
 }
@@ -550,6 +561,7 @@ async function initializeSupabase() {
 window.initializeSupabase = initializeSupabase;
 
 // Auto-initialize on script load
+console.log('🟡 [SUPABASE] About to auto-initialize on:', window.location.href);
 initializeSupabase().catch(error => {
     console.error('Failed to initialize Supabase:', error);
     // Try again after a short delay
