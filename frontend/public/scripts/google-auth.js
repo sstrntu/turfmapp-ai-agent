@@ -12,7 +12,10 @@ const GoogleAuth = {
     /**
      * Initialize authentication state
      */
-    init() {
+    async init() {
+        // Ensure Supabase is initialized
+        await initializeSupabase();
+
         // Check if user is already authenticated
         if (window.supabase.isSessionValid()) {
             this.handleAuthenticatedUser();
@@ -36,41 +39,12 @@ const GoogleAuth = {
     },
 
     /**
-     * Development mode login (fallback for testing)
+     * Development mode login (disabled for security)
+     * This method is preserved for API compatibility but disabled
      */
     async devLogin() {
-        try {
-            this.showStatus('Signing in with development credentials...', 'info');
-
-            // Use the legacy auth system for development
-            const response = await fetch('/api/auth/dev-login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    username: 'test',
-                    password: '123'
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.showStatus('Development login successful!', 'success');
-                
-                // Redirect after short delay
-                setTimeout(() => {
-                    window.location.href = '/home.html';
-                }, 1000);
-            } else {
-                const error = await response.json();
-                throw new Error(error.detail || 'Development login failed');
-            }
-
-        } catch (error) {
-            console.error('Development login error:', error);
-            this.showStatus(`Development login failed: ${error.message}`, 'error');
-        }
+        console.warn('Development login is disabled for security reasons');
+        this.showStatus('Development login is disabled. Please use Google authentication.', 'error');
     },
 
     /**
@@ -373,10 +347,10 @@ const GoogleAuth = {
 };
 
 // Initialize on page load - ONLY for login/portal pages
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // Only initialize GoogleAuth on login/portal pages, not on home page
     if (window.location.pathname === '/portal.html' || window.location.pathname === '/login.html' || window.location.pathname === '/') {
-        GoogleAuth.init();
+        await GoogleAuth.init();
     }
 });
 

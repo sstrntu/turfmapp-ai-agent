@@ -34,9 +34,21 @@ const GoogleServices = {
      */
     async authenticateGoogle() {
         try {
-            const response = await window.supabase.apiRequest('/api/v1/google/auth/url');
+            // Generate CSRF token for additional security
+            const csrfToken = this._generateCSRFToken();
+            this._storeCSRFToken(csrfToken);
+
+            const response = await window.supabase.apiRequest('/api/v1/google/auth/url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    state: csrfToken
+                })
+            });
             const data = await response.json();
-            
+
             if (response.ok && data.success) {
                 // Redirect to Google OAuth
                 window.location.href = data.data.auth_url;
@@ -54,6 +66,11 @@ const GoogleServices = {
      */
     async handleGoogleCallback(code, state) {
         try {
+            // Validate CSRF token first
+            if (state && !this._validateCSRFToken(state)) {
+                throw new Error('Invalid authentication state - possible CSRF attack');
+            }
+
             const response = await window.supabase.apiRequest('/api/v1/google/auth/callback', {
                 method: 'POST',
                 headers: {
@@ -61,9 +78,9 @@ const GoogleServices = {
                 },
                 body: JSON.stringify({ code, state })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok && data.success) {
                 return data.data;
             } else {
@@ -118,6 +135,59 @@ const GoogleServices = {
     isTokenExpired(expiresAt) {
         if (!expiresAt) return true;
         return new Date(expiresAt) <= new Date();
+    },
+
+    /**
+     * Generate CSRF token for OAuth flows
+     */
+    _generateCSRFToken() {
+        // Generate a cryptographically secure random token
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+
+        // Convert to base64url format (URL-safe)
+        return btoa(String.fromCharCode.apply(null, array))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+    },
+
+    /**
+     * Store CSRF token for validation
+     */
+    _storeCSRFToken(token) {
+        sessionStorage.setItem('google-oauth-csrf-token', token);
+        // Also set expiry (5 minutes for OAuth flow)
+        sessionStorage.setItem('google-oauth-csrf-expiry', (Date.now() + 300000).toString());
+    },
+
+    /**
+     * Validate CSRF token
+     */
+    _validateCSRFToken(token) {
+        const storedToken = sessionStorage.getItem('google-oauth-csrf-token');
+        const expiry = sessionStorage.getItem('google-oauth-csrf-expiry');
+
+        // Clean up tokens after use
+        sessionStorage.removeItem('google-oauth-csrf-token');
+        sessionStorage.removeItem('google-oauth-csrf-expiry');
+
+        if (!storedToken || !expiry) {
+            console.error('Google OAuth CSRF token not found or expired');
+            return false;
+        }
+
+        if (Date.now() > parseInt(expiry)) {
+            console.error('Google OAuth CSRF token expired');
+            return false;
+        }
+
+        if (storedToken !== token) {
+            console.error('Google OAuth CSRF token mismatch');
+            return false;
+        }
+
+        return true;
     },
 
     // Gmail Methods

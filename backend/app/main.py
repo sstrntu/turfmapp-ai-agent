@@ -63,6 +63,20 @@ def health_check() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/api/v1/config/frontend")
+def get_frontend_config():
+    """Get frontend configuration (public values only)"""
+    return {
+        "supabase": {
+            "url": os.getenv("SUPABASE_URL"),
+            "anonKey": os.getenv("SUPABASE_ANON_KEY")
+        },
+        "frontend": {
+            "url": os.getenv("FRONTEND_URL", "http://localhost:3005")
+        }
+    }
+
+
 # API v1 routes
 app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(preferences_router_v1, prefix="/api/v1/preferences", tags=["preferences"])
