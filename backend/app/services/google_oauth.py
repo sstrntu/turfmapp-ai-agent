@@ -118,7 +118,6 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error exchanging code for tokens: {e}")
             return None
     
     async def _get_user_info(self, credentials: Credentials) -> Dict[str, Any]:
@@ -137,7 +136,6 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting user info: {e}")
             return {}
     
     def refresh_access_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
@@ -163,7 +161,6 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error refreshing access token: {e}")
             return None
     
     def get_credentials_from_token(self, access_token: str, refresh_token: str = None) -> Credentials:
@@ -182,9 +179,7 @@ class GoogleOAuthService:
         if credentials.expired and credentials.refresh_token:
             try:
                 credentials.refresh(httpx.Request())
-                print(f"🔄 Refreshed expired Google credentials")
             except Exception as e:
-                print(f"❌ Failed to refresh credentials: {e}")
                 raise
         return credentials
     
@@ -233,9 +228,9 @@ class GoogleOAuthService:
                 'resultSizeEstimate': results.get('resultSizeEstimate', 0)
             }
             
-        except HttpError as e:
-            print(f"Error getting Gmail messages: {e}")
-            return {'error': str(e), 'messages': []}
+        except Exception as e:
+            from ..core.exceptions import handle_google_api_error
+            raise handle_google_api_error(e, "Gmail", "get_messages")
     
     def _extract_email_body(self, payload: Dict[str, Any]) -> str:
         """Extract email body content from Gmail API payload."""
@@ -253,7 +248,6 @@ class GoogleOAuthService:
                 data = data.replace('-', '+').replace('_', '/')
                 return base64.b64decode(data).decode('utf-8')
             except Exception as e:
-                print(f"Error decoding base64url: {e}")
                 return ""
         
         def extract_text_from_part(part: Dict[str, Any]) -> str:
@@ -314,9 +308,9 @@ class GoogleOAuthService:
                 'snippet': message.get('snippet')
             }
             
-        except HttpError as e:
-            print(f"Error getting Gmail message content: {e}")
-            return {'error': str(e)}
+        except Exception as e:
+            from ..core.exceptions import handle_google_api_error
+            raise handle_google_api_error(e, "Gmail", "get_message_content")
     
     # Drive API methods
     async def get_drive_files(self, credentials: Credentials, query: str = '', max_results: int = 10) -> Dict[str, Any]:
@@ -335,10 +329,10 @@ class GoogleOAuthService:
                 'files': results.get('files', []),
                 'nextPageToken': results.get('nextPageToken')
             }
-            
-        except HttpError as e:
-            print(f"Error getting Drive files: {e}")
-            return {'error': str(e), 'files': []}
+
+        except Exception as e:
+            from ..core.exceptions import handle_google_api_error
+            raise handle_google_api_error(e, "Drive", "get_files")
     
     async def search_drive_files(self, credentials: Credentials, search_term: str = '', file_type: str = '', 
                                 year: str = '', max_results: int = 10) -> Dict[str, Any]:
@@ -378,9 +372,7 @@ class GoogleOAuthService:
             
             # Combine query parts
             query = " AND ".join(query_parts) if query_parts else "trashed=false"
-            
-            print(f"🔍 Drive search query: {query}")
-            
+
             results = service.files().list(
                 q=query,
                 pageSize=max_results,
@@ -395,7 +387,6 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error searching Drive files: {e}")
             return {'error': str(e), 'files': []}
     
     async def search_drive_folders(self, credentials: Credentials, folder_name: str, max_results: int = 10) -> Dict[str, Any]:
@@ -406,9 +397,7 @@ class GoogleOAuthService:
             
             # Search for folders with the specified name
             query = f"name contains '{folder_name}' AND mimeType = 'application/vnd.google-apps.folder' AND trashed=false"
-            
-            print(f"🔍 Drive folder search query: {query}")
-            
+
             results = service.files().list(
                 q=query,
                 pageSize=max_results,
@@ -423,7 +412,6 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error searching Drive folders: {e}")
             return {'error': str(e), 'folders': []}
     
     async def create_folder_structure(self, credentials: Credentials, folder_path: str, root_folder: str = "TURFMAPP") -> str:
@@ -443,7 +431,6 @@ class GoogleOAuthService:
             return current_parent
             
         except Exception as e:
-            print(f"Error creating folder structure: {e}")
             raise
     
     async def _get_or_create_folder(self, service, folder_name: str, parent_id: str = None) -> str:
@@ -472,7 +459,6 @@ class GoogleOAuthService:
             return folder.get('id')
             
         except Exception as e:
-            print(f"Error getting/creating folder '{folder_name}': {e}")
             raise
     
     async def upload_file_to_drive(self, credentials: Credentials, file_content: bytes, filename: str, folder_path: str = None) -> Dict[str, Any]:
@@ -530,7 +516,6 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error uploading file '{filename}': {e}")
             return {'success': False, 'error': str(e)}
     
     async def delete_file_from_drive(self, credentials: Credentials, file_id: str) -> Dict[str, Any]:
@@ -552,7 +537,6 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error deleting file '{file_id}': {e}")
             return {'success': False, 'error': str(e)}
     
     async def list_files_in_folder(self, credentials: Credentials, folder_path: str) -> Dict[str, Any]:
@@ -579,7 +563,6 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error listing files in '{folder_path}': {e}")
             return {'success': False, 'error': str(e), 'files': []}
     
     async def get_shared_drives(self, credentials: Credentials, max_results: int = 10) -> Dict[str, Any]:
@@ -600,7 +583,6 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting shared drives: {e}")
             return {'error': str(e), 'drives': []}
     
     # Calendar API methods
@@ -622,8 +604,7 @@ class GoogleOAuthService:
                 from datetime import datetime, timezone
                 now = datetime.now(timezone.utc).isoformat()
                 query_params['timeMin'] = now
-                print(f"🗓️ Filtering calendar events from: {now}")
-            
+
             events_result = service.events().list(**query_params).execute()
             
             return {
@@ -632,7 +613,6 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting Calendar events: {e}")
             return {'error': str(e), 'events': []}
 
 

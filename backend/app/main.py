@@ -20,8 +20,23 @@ from .api.v1.fal_tools import router as fal_tools_router
 from .api.v1.admin import router as admin_router_v1
 from .api.v1.settings import router as settings_router_v1
 from .api.v1.google_api import router as google_api_router_v1
+from .api.v1.config import router as config_router_v1
 
 from .database import get_supabase_config
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan context manager"""
+    # Startup
+    config = get_supabase_config()
+    print(f"Supabase configured: {bool(config['url'])}")
+
+    yield
+
+    # Shutdown
+    # Add cleanup code here if needed
 
 
 def _get_cors_origins() -> List[str]:
@@ -35,7 +50,8 @@ def _get_cors_origins() -> List[str]:
 app = FastAPI(
     title="TURFMAPP AI Agent Backend",
     description="Modular AI chatbot backend with Supabase integration",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -74,16 +90,9 @@ app.include_router(fal_tools_router, prefix="/api/v1/fal-tools", tags=["fal-tool
 app.include_router(admin_router_v1, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(settings_router_v1, prefix="/api/v1/settings", tags=["settings"])
 app.include_router(google_api_router_v1, prefix="/api/v1/google", tags=["google-api"])
+app.include_router(config_router_v1, prefix="/api/config", tags=["config"])
 
 # Direct Google OAuth callback route for frontend redirect
 app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oauth"])
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    """Initialize application on startup"""
-    # Supabase integration - configuration loaded
-    config = get_supabase_config()
-    print(f"Supabase configured: {bool(config['url'])}")
 
 

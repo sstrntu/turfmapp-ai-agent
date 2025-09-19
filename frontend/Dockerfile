@@ -1,5 +1,5 @@
 # Multi-stage build to reduce context
-FROM alpine:latest as file-copier
+FROM alpine:latest AS file-copier
 
 # Create directory structure
 RUN mkdir -p /app/public

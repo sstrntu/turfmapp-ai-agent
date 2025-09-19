@@ -53,24 +53,43 @@ const GoogleServices = {
      * Handle Google OAuth callback
      */
     async handleGoogleCallback(code, state) {
+        console.log('🚀 [DEBUG] GoogleServices.handleGoogleCallback called');
+        console.log('📋 [DEBUG] Code:', code ? `${code.substring(0, 20)}...` : 'null');
+        console.log('🏷️ [DEBUG] State:', state);
+
         try {
+            console.log('🔐 [DEBUG] Checking Supabase session...');
+            console.log('🔐 [DEBUG] window.supabase exists:', !!window.supabase);
+            console.log('🔐 [DEBUG] Session valid:', window.supabase?.isSessionValid());
+
+            const requestBody = { code, state };
+            console.log('📤 [DEBUG] Request body:', requestBody);
+
+            console.log('🌐 [DEBUG] Making API request to /api/v1/google/auth/callback');
             const response = await window.supabase.apiRequest('/api/v1/google/auth/callback', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ code, state })
+                body: JSON.stringify(requestBody)
             });
-            
+
+            console.log('📡 [DEBUG] Response status:', response.status);
+            console.log('📡 [DEBUG] Response ok:', response.ok);
+
             const data = await response.json();
-            
+            console.log('📋 [DEBUG] Response data:', data);
+
             if (response.ok && data.success) {
+                console.log('✅ [DEBUG] Callback successful, returning data');
                 return data.data;
             } else {
+                console.error('❌ [DEBUG] Callback failed:', data);
                 throw new Error(data.message || 'Google authentication failed');
             }
         } catch (error) {
-            console.error('Error handling Google callback:', error);
+            console.error('💥 [DEBUG] Error handling Google callback:', error);
+            console.error('💥 [DEBUG] Error stack:', error.stack);
             throw error;
         }
     },

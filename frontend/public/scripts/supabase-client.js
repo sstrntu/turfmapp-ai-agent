@@ -7,12 +7,32 @@
 
 /**
  * Supabase Configuration
- * Replace these with your actual Supabase project credentials
+ * Loads configuration from environment or backend
  */
-const SUPABASE_CONFIG = {
-    url: 'https://pwxhgvuyaxgavommtqpr.supabase.co',  // Your project URL
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3eGhndnV5YXhnYXZvbW10cXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMjA1OTcsImV4cCI6MjA3MTc5NjU5N30.n7i3AMpdRRBWA5AhNMdzO5qf_34w4Fo13adUBWsoevg'  // Your anon/public key
+let SUPABASE_CONFIG = {
+    url: null,
+    anonKey: null
 };
+
+// Load configuration from backend
+async function loadSupabaseConfig() {
+    try {
+        const response = await fetch('/api/config/supabase');
+        if (response.ok) {
+            SUPABASE_CONFIG = await response.json();
+        } else {
+            throw new Error('Failed to load configuration');
+        }
+    } catch (error) {
+        // Config loading failed - fallback for dev only
+        if (window.location.hostname === 'localhost') {
+            SUPABASE_CONFIG = {
+                url: window.SUPABASE_URL || null,
+                anonKey: window.SUPABASE_ANON_KEY || null
+            };
+        }
+    }
+}
 
 /**
  * Simple Supabase Client Implementation
@@ -33,27 +53,41 @@ class SupabaseClient {
     }
 
     /**
-     * Load stored session from localStorage
+     * Load stored session from secure storage
      */
     loadStoredSession() {
         try {
-            const storedSession = localStorage.getItem('sb-session');
+            // Use secure storage if available, fallback to localStorage
+            let storedSession = null;
+            if (window.secureStorage) {
+                storedSession = window.secureStorage.getSecure('session');
+            } else {
+                const sessionData = localStorage.getItem('sb-session');
+                storedSession = sessionData ? JSON.parse(sessionData) : null;
+            }
+
             if (storedSession) {
-                this.session = JSON.parse(storedSession);
+                this.session = storedSession;
                 this.user = this.session?.user || null;
             }
         } catch (error) {
-            console.error('Error loading stored session:', error);
+            // Session loading failed - clear session
             this.clearSession();
         }
     }
 
     /**
-     * Store session in localStorage
+     * Store session in secure storage
      */
     storeSession(session) {
         if (session) {
-            localStorage.setItem('sb-session', JSON.stringify(session));
+            // Use secure storage if available, fallback to localStorage
+            if (window.secureStorage) {
+                window.secureStorage.setSecure('session', session);
+            } else {
+                localStorage.setItem('sb-session', JSON.stringify(session));
+            }
+
             this.session = session;
             this.user = session.user;
             this._scheduleRefresh();
@@ -66,7 +100,12 @@ class SupabaseClient {
      * Clear session
      */
     clearSession() {
+        // Clear from both secure storage and localStorage
+        if (window.secureStorage) {
+            window.secureStorage.removeSecure('session');
+        }
         localStorage.removeItem('sb-session');
+
         this.session = null;
         this.user = null;
         if (this._refreshTimerId) {
@@ -111,7 +150,6 @@ class SupabaseClient {
             
             window.location.href = authUrl;
         } catch (error) {
-            console.error('Google sign in error:', error);
             throw new Error('Failed to initiate Google sign in');
         }
     }
@@ -151,7 +189,6 @@ class SupabaseClient {
             
             throw new Error('Invalid callback parameters');
         } catch (error) {
-            console.error('Auth callback error:', error);
             throw error;
         }
     }
@@ -172,7 +209,7 @@ class SupabaseClient {
                 });
             }
         } catch (error) {
-            console.error('Sign out error:', error);
+            // Sign out error - continue with cleanup
         } finally {
             this.clearSession();
         }
@@ -227,7 +264,7 @@ class SupabaseClient {
                 return newSession;
             }
         } catch (error) {
-            console.error('Session refresh error:', error);
+            // Session refresh failed
         }
 
         // Refresh failed, clear session
@@ -301,8 +338,21 @@ class SupabaseClient {
     }
 }
 
-// Initialize global Supabase client
-window.supabase = new SupabaseClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+// Initialize global Supabase client after config loads
+window.supabase = null;
+
+// Initialize client once config is loaded
+async function initializeSupabaseClient() {
+    await loadSupabaseConfig();
+    if (SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+        window.supabase = new SupabaseClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+    } else {
+        throw new Error('Supabase configuration not available');
+    }
+}
+
+// Auto-initialize on page load
+document.addEventListener('DOMContentLoaded', initializeSupabaseClient);
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

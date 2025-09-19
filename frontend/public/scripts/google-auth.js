@@ -30,7 +30,6 @@ const GoogleAuth = {
             await window.supabase.signInWithGoogle();
             
         } catch (error) {
-            console.error('Google sign in error:', error);
             this.showStatus('Failed to sign in with Google. Please try again.', 'error');
         }
     },
@@ -68,7 +67,6 @@ const GoogleAuth = {
             }
 
         } catch (error) {
-            console.error('Development login error:', error);
             this.showStatus(`Development login failed: ${error.message}`, 'error');
         }
     },
@@ -112,11 +110,9 @@ const GoogleAuth = {
                 }
             } else {
                 // If Google auth check fails, still go to home (non-blocking)
-                console.warn('Could not check Google auth status, proceeding to home');
                 setTimeout(() => window.location.replace('/home.html'), 2000);
             }
         } catch (error) {
-            console.error('Error checking Google services:', error);
             // On error, proceed to home after delay (non-blocking)
             setTimeout(() => window.location.replace('/home.html'), 2000);
         }

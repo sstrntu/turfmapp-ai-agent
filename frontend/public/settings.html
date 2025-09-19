@@ -454,11 +454,17 @@
                                 </div>
                                 
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <button class="save-btn" onclick="addGoogleAccount()" id="add-google-btn">
+                                    <button class="save-btn" onclick="addGoogleAccount()" id="add-google-btn" disabled title="Initializing...">
                                         + Add Google Account
                                     </button>
-                                    <button class="save-btn" onclick="refreshGoogleStatus()" style="background: rgba(100,100,100,0.3);">
+                                    <button class="save-btn" onclick="refreshGoogleStatus()" style="background: rgba(100,100,100,0.3);" disabled>
                                         🔄 Refresh
+                                    </button>
+                                    <button class="save-btn" onclick="debugGoogleOAuth()" style="background: rgba(255,165,0,0.3);" disabled>
+                                        🐛 Debug OAuth
+                                    </button>
+                                    <button class="save-btn" onclick="debugSystemHealth()" style="background: rgba(0,200,0,0.3);" disabled>
+                                        🏥 System Health
                                     </button>
                                 </div>
                             </div>
@@ -619,6 +625,7 @@
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
     <script src="scripts/announcement.js"></script>
+    <script src="scripts/secure-storage.js"></script>
     <script src="scripts/supabase-client.js"></script>
     <script src="scripts/google-auth.js"></script>
     <script src="scripts/ui.js"></script>
@@ -642,6 +649,30 @@
         
         // Initialize settings page
         async function initializeSettings() {
+            console.log('⚡ [DEBUG] initializeSettings() called');
+
+            // Wait for Supabase to be ready
+            console.log('⏳ [DEBUG] Waiting for Supabase initialization...');
+            let attempts = 0;
+            while (!window.supabase && attempts < 50) {  // Wait up to 5 seconds
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (!window.supabase) {
+                console.error('❌ [DEBUG] Supabase client not available after waiting');
+                hideLoadingScreen();
+                showMessage('Application initialization failed. Please refresh the page.', 'error');
+                return;
+            }
+
+            console.log('✅ [DEBUG] Supabase client available');
+            console.log('🔐 [DEBUG] Initial auth state:', {
+                hasSupabase: !!window.supabase,
+                isAuthenticated: GoogleAuth.isAuthenticated(),
+                sessionValid: window.supabase.isSessionValid()
+            });
+
             // Ensure user is authenticated
             if (!GoogleAuth.requireAuth()) {
                 hideLoadingScreen();
@@ -788,49 +819,111 @@
             const container = document.getElementById('users-list');
             
             if (users.length === 0) {
-                container.innerHTML = '<div class="admin-note">No users found</div>';
+                container.textContent = 'No users found';
                 return;
             }
             
             const table = document.createElement('table');
             table.className = 'users-table';
+
+            // Create table header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = ['Name', 'Email', 'Role', 'Status', 'Actions'];
+            headers.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Create table body
+            const tbody = document.createElement('tbody');
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-user-id', user.id);
+
+                // Name cell
+                const nameCell = document.createElement('td');
+                nameCell.textContent = user.name || 'N/A';
+                row.appendChild(nameCell);
+
+                // Email cell
+                const emailCell = document.createElement('td');
+                emailCell.textContent = user.email;
+                row.appendChild(emailCell);
+
+                // Role cell with select
+                const roleCell = document.createElement('td');
+                const roleSelect = document.createElement('select');
+                roleSelect.className = 'role-select';
+                roleSelect.setAttribute('data-user-id', user.id);
+                roleSelect.setAttribute('data-current-role', user.role);
+
+                const roles = ['user', 'admin'];
+                if (currentUser?.role === 'super_admin') {
+                    roles.push('super_admin');
+                }
+
+                roles.forEach(roleValue => {
+                    const option = document.createElement('option');
+                    option.value = roleValue;
+                    option.textContent = roleValue.charAt(0).toUpperCase() + roleValue.slice(1).replace('_', ' ');
+                    if (user.role === roleValue) {
+                        option.selected = true;
+                    }
+                    roleSelect.appendChild(option);
+                });
+
+                roleCell.appendChild(roleSelect);
+                row.appendChild(roleCell);
+
+                // Status cell
+                const statusCell = document.createElement('td');
+                const statusBadge = document.createElement('span');
+                statusBadge.className = `status-badge status-${user.status}`;
+                statusBadge.textContent = user.status;
+                statusCell.appendChild(statusBadge);
+                row.appendChild(statusCell);
+
+                // Actions cell
+                const actionsCell = document.createElement('td');
+
+                if (user.status === 'pending') {
+                    const approveBtn = document.createElement('button');
+                    approveBtn.className = 'action-btn';
+                    approveBtn.textContent = 'Approve';
+                    approveBtn.onclick = () => approveUser(user.id);
+                    actionsCell.appendChild(approveBtn);
+                }
+
+                if (user.status === 'active') {
+                    const suspendBtn = document.createElement('button');
+                    suspendBtn.className = 'action-btn';
+                    suspendBtn.textContent = 'Suspend';
+                    suspendBtn.onclick = () => suspendUser(user.id);
+                    actionsCell.appendChild(suspendBtn);
+                }
+
+                if (user.id !== currentUser?.id) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'action-btn danger';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.onclick = () => deleteUser(user.id, user.email);
+                    actionsCell.appendChild(deleteBtn);
+                }
+
+                row.appendChild(actionsCell);
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(tbody);
             
-            table.innerHTML = `
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${users.map(user => `
-                        <tr data-user-id="${user.id}">
-                            <td>${user.name || 'N/A'}</td>
-                            <td>${user.email}</td>
-                            <td>
-                                <select class="role-select" data-user-id="${user.id}" data-current-role="${user.role}">
-                                    <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
-                                    <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                                    ${currentUser?.role === 'super_admin' ? `<option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>` : ''}
-                                </select>
-                            </td>
-                            <td>
-                                <span class="status-badge status-${user.status}">${user.status}</span>
-                            </td>
-                            <td>
-                                ${user.status === 'pending' ? `<button class="action-btn" onclick="approveUser('${user.id}')">Approve</button>` : ''}
-                                ${user.status === 'active' ? `<button class="action-btn" onclick="suspendUser('${user.id}')">Suspend</button>` : ''}
-                                ${user.id !== currentUser?.id ? `<button class="action-btn danger" onclick="deleteUser('${user.id}', '${user.email}')">Delete</button>` : ''}
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            `;
-            
-            container.innerHTML = '';
+            // Clear container safely
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
             container.appendChild(table);
             
             // Add change listeners to role selects
@@ -1245,22 +1338,207 @@
         let googleAccountsData = [];
 
         async function loadGoogleStatus() {
+            console.log('📊 [DEBUG] loadGoogleStatus() called');
+
             try {
                 const token = GoogleAuth.getToken();
+                console.log('🎫 [DEBUG] Token for status check:', token ? `${token.substring(0, 20)}...` : 'null');
+
+                if (!token) {
+                    throw new Error('No authentication token available');
+                }
+
+                console.log('🌐 [DEBUG] Making request to /api/v1/google/auth/status');
                 const response = await fetch('/api/v1/google/auth/status', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
+                console.log('📡 [DEBUG] Auth status response:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ [DEBUG] Auth status response not OK:', errorText);
+
+                    if (response.status === 403) {
+                        console.error('🚫 [DEBUG] 403 Forbidden - Authentication issue detected');
+                        console.error('🔐 [DEBUG] Current auth state:', {
+                            isAuthenticated: GoogleAuth.isAuthenticated(),
+                            hasSupabase: !!window.supabase,
+                            hasSession: !!window.supabase?.session,
+                            sessionValid: window.supabase?.isSessionValid(),
+                            tokenExists: !!token
+                        });
+
+                        // Try to refresh the session
+                        if (window.supabase && window.supabase.refreshSession) {
+                            console.log('🔄 [DEBUG] Attempting to refresh Supabase session...');
+                            try {
+                                await window.supabase.refreshSession();
+                                console.log('✅ [DEBUG] Session refresh attempted');
+                            } catch (refreshError) {
+                                console.error('❌ [DEBUG] Session refresh failed:', refreshError);
+                            }
+                        }
+
+                        throw new Error('Authentication failed (403). Please log out and log back in.');
+                    }
+
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const data = await response.json();
+                console.log('📋 [DEBUG] Auth status response data:', data);
+
+                // Check if data has the expected structure
+                if (!data || !data.data) {
+                    console.error('❌ [DEBUG] Invalid response structure:', data);
+                    throw new Error('Invalid response structure from server');
+                }
+
                 googleAccountsData = data.data.accounts || [];
-                
+                console.log('👥 [DEBUG] Google accounts found:', googleAccountsData.length);
+
                 updateGoogleStatusDisplay(data.data);
                 updateGoogleFeatureToggles(data.data);
-                
+
+                // Enable Google account buttons after successful load
+                enableGoogleButtons();
+
+                console.log('✅ [DEBUG] loadGoogleStatus completed successfully');
+
             } catch (error) {
-                console.error('Error loading Google status:', error);
-                document.getElementById('google-status').innerHTML = 
-                    '<span style="color: #ff6b6b;">Error loading Google account status</span>';
+                console.error('💥 [DEBUG] Error loading Google status:', error);
+                console.error('💥 [DEBUG] Error stack:', error.stack);
+
+                const statusElement = document.getElementById('google-status');
+                if (statusElement) {
+                    statusElement.textContent = 'Error loading Google account status';
+                    statusElement.style.color = '#ff6b6b';
+                }
+
+                // Still enable buttons even on error
+                enableGoogleButtons();
+
+                // Re-throw the error so refreshGoogleStatus can handle it
+                throw error;
+            }
+        }
+
+        function enableGoogleButtons() {
+            const addBtn = document.getElementById('add-google-btn');
+            const refreshBtn = document.querySelector('button[onclick="refreshGoogleStatus()"]');
+            const debugBtn = document.querySelector('button[onclick="debugGoogleOAuth()"]');
+            const healthBtn = document.querySelector('button[onclick="debugSystemHealth()"]');
+
+            if (addBtn) {
+                addBtn.disabled = false;
+                addBtn.title = 'Add another Google account';
+            }
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+            }
+            if (debugBtn) {
+                debugBtn.disabled = false;
+            }
+            if (healthBtn) {
+                healthBtn.disabled = false;
+            }
+        }
+
+        async function debugGoogleOAuth() {
+            console.log('🐛 [DEBUG] debugGoogleOAuth() called');
+
+            // First, debug the authentication state
+            console.log('🔍 [DEBUG] === AUTHENTICATION STATE DEBUG ===');
+            console.log('🔐 [DEBUG] window.supabase exists:', !!window.supabase);
+            console.log('🔐 [DEBUG] window.supabase.session:', window.supabase?.session);
+            console.log('🔐 [DEBUG] GoogleAuth.isAuthenticated():', GoogleAuth.isAuthenticated());
+
+            if (window.supabase) {
+                console.log('🔐 [DEBUG] session valid:', window.supabase.isSessionValid());
+                console.log('🔐 [DEBUG] session details:', {
+                    access_token: window.supabase.session?.access_token ? `${window.supabase.session.access_token.substring(0, 20)}...` : 'null',
+                    refresh_token: window.supabase.session?.refresh_token ? `${window.supabase.session.refresh_token.substring(0, 20)}...` : 'null',
+                    expires_at: window.supabase.session?.expires_at,
+                    user: window.supabase.session?.user
+                });
+            }
+
+            try {
+                const token = GoogleAuth.getToken();
+                console.log('🎫 [DEBUG] Token for debug:', token ? `${token.substring(0, 20)}...` : 'null');
+
+                if (!token) {
+                    showMessage('No authentication token available - Check console for auth debug info', 'error');
+                    return;
+                }
+
+                showMessage('Running OAuth debug test...', 'info');
+
+                const response = await fetch('/api/v1/google/auth/debug', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('🐛 [DEBUG] Debug response status:', response.status);
+
+                if (response.status === 403) {
+                    const errorText = await response.text();
+                    console.error('🚫 [DEBUG] 403 on debug endpoint:', errorText);
+                    showMessage('Authentication failed (403) - Check console for details', 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('🐛 [DEBUG] Debug response data:', data);
+
+                if (response.ok) {
+                    showMessage(`Debug result: ${data.status} - OAuth service: ${data.oauth_service_available ? 'Available' : 'Not Available'}`,
+                               data.status === 'ok' ? 'success' : 'error');
+                } else {
+                    showMessage(`Debug failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('🐛 [DEBUG] Debug error:', error);
+                showMessage('Debug test failed: ' + error.message, 'error');
+            }
+        }
+
+        async function debugSystemHealth() {
+            console.log('🏥 [DEBUG] debugSystemHealth() called');
+
+            try {
+                showMessage('Running system health check...', 'info');
+
+                // Check configuration
+                console.log('🔧 [DEBUG] Checking configuration...');
+                const configResponse = await fetch('/api/config/debug');
+                const configData = await configResponse.json();
+                console.log('🔧 [DEBUG] Config data:', configData);
+
+                // Check database health
+                console.log('🗄️ [DEBUG] Checking database health...');
+                const dbResponse = await fetch('/api/config/database-health');
+                const dbData = await dbResponse.json();
+                console.log('🗄️ [DEBUG] Database data:', dbData);
+
+                // Show results
+                const configStatus = configData.supabase_configured ? '✅' : '❌';
+                const dbStatus = dbData.database_connected ? '✅' : '❌';
+                const schemaStatus = dbData.schema_exists ? '✅' : '❌';
+                const usersTableStatus = dbData.users_table_exists ? '✅' : '❌';
+
+                showMessage(
+                    `System Health: ${configStatus} Config | ${dbStatus} DB | ${schemaStatus} Schema | ${usersTableStatus} Users Table (${dbData.total_users || 0} users)`,
+                    (configData.supabase_configured && dbData.database_connected && dbData.schema_exists && dbData.users_table_exists) ? 'success' : 'error'
+                );
+
+            } catch (error) {
+                console.error('🏥 [DEBUG] System health check error:', error);
+                showMessage('System health check failed: ' + error.message, 'error');
             }
         }
 
@@ -1330,25 +1608,80 @@
         }
 
         async function addGoogleAccount() {
+            console.log('🚀 [DEBUG] addGoogleAccount() called');
+
             try {
+                // Debug: Check authentication status
+                const isAuth = GoogleAuth.isAuthenticated();
+                console.log('🔐 [DEBUG] User authenticated:', isAuth);
+                console.log('🔐 [DEBUG] window.supabase exists:', !!window.supabase);
+                console.log('🔐 [DEBUG] window.supabase.session:', window.supabase?.session);
+
+                if (!isAuth) {
+                    console.error('❌ [DEBUG] User not authenticated');
+                    showMessage('Please log in first to add Google accounts', 'error');
+                    return;
+                }
+
                 // Store return URL information for callback
                 localStorage.setItem('google-oauth-return-url', 'settings.html');
                 localStorage.setItem('google-oauth-return-context', 'settings');
-                
+                console.log('💾 [DEBUG] Return URL stored in localStorage');
+
                 const token = GoogleAuth.getToken();
-                const response = await fetch('/api/v1/google/auth/url?add_account=true', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                console.log('🎫 [DEBUG] Token obtained:', token ? `${token.substring(0, 20)}...` : 'null');
+
+                if (!token) {
+                    console.error('❌ [DEBUG] No authentication token available');
+                    showMessage('Authentication token not available. Please refresh the page and try again.', 'error');
+                    return;
+                }
+
+                showMessage('Preparing Google authorization...', 'info');
+
+                const apiUrl = '/api/v1/google/auth/url?add_account=true';
+                console.log('🌐 [DEBUG] Making request to:', apiUrl);
+                console.log('🌐 [DEBUG] Request headers:', {
+                    'Authorization': `Bearer ${token.substring(0, 20)}...`,
+                    'Content-Type': 'application/json'
                 });
 
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('📡 [DEBUG] Response status:', response.status);
+                console.log('📡 [DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ [DEBUG] Response not OK:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const data = await response.json();
-                if (data.success) {
-                    // Redirect to Google OAuth
-                    window.location.href = data.data.auth_url;
+                console.log('📋 [DEBUG] Response data:', data);
+
+                if (data.success && data.data && data.data.auth_url) {
+                    console.log('✅ [DEBUG] Auth URL received:', data.data.auth_url);
+                    showMessage('Redirecting to Google...', 'info');
+
+                    // Small delay to show the message
+                    setTimeout(() => {
+                        console.log('🔄 [DEBUG] Redirecting to Google OAuth...');
+                        window.location.href = data.data.auth_url;
+                    }, 500);
                 } else {
-                    showMessage('Failed to get Google auth URL: ' + data.message, 'error');
+                    console.error('❌ [DEBUG] Invalid response data:', data);
+                    throw new Error(data.message || 'Failed to get Google authorization URL');
                 }
             } catch (error) {
-                showMessage('Error: ' + error.message, 'error');
+                console.error('💥 [DEBUG] Add Google Account error:', error);
+                console.error('💥 [DEBUG] Error stack:', error.stack);
+                showMessage('Failed to add Google account: ' + error.message, 'error');
             }
         }
 
@@ -1422,8 +1755,25 @@
         }
 
         async function refreshGoogleStatus() {
-            document.getElementById('google-status').innerHTML = 'Refreshing...';
-            await loadGoogleStatus();
+            console.log('🔄 [DEBUG] refreshGoogleStatus() called');
+
+            const statusElement = document.getElementById('google-status');
+            if (statusElement) {
+                statusElement.innerHTML = 'Refreshing...';
+                statusElement.style.color = '#007cba';
+            }
+
+            try {
+                await loadGoogleStatus();
+                console.log('✅ [DEBUG] refreshGoogleStatus completed successfully');
+            } catch (error) {
+                console.error('❌ [DEBUG] refreshGoogleStatus failed:', error);
+                if (statusElement) {
+                    statusElement.innerHTML = 'Failed to refresh Google status';
+                    statusElement.style.color = '#ff6b6b';
+                }
+                showMessage('Failed to refresh Google status: ' + error.message, 'error');
+            }
         }
 
         function toggleGmailFeatures() {

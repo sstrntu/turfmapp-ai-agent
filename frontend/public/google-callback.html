@@ -26,12 +26,22 @@
 
     <script>
         async function handleGoogleCallback() {
+            console.log('🚀 [DEBUG] handleGoogleCallback started');
+            console.log('🌐 [DEBUG] Current URL:', window.location.href);
+
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
             const error = urlParams.get('error');
-            
+
+            console.log('📋 [DEBUG] URL params:', {
+                code: code ? `${code.substring(0, 20)}...` : 'null',
+                state,
+                error
+            });
+
             if (error) {
+                console.error('❌ [DEBUG] OAuth error received:', error);
                 let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
                 const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
                 localStorage.removeItem('google-oauth-return-url');
@@ -57,15 +67,44 @@
                 return;
             }
             
+            // Wait for Supabase to be ready (similar to settings page)
+            console.log('⏳ [DEBUG] Waiting for Supabase initialization...');
+            let attempts = 0;
+            while (!window.supabase && attempts < 50) {  // Wait up to 5 seconds
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
             // Check if user is authenticated with TURFMAPP first
+            console.log('🔐 [DEBUG] Checking TURFMAPP authentication...');
+            console.log('🔐 [DEBUG] window.supabase exists:', !!window.supabase);
+            console.log('🔐 [DEBUG] window.supabase.session:', window.supabase?.session);
+
+            if (!window.supabase) {
+                console.error('❌ [DEBUG] Supabase client not available after waiting');
+                document.getElementById('status').innerHTML =
+                    '<div class="error">❌ Application initialization failed</div>';
+                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
+                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
+                localStorage.removeItem('google-oauth-return-url');
+                localStorage.removeItem('google-oauth-return-context');
+
+                document.getElementById('result').innerHTML = `
+                    <p>Application initialization failed. Please refresh and try again.</p>
+                    <p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>
+                `;
+                return;
+            }
+
             if (!window.supabase.isSessionValid()) {
-                document.getElementById('status').innerHTML = 
+                console.error('❌ [DEBUG] TURFMAPP session invalid');
+                document.getElementById('status').innerHTML =
                     '<div class="error">❌ TURFMAPP authentication required</div>';
                 let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
                 const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
                 localStorage.removeItem('google-oauth-return-url');
                 localStorage.removeItem('google-oauth-return-context');
-                
+
                 document.getElementById('result').innerHTML = `
                     <p>You need to be logged into TURFMAPP before connecting Google services.</p>
                     <p><a href="portal.html">← Login to TURFMAPP first</a></p>
@@ -73,6 +112,8 @@
                 `;
                 return;
             }
+
+            console.log('✅ [DEBUG] TURFMAPP authentication verified');
             
             try {
                 // Handle the OAuth callback
@@ -133,7 +174,11 @@
         }
         
         // Process callback when page loads
-        document.addEventListener('DOMContentLoaded', handleGoogleCallback);
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Add a small delay to ensure scripts are loaded
+            await new Promise(resolve => setTimeout(resolve, 100));
+            handleGoogleCallback();
+        });
     </script>
 </body>
 </html>
