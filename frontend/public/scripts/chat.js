@@ -104,13 +104,13 @@
                 // Add sources if available
                 var extracted = extractSources(metadata);
                 //console.log('Sources check:', {
-                    sources: metadata.sources,
-                    isArray: Array.isArray(metadata.sources),
-                    length: metadata.sources?.length,
-                    truthy: !!metadata.sources,
-                    keys: (metadata && typeof metadata === 'object') ? Object.keys(metadata) : null,
-                    extractedLength: extracted.length
-                });
+                //     sources: metadata.sources,
+                //     isArray: Array.isArray(metadata.sources),
+                //     length: metadata.sources?.length,
+                //     truthy: !!metadata.sources,
+                //     keys: (metadata && typeof metadata === 'object') ? Object.keys(metadata) : null,
+                //     extractedLength: extracted.length
+                // });
 
                 // Render reasoning first (if any), then sources last
                 if (metadata.reasoning) {
@@ -1853,13 +1853,13 @@
                         }
 
                         //console.log('Loading message:', {
-                            role: msg.role,
-                            content: msg.content?.substring(0, 50) + '...',
-                            rawMetadata: msg.metadata,
-                            parsedMetadata: parsedMetadata,
-                            sources: parsedMetadata?.sources,
-                            extractedSourcesLength: extractSources(parsedMetadata).length
-                        });
+                        //     role: msg.role,
+                        //     content: msg.content?.substring(0, 50) + '...',
+                        //     rawMetadata: msg.metadata,
+                        //     parsedMetadata: parsedMetadata,
+                        //     sources: parsedMetadata?.sources,
+                        //     extractedSourcesLength: extractSources(parsedMetadata).length
+                        // });
                         renderLoadedMessage(msg.role, msg.content, parsedMetadata);
                     }
                 });
