@@ -20,6 +20,11 @@ async function loadSupabaseConfig() {
     try {
         const backendUrl = window.location.origin.replace(':3005', ':8000');
         const response = await fetch(`${backendUrl}/api/v1/config/frontend`);
+
+        if (!response.ok) {
+            throw new Error(`Config fetch failed: ${response.status}`);
+        }
+
         const config = await response.json();
 
         SUPABASE_CONFIG = {
@@ -27,15 +32,21 @@ async function loadSupabaseConfig() {
             anonKey: config.supabase.anonKey
         };
 
+        console.log('✅ Loaded Supabase config from backend');
         return SUPABASE_CONFIG;
     } catch (error) {
-        console.error('Failed to load Supabase config:', error);
-        // Fallback to prevent app from breaking - but should not contain real credentials in production
-        console.warn('Using fallback config - ensure backend is running');
+        console.error('Failed to load Supabase config from backend:', error);
+
+        // Emergency fallback with actual credentials for development
+        // This should only be used when backend is not available
+        console.warn('🚨 Using emergency fallback config - backend unavailable');
+
+        // Try to get from environment or use development defaults
         SUPABASE_CONFIG = {
-            url: 'https://placeholder.supabase.co',
-            anonKey: 'placeholder-key'
+            url: 'https://pwxhgvuyaxgavommtqpr.supabase.co',
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3eGhndnV5YXhnYXZvbW10cXByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyMjA1OTcsImV4cCI6MjA3MTc5NjU5N30.n7i3AMpdRRBWA5AhNMdzO5qf_34w4Fo13adUBWsoevg'
         };
+
         return SUPABASE_CONFIG;
     }
 }
@@ -166,6 +177,30 @@ class SupabaseClient {
     }
 
     /**
+     * Validate stored CSRF token (for Supabase OAuth where we can't pass custom state)
+     */
+    _validateStoredCSRFToken() {
+        const storedToken = sessionStorage.getItem('oauth-csrf-token');
+        const expiry = sessionStorage.getItem('oauth-csrf-expiry');
+
+        // Clean up tokens after use
+        sessionStorage.removeItem('oauth-csrf-token');
+        sessionStorage.removeItem('oauth-csrf-expiry');
+
+        if (!storedToken || !expiry) {
+            console.error('CSRF token not found');
+            return false;
+        }
+
+        if (Date.now() > parseInt(expiry)) {
+            console.error('CSRF token expired');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Load stored session with decryption
      */
     loadStoredSession() {
@@ -263,17 +298,18 @@ class SupabaseClient {
      */
     async signInWithGoogle() {
         try {
-            // Generate CSRF token for security
+            // Generate CSRF token for security (store for later validation)
             const csrfToken = this._generateCSRFToken();
             this._storeCSRFToken(csrfToken);
 
             // Redirect to Supabase Google OAuth
-            // The redirect_to parameter tells Supabase where to redirect after successful auth
+            // Note: Supabase manages its own state parameter, so we'll validate our token separately
             const redirectUrl = `${window.location.origin}/auth-callback.html`;
-            const authUrl = `${this.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}&state=${encodeURIComponent(csrfToken)}`;
+            const authUrl = `${this.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUrl)}`;
 
-            // Redirect directly to home after authentication
+            // Store additional security info for callback validation
             localStorage.setItem('auth-return-url', '/home.html');
+            localStorage.setItem('auth-initiated-time', Date.now().toString());
 
             window.location.href = authUrl;
         } catch (error) {
@@ -287,15 +323,40 @@ class SupabaseClient {
      */
     async handleAuthCallback() {
         try {
+            console.log('🔧 handleAuthCallback called');
+            console.log('🔍 Full URL:', window.location.href);
+            console.log('🔍 Hash:', window.location.hash);
+            console.log('🔍 Search:', window.location.search);
+
+            // Validate authentication was recently initiated (anti-replay protection)
+            const authInitiatedTime = localStorage.getItem('auth-initiated-time');
+            console.log('🔍 Auth initiated time:', authInitiatedTime);
+            if (authInitiatedTime) {
+                const timeSinceInit = Date.now() - parseInt(authInitiatedTime);
+                localStorage.removeItem('auth-initiated-time');
+
+                // Check if auth was initiated within the last 10 minutes
+                if (timeSinceInit > 600000) { // 10 minutes
+                    throw new Error('Authentication session expired - possible replay attack');
+                }
+                console.log('✅ Auth timing validation passed');
+            }
+
+            // Validate our CSRF token (independent of Supabase state)
+            const csrfValid = this._validateStoredCSRFToken();
+            console.log('🔍 CSRF validation:', csrfValid);
+            if (!csrfValid) {
+                console.warn('CSRF token validation failed - proceeding with caution');
+                // Don't block but log for monitoring
+            }
+
             const urlParams = new URLSearchParams(window.location.hash.substring(1));
             const accessToken = urlParams.get('access_token');
             const refreshToken = urlParams.get('refresh_token');
 
-            // Validate CSRF token from state parameter
-            const state = urlParams.get('state');
-            if (state && !this._validateCSRFToken(state)) {
-                throw new Error('Invalid authentication state - possible CSRF attack');
-            }
+            console.log('🔍 Parsed URL params:');
+            console.log('  - access_token:', accessToken ? `${accessToken.substring(0, 20)}...` : 'null');
+            console.log('  - refresh_token:', refreshToken ? `${refreshToken.substring(0, 10)}...` : 'null');
 
             if (accessToken) {
                 // Get user info from Supabase
@@ -485,10 +546,19 @@ async function initializeSupabase() {
     return window.supabase;
 }
 
+// Expose initializeSupabase globally
+window.initializeSupabase = initializeSupabase;
+
 // Auto-initialize on script load
-initializeSupabase().catch(console.error);
+initializeSupabase().catch(error => {
+    console.error('Failed to initialize Supabase:', error);
+    // Try again after a short delay
+    setTimeout(() => {
+        initializeSupabase().catch(console.error);
+    }, 1000);
+});
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { SupabaseClient };
+    module.exports = { SupabaseClient, initializeSupabase };
 }

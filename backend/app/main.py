@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from typing import List
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
@@ -28,14 +29,29 @@ def _get_cors_origins() -> List[str]:
     origins_env = os.getenv("BACKEND_CORS_ORIGINS", "")
     if origins_env:
         return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
-    
+
     # Default CORS origins
     return ["http://localhost:3005", "http://localhost:3000"]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    config = get_supabase_config()
+    print(f"Supabase configured: {bool(config['url'])}")
+
+    yield
+
+    # Shutdown
+    print("Application shutting down...")
+
 
 app = FastAPI(
     title="TURFMAPP AI Agent Backend",
     description="Modular AI chatbot backend with Supabase integration",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -93,11 +109,6 @@ app.include_router(google_api_router_v1, prefix="/api/v1/google", tags=["google-
 app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oauth"])
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    """Initialize application on startup"""
-    # Supabase integration - configuration loaded
-    config = get_supabase_config()
-    print(f"Supabase configured: {bool(config['url'])}")
+# Startup logic moved to lifespan context manager above
 
 

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Auth Processor - TURFMAPP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #007bff; }
+        .token-display {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Authentication Token Processor</h1>
+        <p>This tool will help you process authentication tokens from the URL fragment.</p>
+
+        <div id="status" class="info">Processing URL...</div>
+
+        <div id="token-info" style="display: none;">
+            <h3>Token Information:</h3>
+            <div id="user-info"></div>
+            <div id="token-display"></div>
+        </div>
+
+        <div id="actions" style="display: none;">
+            <h3>Actions:</h3>
+            <button onclick="saveToLocalStorage()">Save Tokens to Local Storage</button>
+            <button onclick="redirectToApp()">Go to Application</button>
+            <button onclick="testAPI()">Test API Connection</button>
+        </div>
+
+        <div id="debug-info"></div>
+    </div>
+
+    <script>
+        let authData = {};
+
+        function parseURLFragment() {
+            const fragment = window.location.hash.substring(1);
+            const params = new URLSearchParams(fragment);
+
+            authData = {
+                access_token: params.get('access_token'),
+                refresh_token: params.get('refresh_token'),
+                expires_at: params.get('expires_at'),
+                expires_in: params.get('expires_in'),
+                provider_token: params.get('provider_token'),
+                token_type: params.get('token_type')
+            };
+
+            return authData;
+        }
+
+        async function processAuthentication() {
+            const statusEl = document.getElementById('status');
+
+            try {
+                const tokens = parseURLFragment();
+
+                if (!tokens.access_token) {
+                    statusEl.innerHTML = '<span class="error">❌ No access token found in URL</span>';
+                    return;
+                }
+
+                statusEl.innerHTML = '<span class="success">✅ Tokens extracted successfully!</span>';
+
+                // Get config from backend first
+                const backendUrl = window.location.origin.replace(':3005', ':8000');
+                const configResponse = await fetch(`${backendUrl}/api/v1/config/frontend`);
+                const config = await configResponse.json();
+
+                // Try to get user info
+                try {
+                    const userResponse = await fetch(`${config.supabase.url}/auth/v1/user`, {
+                        headers: {
+                            'Authorization': `Bearer ${tokens.access_token}`,
+                            'apikey': config.supabase.anonKey
+                        }
+                    });
+
+                    if (userResponse.ok) {
+                        const userData = await userResponse.json();
+
+                        document.getElementById('user-info').innerHTML = `
+                            <div class="success">
+                                <strong>Welcome, ${userData.user_metadata?.full_name || userData.email}!</strong><br>
+                                Email: ${userData.email}<br>
+                                Provider: ${userData.app_metadata?.provider || 'Unknown'}
+                            </div>
+                        `;
+
+                        // Create session object
+                        authData.session = {
+                            access_token: tokens.access_token,
+                            refresh_token: tokens.refresh_token,
+                            user: userData,
+                            expires_at: Date.now() + (parseInt(tokens.expires_in) * 1000)
+                        };
+
+                        document.getElementById('token-display').innerHTML = `
+                            <strong>Session Data:</strong>
+                            <div class="token-display">${JSON.stringify(authData.session, null, 2)}</div>
+                        `;
+
+                        document.getElementById('token-info').style.display = 'block';
+                        document.getElementById('actions').style.display = 'block';
+
+                    } else {
+                        throw new Error(`User fetch failed: ${userResponse.status}`);
+                    }
+
+                } catch (error) {
+                    statusEl.innerHTML += `<br><span class="error">❌ Failed to fetch user info: ${error.message}</span>`;
+
+                    // Still show basic token info
+                    document.getElementById('token-display').innerHTML = `
+                        <strong>Raw Tokens:</strong>
+                        <div class="token-display">${JSON.stringify(tokens, null, 2)}</div>
+                    `;
+                    document.getElementById('token-info').style.display = 'block';
+                }
+
+            } catch (error) {
+                statusEl.innerHTML = `<span class="error">❌ Error processing authentication: ${error.message}</span>`;
+            }
+        }
+
+        function saveToLocalStorage() {
+            if (authData.session) {
+                localStorage.setItem('sb-session', JSON.stringify(authData.session));
+                document.getElementById('debug-info').innerHTML = '<div class="success">✅ Session saved to localStorage as "sb-session"</div>';
+            } else {
+                document.getElementById('debug-info').innerHTML = '<div class="error">❌ No session data to save</div>';
+            }
+        }
+
+        function redirectToApp() {
+            const localUrl = 'http://localhost:3005/home.html';
+            window.location.href = localUrl;
+        }
+
+        async function testAPI() {
+            const debugEl = document.getElementById('debug-info');
+
+            try {
+                if (!authData.session) {
+                    debugEl.innerHTML = '<div class="error">❌ No session data available</div>';
+                    return;
+                }
+
+                // Test local backend API
+                const response = await fetch('http://localhost:8000/api/v1/auth/status', {
+                    headers: {
+                        'Authorization': `Bearer ${authData.session.access_token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    debugEl.innerHTML = `
+                        <div class="success">
+                            ✅ API Test Successful!<br>
+                            <div class="token-display">${JSON.stringify(data, null, 2)}</div>
+                        </div>
+                    `;
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    debugEl.innerHTML = `
+                        <div class="error">
+                            ❌ API Test Failed (${response.status})<br>
+                            ${JSON.stringify(errorData, null, 2)}
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                debugEl.innerHTML = `<div class="error">❌ API Test Error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-process on page load
+        window.addEventListener('load', processAuthentication);
+    </script>
+</body>
+</html>
