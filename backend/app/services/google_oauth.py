@@ -73,14 +73,14 @@ class GoogleOAuthService:
             scopes=self.scopes
         )
         flow.redirect_uri = self.redirect_uri
-        
+
         authorization_url, _ = flow.authorization_url(
             access_type='offline',        # Critical for refresh tokens!
             include_granted_scopes='true',
-            prompt='consent',            # Force consent to get refresh token
+            prompt='select_account consent',  # Force account selection AND consent for re-auth
             state=state
         )
-        
+
         return authorization_url
     
     async def exchange_code_for_tokens(self, authorization_code: str, state: str = None) -> Optional[Dict[str, Any]]:
@@ -104,11 +104,20 @@ class GoogleOAuthService:
             
             # Exchange code for tokens
             flow.fetch_token(code=authorization_code)
-            
+
             # Get user info
             credentials = flow.credentials
             user_info = await self._get_user_info(credentials)
-            
+
+            # Validate we have required tokens - especially refresh token for re-auth scenarios
+            if not credentials.token:
+                raise Exception("No access token received from Google")
+
+            if not credentials.refresh_token:
+                # This can happen when user re-authorizes - try to handle gracefully
+                print(f"Warning: No refresh token received for {user_info.get('email', 'unknown')} - user may need to revoke app access first")
+                # For now, we'll allow this but log it for monitoring
+
             return {
                 'access_token': credentials.token,
                 'refresh_token': credentials.refresh_token,

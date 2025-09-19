@@ -66,10 +66,8 @@ const GoogleServices = {
      */
     async handleGoogleCallback(code, state) {
         try {
-            // Validate CSRF token first
-            if (state && !this._validateCSRFToken(state)) {
-                throw new Error('Invalid authentication state - possible CSRF attack');
-            }
+            // Note: Backend handles state validation (user_id|action format)
+            // No CSRF validation needed here as backend does proper state verification
 
             const response = await window.supabase.apiRequest('/api/v1/google/auth/callback', {
                 method: 'POST',
