@@ -61,7 +61,7 @@ Send a message to the AI assistant and receive a response.
     "created_at": "ISO datetime"
   },
   "assistant_message": {
-    "id": "uuid", 
+    "id": "uuid",
     "role": "assistant",
     "content": "string",
     "created_at": "ISO datetime"
@@ -70,7 +70,7 @@ Send a message to the AI assistant and receive a response.
   "sources": [
     {
       "url": "string",
-      "site": "string", 
+      "site": "string",
       "favicon": "string",
       "favicon_fallbacks": ["string"],
       "title": "string (optional)",
@@ -209,7 +209,7 @@ Check the health status of the chat service.
 ```json
 {
   "status": "healthy",
-  "service": "chat", 
+  "service": "chat",
   "timestamp": "ISO datetime"
 }
 ```
@@ -231,7 +231,7 @@ Get list of supported AI models.
       "description": "Most capable model"
     },
     {
-      "id": "gpt-4o-mini", 
+      "id": "gpt-4o-mini",
       "name": "GPT-4O Mini",
       "description": "Fast and efficient"
     },
@@ -242,7 +242,7 @@ Get list of supported AI models.
     },
     {
       "id": "o1-mini",
-      "name": "O1 Mini", 
+      "name": "O1 Mini",
       "description": "Reasoning optimized"
     },
     {
@@ -298,7 +298,7 @@ Get current user information from JWT token.
 ```json
 {
   "id": "uuid",
-  "email": "string", 
+  "email": "string",
   "name": "string (optional)",
   "created_at": "ISO datetime (optional)",
   "last_login": "ISO datetime (optional)"
@@ -314,7 +314,7 @@ Get current user information from JWT token.
 - **Response Time**: 2-10 seconds
 
 ### O1 Models (O1, O1-Mini, O1-Preview)
-- **Token Limit**: 1500 tokens  
+- **Token Limit**: 1500 tokens
 - **API**: OpenAI Responses API
 - **Features**: Advanced reasoning, reasoning summary in response
 - **Response Time**: 10-30 seconds
@@ -366,7 +366,7 @@ The system automatically extracts URLs from AI responses and enriches them with 
 
 ### Common Error Codes
 - `400`: Bad Request - Invalid request format or parameters
-- `401`: Unauthorized - Missing, invalid, or expired authentication token  
+- `401`: Unauthorized - Missing, invalid, or expired authentication token
 - `404`: Not Found - Resource doesn't exist or user lacks access
 - `422`: Unprocessable Entity - Request validation failed
 - `429`: Too Many Requests - Rate limit exceeded (future implementation)
@@ -385,7 +385,7 @@ Planned rate limiting structure:
 
 ```
 - Chat messages: 60 per hour per user
-- Conversation operations: 100 per hour per user  
+- Conversation operations: 100 per hour per user
 - Health/model endpoints: 1000 per hour per IP
 ```
 
@@ -400,7 +400,7 @@ X-RateLimit-Reset: 1693440000
 
 Planned webhook support for:
 - Conversation events (created, updated, deleted)
-- Message events (sent, received)  
+- Message events (sent, received)
 - User events (authenticated, preferences changed)
 
 ## SDK Examples
@@ -419,8 +419,8 @@ const response = await client.chat.send({
   model: 'gpt-4o'
 });
 
-console.log(response.assistant_message.content);
-console.log(response.sources);
+//console.log(response.assistant_message.content);
+//console.log(response.sources);
 
 // Load conversation
 const conversation = await client.chat.getConversation('conversation-id');
@@ -428,7 +428,7 @@ const conversation = await client.chat.getConversation('conversation-id');
 
 ### Python
 ```python
-# Initialize client  
+# Initialize client
 from turfmapp import TurfmappClient
 
 client = TurfmappClient(
@@ -451,6 +451,6 @@ conversation = client.chat.get_conversation('conversation-id')
 
 ---
 
-**API Version**: v1.0  
-**Last Updated**: August 30, 2025  
+**API Version**: v1.0
+**Last Updated**: August 30, 2025
 **OpenAPI Spec**: Available at `/docs` (Swagger UI) and `/redoc` (ReDoc)

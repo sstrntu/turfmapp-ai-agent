@@ -23,12 +23,12 @@
             background: url('ProfileBackground.jpg') center center/cover no-repeat;
             background-attachment: scroll;
         }
-        
+
         /* Pull main content and section closer to header */
         .main-content { padding: var(--spacing-lg) 0 var(--spacing-xl); }
         .profile-section { margin-top: var(--spacing-md); }
-        
-        
+
+
         .announcement-display {
             display: flex;
             align-items: center;
@@ -54,7 +54,7 @@
         }
 
         /* System Prompt styles removed - now in Settings page */
-        
+
         /* Move sidebar menus up for profile page */
         body[data-page="profile"] .panel-bottom-menu {
             margin-top: 0;  /* Remove auto margin */
@@ -65,7 +65,7 @@
             justify-content: flex-start;  /* Align to top */
             padding-top: 16px;  /* Add top padding */
         }
-        
+
     </style>
 </head>
 <body data-page="profile">
@@ -78,7 +78,7 @@
             <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
     </div>
-    
+
     <header class="app-header" role="banner">
         <div class="header-container">
             <div class="brand-section">
@@ -89,7 +89,7 @@
                 </button>
                 <h1 class="app-title">TURFMAPP</h1>
             </div>
-            
+
             <!-- Announcement area -->
             <div class="top-actions">
                 <div class="announcement-display" id="announcement-display" style="display: none;">
@@ -141,7 +141,7 @@
             </section>
         </div>
     </main>
-    
+
     <!-- Left sidebar panel -->
     <aside id="left-panel" class="left-panel" aria-hidden="true">
         <div class="left-panel-inner">
@@ -158,7 +158,7 @@
                     </svg>
                 </button>
             </div>
-            
+
             <div class="left-panel-content">
                 <!-- Bottom Menu Section -->
                 <div class="panel-bottom-menu">
@@ -201,32 +201,36 @@
         // Profile page initialization
         (function() {
             'use strict';
-            
+
             function initializeProfilePage() {
                 // Left panel functionality is handled by chat.js - no need to duplicate
-                console.log('Profile page initialized - left panel handled by chat.js');
-            
+                //console.log('Profile page initialized - left panel handled by chat.js');
+
                 // Initialize shared announcement header
                 Announcement.initHeader('announcement-display', 'announcement-text');
-                
+
                 // Load user profile data
                 async function loadUserProfile() {
                     try {
-                        // Check authentication
-                        if (!window.supabase || !window.supabase.isSessionValid()) {
-                            console.warn('User not authenticated, redirecting to login');
-                            window.location.href = '/portal.html';
+                        //console.log('🟢 [PROFILE] Loading user profile...');
+
+                        // Ensure authentication with proper async handling
+                        const isAuth = await GoogleAuth.requireAuth();
+                        if (!isAuth) {
+                            console.warn('🔴 [PROFILE] Authentication failed');
                             return;
                         }
+
+                        //console.log('✅ [PROFILE] Authentication passed');
 
                         // Get user info from Supabase session
                         const user = window.supabase.getUser();
                         if (user) {
                             // Update profile fields with user data
-                            document.getElementById('profile-name').textContent = 
+                            document.getElementById('profile-name').textContent =
                                 user.user_metadata?.full_name || user.user_metadata?.name || 'Not provided';
                             document.getElementById('profile-email').textContent = user.email || 'Not provided';
-                            
+
                             // Try to get additional user info from backend
                             try {
                                 const response = await window.supabase.apiRequest('/api/v1/auth/status');
@@ -234,20 +238,20 @@
                                     const authStatus = await response.json();
                                     if (authStatus.authenticated && authStatus.user) {
                                         // Update with backend user info
-                                        document.getElementById('profile-name').textContent = 
+                                        document.getElementById('profile-name').textContent =
                                             authStatus.user.name || user.user_metadata?.full_name || user.user_metadata?.name || 'Not provided';
-                                        document.getElementById('profile-role').textContent = 
+                                        document.getElementById('profile-role').textContent =
                                             authStatus.role || 'User';
-                                        
+
                                         // Format member since date
                                         const createdAt = new Date(user.created_at);
-                                        document.getElementById('profile-member-since').textContent = 
+                                        document.getElementById('profile-member-since').textContent =
                                             createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
                                     } else {
                                         // Fallback to basic info
                                         document.getElementById('profile-role').textContent = 'User';
                                         const createdAt = new Date(user.created_at);
-                                        document.getElementById('profile-member-since').textContent = 
+                                        document.getElementById('profile-member-since').textContent =
                                             createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
                                     }
                                 }
@@ -256,7 +260,7 @@
                                 // Use fallback values
                                 document.getElementById('profile-role').textContent = 'User';
                                 const createdAt = new Date(user.created_at);
-                                document.getElementById('profile-member-since').textContent = 
+                                document.getElementById('profile-member-since').textContent =
                                     createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
                             }
                         } else {
@@ -275,13 +279,13 @@
                         document.getElementById('profile-member-since').textContent = 'Error loading data';
                     }
                 }
-            
+
                 // Load user profile when page loads
                 loadUserProfile();
             }
-            
+
             // System Prompt functionality removed - now handled in Settings page
-            
+
             // Initialize when DOM is ready
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', initializeProfilePage);

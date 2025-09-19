@@ -11,15 +11,15 @@
         .warning { background: #ffc107; color: black; }
         .error { background: #dc3545; color: white; }
         .status { padding: 10px; margin: 10px 0; border-radius: 3px; }
-        .message-item, .file-item, .event-item { 
-            border: 1px solid #eee; padding: 10px; margin: 5px 0; border-radius: 3px; 
+        .message-item, .file-item, .event-item {
+            border: 1px solid #eee; padding: 10px; margin: 5px 0; border-radius: 3px;
         }
         .messages-list, .files-list, .events-list { max-height: 400px; overflow-y: auto; }
     </style>
 </head>
 <body>
     <h1>Google Services Integration Test</h1>
-    
+
     <div class="section">
         <h2>Authentication</h2>
         <div id="auth-status" class="status">Checking authentication...</div>
@@ -53,20 +53,20 @@
 
     <div class="section">
         <h2>Advanced Google Drive Operations</h2>
-        
+
         <h3>Create Folder Structure</h3>
         <input type="text" id="folder-path" placeholder="e.g., Projects/Client Name/Documents" style="width: 300px;">
         <button class="primary" onclick="createFolder()">Create Folders</button>
-        
+
         <h3>Upload File</h3>
         <input type="file" id="file-input" multiple>
         <input type="text" id="upload-folder" placeholder="Folder path (optional)" style="width: 300px;">
         <button class="primary" onclick="uploadFiles()">Upload to Drive</button>
-        
+
         <h3>List Files in Folder</h3>
         <input type="text" id="list-folder" placeholder="Folder path" style="width: 300px;">
         <button class="primary" onclick="listFolderFiles()">List Files</button>
-        
+
         <div id="drive-operations-result" style="margin-top: 20px;"></div>
     </div>
 
@@ -79,20 +79,25 @@
         // Initialize and check auth status
         async function init() {
             try {
-                // Check if user is authenticated with TURFMAPP
-                if (!GoogleAuth.isAuthenticated()) {
-                    document.getElementById('auth-status').innerHTML = 
+                //console.log('🟢 [TEST-GOOGLE] Initializing Google test page...');
+
+                // Check if user is authenticated with TURFMAPP using proper async method
+                const isAuth = await GoogleAuth.requireAuth();
+                if (!isAuth) {
+                    document.getElementById('auth-status').innerHTML =
                         '<div class="error">Please login to TURFMAPP first: <a href="/portal.html">Login</a></div>';
                     return;
                 }
 
+                //console.log('✅ [TEST-GOOGLE] TURFMAPP authentication passed');
+
                 // Check Google auth status
                 const googleAuth = await GoogleServices.checkGoogleAuth();
                 updateAuthStatus(googleAuth);
-                
+
             } catch (error) {
                 console.error('Initialization error:', error);
-                document.getElementById('auth-status').innerHTML = 
+                document.getElementById('auth-status').innerHTML =
                     `<div class="error">Initialization failed: ${error.message}</div>`;
             }
         }
@@ -142,7 +147,7 @@
                 const result = await GoogleServices.getGmailMessages(query, 10);
                 GoogleServices.displayGmailMessages(result.messages, 'gmail-messages');
             } catch (error) {
-                document.getElementById('gmail-messages').innerHTML = 
+                document.getElementById('gmail-messages').innerHTML =
                     `<div class="error">Failed to load Gmail messages: ${error.message}</div>`;
             }
         }
@@ -153,7 +158,7 @@
                 const result = await GoogleServices.getDriveFiles(query, 10);
                 GoogleServices.displayDriveFiles(result.files, 'drive-files');
             } catch (error) {
-                document.getElementById('drive-files').innerHTML = 
+                document.getElementById('drive-files').innerHTML =
                     `<div class="error">Failed to load Drive files: ${error.message}</div>`;
             }
         }
@@ -163,7 +168,7 @@
                 const result = await GoogleServices.getCalendarEvents('primary', 10);
                 GoogleServices.displayCalendarEvents(result.events, 'calendar-events');
             } catch (error) {
-                document.getElementById('calendar-events').innerHTML = 
+                document.getElementById('calendar-events').innerHTML =
                     `<div class="error">Failed to load Calendar events: ${error.message}</div>`;
             }
         }
@@ -178,11 +183,11 @@
                 }
 
                 const result = await GoogleServices.createFolderStructure(folderPath);
-                document.getElementById('drive-operations-result').innerHTML = 
+                document.getElementById('drive-operations-result').innerHTML =
                     `<div class="success">✅ Created: ${result.folder_path} (ID: ${result.folder_id})</div>`;
-                
+
             } catch (error) {
-                document.getElementById('drive-operations-result').innerHTML = 
+                document.getElementById('drive-operations-result').innerHTML =
                     `<div class="error">❌ Error: ${error.message}</div>`;
             }
         }
@@ -191,7 +196,7 @@
             try {
                 const fileInput = document.getElementById('file-input');
                 const folderPath = document.getElementById('upload-folder').value || null;
-                
+
                 if (!fileInput.files.length) {
                     alert('Please select files to upload');
                     return;
@@ -207,11 +212,11 @@
                     }
                 }
 
-                document.getElementById('drive-operations-result').innerHTML = 
+                document.getElementById('drive-operations-result').innerHTML =
                     `<div class="success"><strong>Upload Results:</strong><br>${results.join('<br>')}</div>`;
-                
+
             } catch (error) {
-                document.getElementById('drive-operations-result').innerHTML = 
+                document.getElementById('drive-operations-result').innerHTML =
                     `<div class="error">❌ Upload Error: ${error.message}</div>`;
             }
         }
@@ -225,21 +230,21 @@
                 }
 
                 const result = await GoogleServices.listFilesInFolder(folderPath);
-                
+
                 if (result.files && result.files.length > 0) {
-                    const fileList = result.files.map(file => 
+                    const fileList = result.files.map(file =>
                         `📄 ${file.name} (${file.size ? formatFileSize(file.size) : 'Unknown size'})`
                     ).join('<br>');
-                    
-                    document.getElementById('drive-operations-result').innerHTML = 
+
+                    document.getElementById('drive-operations-result').innerHTML =
                         `<div class="success"><strong>Files in ${folderPath}:</strong><br>${fileList}</div>`;
                 } else {
-                    document.getElementById('drive-operations-result').innerHTML = 
+                    document.getElementById('drive-operations-result').innerHTML =
                         `<div class="warning">No files found in ${folderPath}</div>`;
                 }
-                
+
             } catch (error) {
-                document.getElementById('drive-operations-result').innerHTML = 
+                document.getElementById('drive-operations-result').innerHTML =
                     `<div class="error">❌ Error: ${error.message}</div>`;
             }
         }

@@ -18,10 +18,10 @@
             <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
     </div>
-    
+
     <!-- Main application container -->
     <div class="app-container">
-            
+
             <!-- Application Header -->
             <header class="app-header" role="banner">
                 <div class="header-container">
@@ -33,7 +33,7 @@
                         </button>
                         <h1 class="app-title">TURFMAPP</h1>
                     </div>
-                    
+
                     <!-- Announcement area -->
                     <div class="top-actions">
                         <div class="announcement-display" id="announcement-display" style="display: none;">
@@ -43,11 +43,11 @@
                     </div>
                 </div>
             </header>
-            
+
             <!-- Main Content Area -->
             <main class="main-content" role="main">
                 <div class="content-container">
-                    
+
                     <!-- Minimal Chat Section -->
                     <section class="chat-section" aria-label="Messages">
                         <div class="chat-card">
@@ -87,7 +87,7 @@
                     </section>
                 </div>
             </main>
-            
+
             <!-- ChatGPT-style left sidebar -->
             <aside id="left-panel" class="left-panel" aria-hidden="true">
                 <div class="left-panel-inner">
@@ -104,14 +104,14 @@
                             </svg>
                         </button>
                     </div>
-                    
+
                     <div class="left-panel-content">
                         <!-- History Section -->
                         <div class="panel-group">
                             <div class="panel-subtitle">Recent</div>
                             <ul id="history-list" class="chat-history" aria-live="polite"></ul>
                         </div>
-                        
+
                         <!-- Bottom Menu Section -->
                         <div class="panel-bottom-menu">
                             <a href="/profile.html" class="menu-item profile-item">
@@ -135,11 +135,11 @@
                     </div>
                 </div>
             </aside>
-            
-            
+
+
         </div>
     </div>
-    
+
     <!-- JavaScript modules -->
     <script src="scripts/config.js"></script>
     <script src="scripts/utils.js"></script>
@@ -151,24 +151,16 @@
     <script>
         // Single-pass authentication guard for home page
         document.addEventListener('DOMContentLoaded', async () => {
-            // Briefly wait for Supabase client to initialize
-            await new Promise(r => setTimeout(r, 200));
+            //console.log('🟢 [HOME] Initializing home page...');
 
-            if (!window.supabase) {
-                window.location.replace('/portal.html');
+            // Use proper authentication check
+            const isAuth = await GoogleAuth.requireAuth();
+            if (!isAuth) {
+                console.warn('🔴 [HOME] Authentication failed');
                 return;
             }
 
-            // Attempt refresh if not valid yet
-            if (!window.supabase.isSessionValid()) {
-                try { await window.supabase.refreshSession(); } catch (e) { /* no-op */ }
-            }
-
-            if (!window.supabase.isSessionValid()) {
-                window.location.replace('/portal.html');
-                return;
-            }
-            // Session is valid; stay on page and let auto-refresh handle longevity
+            //console.log('✅ [HOME] Authentication passed - home page ready');
         });
     </script>
     <script>

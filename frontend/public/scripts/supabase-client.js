@@ -32,7 +32,7 @@ async function loadSupabaseConfig() {
             anonKey: config.supabase.anonKey
         };
 
-        console.log('✅ Loaded Supabase config from backend');
+        //console.log('✅ Loaded Supabase config from backend');
         return SUPABASE_CONFIG;
     } catch (error) {
         console.error('Failed to load Supabase config from backend:', error);
@@ -57,20 +57,16 @@ async function loadSupabaseConfig() {
  */
 class SupabaseClient {
     constructor(url, anonKey) {
-        console.log('🟠 [SUPABASE] SupabaseClient constructor called');
         this.url = url;
         this.anonKey = anonKey;
         this.session = null;
         this.user = null;
         this._refreshTimerId = null;
 
-        console.log('🟠 [SUPABASE] Loading stored session...');
         // Initialize from stored session
         this.loadStoredSession();
-        console.log('🟠 [SUPABASE] Session loaded, scheduling refresh...');
         // Schedule refresh if a session exists
         this._scheduleRefresh();
-        console.log('🟠 [SUPABASE] SupabaseClient constructor complete');
     }
 
     /**
@@ -327,14 +323,8 @@ class SupabaseClient {
      */
     async handleAuthCallback() {
         try {
-            console.log('🔧 handleAuthCallback called');
-            console.log('🔍 Full URL:', window.location.href);
-            console.log('🔍 Hash:', window.location.hash);
-            console.log('🔍 Search:', window.location.search);
-
             // Validate authentication was recently initiated (anti-replay protection)
             const authInitiatedTime = localStorage.getItem('auth-initiated-time');
-            console.log('🔍 Auth initiated time:', authInitiatedTime);
             if (authInitiatedTime) {
                 const timeSinceInit = Date.now() - parseInt(authInitiatedTime);
                 localStorage.removeItem('auth-initiated-time');
@@ -343,12 +333,10 @@ class SupabaseClient {
                 if (timeSinceInit > 600000) { // 10 minutes
                     throw new Error('Authentication session expired - possible replay attack');
                 }
-                console.log('✅ Auth timing validation passed');
             }
 
             // Validate our CSRF token (independent of Supabase state)
             const csrfValid = this._validateStoredCSRFToken();
-            console.log('🔍 CSRF validation:', csrfValid);
             if (!csrfValid) {
                 console.warn('CSRF token validation failed - proceeding with caution');
                 // Don't block but log for monitoring
@@ -357,10 +345,6 @@ class SupabaseClient {
             const urlParams = new URLSearchParams(window.location.hash.substring(1));
             const accessToken = urlParams.get('access_token');
             const refreshToken = urlParams.get('refresh_token');
-
-            console.log('🔍 Parsed URL params:');
-            console.log('  - access_token:', accessToken ? `${accessToken.substring(0, 20)}...` : 'null');
-            console.log('  - refresh_token:', refreshToken ? `${refreshToken.substring(0, 10)}...` : 'null');
 
             if (accessToken) {
                 // Get user info from Supabase
@@ -373,7 +357,7 @@ class SupabaseClient {
 
                 if (userResponse.ok) {
                     const userData = await userResponse.json();
-                    
+
                     const session = {
                         access_token: accessToken,
                         refresh_token: refreshToken,
@@ -385,7 +369,7 @@ class SupabaseClient {
                     return session;
                 }
             }
-            
+
             throw new Error('Invalid callback parameters');
         } catch (error) {
             console.error('Auth callback error:', error);
@@ -521,7 +505,7 @@ class SupabaseClient {
         };
 
         const response = await fetch(endpoint, mergedOptions);
-        
+
         if (response.status === 401) {
             // Token expired, try refresh
             await this.refreshSession();
@@ -542,17 +526,10 @@ class SupabaseClient {
 let supabaseInitialized = false;
 
 async function initializeSupabase() {
-    console.log('🔵 [SUPABASE] initializeSupabase called on:', window.location.href);
-    if (supabaseInitialized) {
-        console.log('🔵 [SUPABASE] Already initialized, returning existing client');
-        return window.supabase;
-    }
+    if (supabaseInitialized) return window.supabase;
 
-    console.log('🔵 [SUPABASE] Loading config...');
     const config = await loadSupabaseConfig();
-    console.log('🔵 [SUPABASE] Creating SupabaseClient...');
     window.supabase = new SupabaseClient(config.url, config.anonKey);
-    console.log('🔵 [SUPABASE] SupabaseClient created successfully');
     supabaseInitialized = true;
     return window.supabase;
 }
@@ -561,7 +538,6 @@ async function initializeSupabase() {
 window.initializeSupabase = initializeSupabase;
 
 // Auto-initialize on script load
-console.log('🟡 [SUPABASE] About to auto-initialize on:', window.location.href);
 initializeSupabase().catch(error => {
     console.error('Failed to initialize Supabase:', error);
     // Try again after a short delay

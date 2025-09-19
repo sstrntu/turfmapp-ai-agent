@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="styles/home.css">
     <link rel="stylesheet" href="styles/sphere.css">
     <style>
-        html, body { 
-            min-height: 100vh; 
+        html, body {
+            min-height: 100vh;
             overflow-x: hidden;
             overflow-y: auto;
         }
@@ -29,7 +29,7 @@
         /* Pull main content and section closer to header */
         .main-content { padding: var(--spacing-lg) 0 var(--spacing-xl); }
         .profile-section { margin-top: var(--spacing-md); }
-        
+
         /* Announcement styling */
         .announcement-display {
             display: flex;
@@ -54,14 +54,14 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
+
         /* Tab System */
         .settings-tabs {
             display: flex;
             margin-bottom: 20px;
             border-bottom: 1px solid var(--color-border);
         }
-        
+
         .tab-button {
             background: transparent;
             border: none;
@@ -75,26 +75,26 @@
             transition: all 0.3s ease;
             position: relative;
         }
-        
+
         .tab-button:hover {
             color: rgba(255, 255, 255, 0.9);
             background: rgba(255, 255, 255, 0.05);
         }
-        
+
         .tab-button.active {
             color: var(--color-primary);
             border-bottom-color: var(--color-border-hover);
             background: rgba(255, 255, 255, 0.1);
         }
-        
+
         .tab-content {
             display: none;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         /* Loading screen */
         .loading-screen {
             position: fixed;
@@ -150,7 +150,7 @@
             margin-left: 8px;
             border: 1px solid rgba(255, 100, 100, 0.3);
         }
-        
+
         /* Form styling from original admin page */
         .admin-note { color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; }
         .form-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px 16px; align-items: center; }
@@ -179,7 +179,7 @@
             border-color: var(--color-border-hover);
             transform: translateY(-1px);
         }
-        
+
         /* Tool Checkboxes */
         .tool-checkbox {
             display: flex;
@@ -219,31 +219,31 @@
             font-size: 12px;
             font-weight: bold;
         }
-        
+
         /* User management table */
         .users-table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 12px;
         }
-        
+
         .users-table th,
         .users-table td {
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-        
+
         .users-table th {
             background: rgba(255, 255, 255, 0.05);
             color: var(--color-primary);
             font-weight: 600;
         }
-        
+
         .users-table td {
             color: rgba(255, 255, 255, 0.9);
         }
-        
+
         .role-select {
             background: rgba(0,0,0,0.3);
             color: var(--color-primary);
@@ -252,7 +252,7 @@
             padding: 4px 8px;
             font-size: 0.8rem;
         }
-        
+
         .status-badge {
             padding: 4px 8px;
             border-radius: 12px;
@@ -260,25 +260,25 @@
             font-weight: 600;
             text-transform: uppercase;
         }
-        
+
         .status-active {
             background: rgba(72, 187, 120, 0.2);
             color: #48bb78;
             border: 1px solid rgba(72, 187, 120, 0.3);
         }
-        
+
         .status-pending {
             background: rgba(237, 137, 54, 0.2);
             color: #ed8936;
             border: 1px solid rgba(237, 137, 54, 0.3);
         }
-        
+
         .status-suspended {
             background: rgba(245, 101, 101, 0.2);
             color: #f56565;
             border: 1px solid rgba(245, 101, 101, 0.3);
         }
-        
+
         .action-btn {
             background: rgba(255,255,255,0.1);
             color: var(--color-primary);
@@ -289,17 +289,17 @@
             cursor: pointer;
             margin-right: 4px;
         }
-        
+
         .action-btn:hover {
             background: rgba(255,255,255,0.2);
         }
-        
+
         .action-btn.danger {
             background: rgba(245, 101, 101, 0.2);
             color: #f56565;
             border-color: rgba(245, 101, 101, 0.3);
         }
-        
+
         /* Move sidebar menus up for settings page */
         body[data-page="settings"] .panel-bottom-menu {
             margin-top: 0;
@@ -310,7 +310,7 @@
             justify-content: flex-start;
             padding-top: 16px;
         }
-        
+
         /* Error/Success messages */
         .message {
             padding: 12px;
@@ -318,13 +318,13 @@
             margin-bottom: 16px;
             font-size: 0.9rem;
         }
-        
+
         .message.error {
             background: rgba(245, 101, 101, 0.2);
             color: #f56565;
             border: 1px solid rgba(245, 101, 101, 0.3);
         }
-        
+
         .message.success {
             background: rgba(72, 187, 120, 0.2);
             color: #48bb78;
@@ -350,7 +350,7 @@
             <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
     </div>
-    
+
     <header class="app-header" role="banner">
         <div class="header-container">
             <div class="brand-section">
@@ -361,7 +361,7 @@
                 </button>
                 <h1 class="app-title">TURFMAPP</h1>
             </div>
-            
+
             <div class="top-actions">
                 <div class="announcement-display" id="announcement-display" style="display: none;">
                     <span class="announcement-label">Announcement:</span>
@@ -396,18 +396,18 @@
                     <!-- Settings Tab Content -->
                     <div id="settings-tab" class="tab-content active">
                         <div class="profile-grid" style="row-gap: 18px;">
-                            
+
                             <!-- User Profile Section -->
                             <div class="form-row">
                                 <div class="label">Profile</div>
                                 <div class="admin-note">Update your profile information</div>
                             </div>
-                            
+
                             <div class="form-row">
                                 <div class="label">Name</div>
                                 <input type="text" id="user-name" class="text-input" placeholder="Enter your name">
                             </div>
-                            
+
                             <!-- Model Selection -->
                             <div class="form-row">
                                 <div class="label">Preferred Model</div>
@@ -416,13 +416,13 @@
                                     <option value="gpt-5-mini">gpt-5-mini (Latest, Experimental)</option>
                                 </select>
                             </div>
-                            
+
                             <!-- System Prompt -->
                             <div class="form-row" style="align-items: start;">
                                 <div class="label">System Prompt</div>
                                 <textarea id="system-prompt" class="textarea-input" placeholder="Enter custom system prompt (optional)" rows="3"></textarea>
                             </div>
-                            
+
                             <!-- Account Actions -->
                             <div class="form-row">
                                 <div class="label">Account Actions</div>
@@ -437,7 +437,7 @@
                     <!-- Integrations Tab Content -->
                     <div id="integrations-tab" class="tab-content">
                         <div class="profile-grid" style="row-gap: 18px;">
-                            
+
                             <!-- Google Services Section -->
                             <div class="form-row">
                                 <div class="label">Google Services</div>
@@ -448,11 +448,11 @@
                                 <div id="google-status" class="admin-note" style="margin-bottom: 15px;">
                                     Loading Google account status...
                                 </div>
-                                
+
                                 <div id="google-accounts-list" style="margin-bottom: 15px;">
                                     <!-- Google accounts will be populated here -->
                                 </div>
-                                
+
                                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                     <button class="save-btn" onclick="addGoogleAccount()" id="add-google-btn">
                                         + Add Google Account
@@ -529,23 +529,23 @@
                     <!-- Admin Tab Content -->
                     <div id="admin-tab-content" class="tab-content">
                         <div class="profile-grid" style="row-gap: 18px;">
-                            
+
                             <!-- User Management Section -->
                             <div class="form-row">
                                 <div class="label">User Management</div>
                                 <div class="admin-note">Manage user roles and permissions</div>
                             </div>
-                            
+
                             <div style="grid-column: 1 / -1;">
                                 <div id="users-list" class="admin-note">Loading users...</div>
                             </div>
-                            
+
                             <!-- Announcement Section -->
                             <div class="form-row">
                                 <div class="label">Announcement</div>
                                 <div class="admin-note">Set announcement text that appears on all pages</div>
                             </div>
-                            
+
                             <div class="form-row" style="align-items: start;">
                                 <div class="label">Message</div>
                                 <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
@@ -556,7 +556,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Tools Configuration Section -->
                             <div class="form-row" style="align-items: start;">
                                 <div class="label">Tools Configuration</div>
@@ -578,7 +578,7 @@
                                             </label>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Placeholder tools -->
                                     <div class="tool-section">
                                         <label class="tool-checkbox">
@@ -587,7 +587,7 @@
                                             <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
                                         </label>
                                     </div>
-                                    
+
                                     <div class="tool-section">
                                         <label class="tool-checkbox">
                                             <input type="checkbox" id="tool-mcp" disabled>
@@ -597,7 +597,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Admin Actions -->
                             <div class="form-row">
                                 <div class="label">Admin Actions</div>
@@ -626,7 +626,7 @@
 
     <!-- Settings JavaScript -->
     <script>
-        console.log('🔴 [SETTINGS] Settings script loading...');
+        //console.log('🔴 [SETTINGS] Settings script loading...');
 
         // Global state
         let currentUser = null;
@@ -634,7 +634,7 @@
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async function() {
-            console.log('🟢 [SETTINGS] DOMContentLoaded fired - page loaded successfully!');
+            //console.log('🟢 [SETTINGS] DOMContentLoaded fired - page loaded successfully!');
             try {
                 await initializeSettings();
             } catch (error) {
@@ -643,61 +643,61 @@
                 hideLoadingScreen();
             }
         });
-        
+
         // Initialize settings page
         async function initializeSettings() {
-            console.log('🚀 [SETTINGS] Initializing settings page...');
-            console.log('🔍 [SETTINGS] GoogleAuth exists:', !!window.GoogleAuth);
-            console.log('🔍 [SETTINGS] Supabase exists:', !!window.supabase);
+            //console.log('🚀 [SETTINGS] Initializing settings page...');
+            //console.log('🔍 [SETTINGS] GoogleAuth exists:', !!window.GoogleAuth);
+            //console.log('🔍 [SETTINGS] Supabase exists:', !!window.supabase);
 
             // Debug authentication state
-            console.log('🔍 [SETTINGS] isAuthenticated():', GoogleAuth.isAuthenticated());
-            console.log('🔍 [SETTINGS] getToken():', !!GoogleAuth.getToken());
+            //console.log('🔍 [SETTINGS] isAuthenticated():', GoogleAuth.isAuthenticated());
+            //console.log('🔍 [SETTINGS] getToken():', !!GoogleAuth.getToken());
 
             // Ensure user is authenticated (now async)
             const isAuth = await GoogleAuth.requireAuth();
-            console.log('🔍 [SETTINGS] requireAuth() result:', isAuth);
+            //console.log('🔍 [SETTINGS] requireAuth() result:', isAuth);
 
             if (!isAuth) {
-                console.log('❌ [SETTINGS] Authentication failed, hiding loading screen');
+                //console.log('❌ [SETTINGS] Authentication failed, hiding loading screen');
                 hideLoadingScreen();
                 return;
             }
 
-            console.log('✅ [SETTINGS] Authentication passed, continuing initialization...');
+            //console.log('✅ [SETTINGS] Authentication passed, continuing initialization...');
 
             try {
                 // Load current user and check admin status first (before showing UI)
                 await loadCurrentUser();
-                
+
                 // Setup admin UI permissions and wait for completion
                 isAdmin = await GoogleAuth.setupAdminUI();
-                
+
                 // Initialize tab switching after admin verification
                 initTabSwitching();
-                
+
                 // Load user settings
                 await loadUserSettings();
-                
+
                 // Load admin settings if user is admin
                 if (isAdmin) {
                     document.getElementById('admin-tab').style.display = 'block';
                     await loadAdminSettings();
                     await loadUsersList();
                 }
-                
+
                 // Setup event listeners
                 setupEventListeners();
-                
+
                 // Load existing local settings (for tools config)
                 loadLocalSettings();
-                
+
                 // Initialize shared announcement header
                 Announcement.initHeader('announcement-display', 'announcement-text-display');
-                
+
                 // All initialization complete - show content
                 hideLoadingScreen();
-                
+
             } catch (error) {
                 console.error('Settings initialization error:', error);
                 hideLoadingScreen();
@@ -709,16 +709,16 @@
         function hideLoadingScreen() {
             const loadingScreen = document.getElementById('loading-screen');
             const settingsContent = document.getElementById('settings-content');
-            
+
             if (loadingScreen) {
                 loadingScreen.style.display = 'none';
             }
-            
+
             if (settingsContent) {
                 settingsContent.classList.add('loaded');
             }
         }
-        
+
         // Load current user data
         async function loadCurrentUser() {
             try {
@@ -727,17 +727,17 @@
                     window.location.href = '/';
                     return;
                 }
-                
+
                 const response = await fetch('/api/v1/settings/profile', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     currentUser = await response.json();
                     isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
-                    
+
                     // Update UI with user data
                     document.getElementById('user-name').value = currentUser.name || '';
                 } else {
@@ -748,7 +748,7 @@
                 showMessage('Error loading user profile', 'error');
             }
         }
-        
+
         // Load user preferences
         async function loadUserSettings() {
             try {
@@ -758,7 +758,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     const preferences = await response.json();
                     document.getElementById('user-model').value = preferences.default_model || 'gpt-4o';
@@ -768,7 +768,7 @@
                 console.error('Error loading user settings:', error);
             }
         }
-        
+
         // Load admin settings (announcements, etc.)
         async function loadAdminSettings() {
             try {
@@ -778,7 +778,7 @@
                 console.error('Error loading admin settings:', error);
             }
         }
-        
+
         // Load users list for admin
         async function loadUsersList() {
             try {
@@ -788,7 +788,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     const users = await response.json();
                     renderUsersTable(users);
@@ -800,19 +800,19 @@
                 document.getElementById('users-list').textContent = 'Error loading users';
             }
         }
-        
+
         // Render users table
         function renderUsersTable(users) {
             const container = document.getElementById('users-list');
-            
+
             if (users.length === 0) {
                 container.innerHTML = '<div class="admin-note">No users found</div>';
                 return;
             }
-            
+
             const table = document.createElement('table');
             table.className = 'users-table';
-            
+
             table.innerHTML = `
                 <thead>
                     <tr>
@@ -847,24 +847,24 @@
                     `).join('')}
                 </tbody>
             `;
-            
+
             container.innerHTML = '';
             container.appendChild(table);
-            
+
             // Add change listeners to role selects
             table.querySelectorAll('.role-select').forEach(select => {
                 select.addEventListener('change', handleRoleChange);
             });
         }
-        
+
         // Handle role change
         async function handleRoleChange(event) {
             const userId = event.target.dataset.userId;
             const newRole = event.target.value;
             const currentRole = event.target.dataset.currentRole;
-            
+
             if (newRole === currentRole) return;
-            
+
             try {
                 const token = GoogleAuth.getToken();
                 const response = await fetch(`/api/v1/admin/users/${userId}`, {
@@ -875,7 +875,7 @@
                     },
                     body: JSON.stringify({ role: newRole })
                 });
-                
+
                 if (response.ok) {
                     event.target.dataset.currentRole = newRole;
                     showMessage(`User role updated to ${newRole}`, 'success');
@@ -890,7 +890,7 @@
                 showMessage('Error updating role', 'error');
             }
         }
-        
+
         // User action functions
         window.approveUser = async function(userId) {
             try {
@@ -901,7 +901,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     showMessage('User approved successfully', 'success');
                     await loadUsersList();
@@ -914,10 +914,10 @@
                 showMessage('Error approving user', 'error');
             }
         };
-        
+
         window.suspendUser = async function(userId) {
             if (!confirm('Are you sure you want to suspend this user?')) return;
-            
+
             try {
                 const token = GoogleAuth.getToken();
                 const response = await fetch(`/api/v1/admin/users/${userId}/suspend`, {
@@ -926,7 +926,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     showMessage('User suspended successfully', 'success');
                     await loadUsersList();
@@ -939,10 +939,10 @@
                 showMessage('Error suspending user', 'error');
             }
         };
-        
+
         window.deleteUser = async function(userId, userEmail) {
             if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) return;
-            
+
             try {
                 const token = GoogleAuth.getToken();
                 const response = await fetch(`/api/v1/admin/users/${userId}`, {
@@ -951,7 +951,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     showMessage('User deleted successfully', 'success');
                     await loadUsersList();
@@ -964,13 +964,13 @@
                 showMessage('Error deleting user', 'error');
             }
         };
-        
+
         // Load local settings (legacy tool configs)
         function loadLocalSettings() {
             try {
                 const toolWebSearch = localStorage.getItem('tm_tool_web_search') || 'true';
                 const webSearchContext = localStorage.getItem('tm_web_search_context') || 'medium';
-                
+
                 if (document.getElementById('tool-web-search')) {
                     document.getElementById('tool-web-search').checked = toolWebSearch === 'true';
                 }
@@ -981,39 +981,39 @@
                 console.error('Error loading local settings:', e);
             }
         }
-        
+
         // Setup event listeners
         function setupEventListeners() {
             // Settings tab save
             document.getElementById('save-settings')?.addEventListener('click', saveUserSettings);
-            
+
             // Delete account
             document.getElementById('delete-account')?.addEventListener('click', deleteAccount);
-            
+
             // Admin settings save
             document.getElementById('save-admin-settings')?.addEventListener('click', saveAdminSettings);
-            
+
             // Reset admin form
             document.getElementById('reset-admin-form')?.addEventListener('click', resetAdminForm);
-            
+
             // Announcement actions
             document.getElementById('save-announcement')?.addEventListener('click', saveAnnouncement);
             document.getElementById('clear-announcement')?.addEventListener('click', clearAnnouncement);
         }
-        
+
         // Tab switching functionality
         function initTabSwitching() {
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
-            
+
             tabButtons.forEach(button => {
                 button.addEventListener('click', () => {
                     const targetTab = button.getAttribute('data-tab');
-                    
+
                     // Update active tab button
                     tabButtons.forEach(btn => btn.classList.remove('active'));
                     button.classList.add('active');
-                    
+
                     // Update active tab content
                     tabContents.forEach(content => content.classList.remove('active'));
                     const targetContent = document.getElementById(
@@ -1025,17 +1025,17 @@
                 });
             });
         }
-        
+
         // Save user settings
         async function saveUserSettings() {
             try {
                 const token = GoogleAuth.getToken();
-                
+
                 // Update profile
                 const profileData = {
                     name: document.getElementById('user-name').value.trim() || null
                 };
-                
+
                 await fetch('/api/v1/settings/profile', {
                     method: 'PUT',
                     headers: {
@@ -1044,13 +1044,13 @@
                     },
                     body: JSON.stringify(profileData)
                 });
-                
+
                 // Update preferences
                 const preferencesData = {
                     default_model: document.getElementById('user-model').value,
                     system_prompt: document.getElementById('system-prompt').value.trim() || null
                 };
-                
+
                 const response = await fetch('/api/v1/settings/preferences', {
                     method: 'PUT',
                     headers: {
@@ -1059,7 +1059,7 @@
                     },
                     body: JSON.stringify(preferencesData)
                 });
-                
+
                 if (response.ok) {
                     showMessage('Settings saved successfully!', 'success');
                 } else {
@@ -1070,17 +1070,17 @@
                 showMessage('Error saving settings', 'error');
             }
         }
-        
+
         // Delete account
         async function deleteAccount() {
             if (!confirm('Are you sure you want to delete your account? This action cannot be undone and will permanently remove all your data.')) {
                 return;
             }
-            
+
             if (!prompt('Type "DELETE" to confirm account deletion:') === 'DELETE') {
                 return;
             }
-            
+
             try {
                 const token = GoogleAuth.getToken();
                 const response = await fetch('/api/v1/settings/account', {
@@ -1089,7 +1089,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                
+
                 if (response.ok) {
                     showMessage('Account deleted successfully. Logging out...', 'success');
                     setTimeout(() => {
@@ -1103,31 +1103,31 @@
                 showMessage('Error deleting account', 'error');
             }
         }
-        
+
         // Save admin settings
         function saveAdminSettings() {
             try {
                 // Save tool settings to localStorage
                 const toolWebSearch = document.getElementById('tool-web-search')?.checked || false;
                 const webSearchContext = document.getElementById('web-search-context')?.value || 'medium';
-                
+
                 localStorage.setItem('tm_tool_web_search', toolWebSearch.toString());
                 localStorage.setItem('tm_web_search_context', webSearchContext);
-                
+
                 showMessage('Admin settings saved successfully!', 'success');
             } catch (e) {
                 console.error('Error saving admin settings:', e);
                 showMessage('Error saving admin settings', 'error');
             }
         }
-        
+
         // Reset admin form
         function resetAdminForm() {
             if (confirm('Are you sure you want to reset all admin settings to defaults?')) {
                 // Clear localStorage
                 const keys = Object.keys(localStorage).filter(key => key.startsWith('tm_'));
                 keys.forEach(key => localStorage.removeItem(key));
-                
+
                 // Reset form values to defaults
                 if (document.getElementById('tool-web-search')) {
                     document.getElementById('tool-web-search').checked = true;
@@ -1135,47 +1135,47 @@
                 if (document.getElementById('web-search-context')) {
                     document.getElementById('web-search-context').value = 'medium';
                 }
-                
+
                 showMessage('Admin settings reset to defaults.', 'success');
             }
         }
-        
+
         // Announcement functions (from original admin page)
         function saveAnnouncement() {
             const announcementText = document.getElementById('announcement-text').value.trim();
             localStorage.setItem('announcement', announcementText);
-            
+
             // Trigger storage event for other pages to update
             window.dispatchEvent(new StorageEvent('storage', {
                 key: 'announcement',
                 newValue: announcementText
             }));
-            
+
             showMessage('Announcement saved successfully!', 'success');
         }
-        
+
         function clearAnnouncement() {
             document.getElementById('announcement-text').value = '';
             localStorage.removeItem('announcement');
-            
+
             // Trigger storage event for other pages to update
             window.dispatchEvent(new StorageEvent('storage', {
                 key: 'announcement',
                 newValue: ''
             }));
-            
+
             showMessage('Announcement cleared successfully!', 'success');
         }
-        
+
         // Show message function
         function showMessage(message, type = 'success') {
             const container = document.getElementById('message-container');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type}`;
             messageDiv.textContent = message;
-            
+
             container.appendChild(messageDiv);
-            
+
             // Auto remove after 5 seconds
             setTimeout(() => {
                 if (messageDiv.parentNode) {
@@ -1184,7 +1184,7 @@
             }, 5000);
         }
     </script>
-    
+
     <!-- Left sidebar panel -->
     <aside id="left-panel" class="left-panel" aria-hidden="true">
         <div class="left-panel-inner">
@@ -1201,7 +1201,7 @@
                     </svg>
                 </button>
             </div>
-            
+
             <div class="left-panel-content">
                 <!-- Bottom Menu Section -->
                 <div class="panel-bottom-menu">
@@ -1239,7 +1239,7 @@
             const toggleBtn = document.getElementById('left-panel-toggle');
             const closeBtn = document.getElementById('left-panel-close');
             const panel = document.getElementById('left-panel');
-            
+
             if (toggleBtn && panel) {
                 toggleBtn.addEventListener('click', function() {
                     panel.classList.toggle('open');
@@ -1248,7 +1248,7 @@
                     document.body.classList.toggle('panel-open', panel.classList.contains('open'));
                 });
             }
-            
+
             if (closeBtn && panel) {
                 closeBtn.addEventListener('click', function() {
                     panel.classList.remove('open');
@@ -1271,13 +1271,13 @@
 
                 const data = await response.json();
                 googleAccountsData = data.data.accounts || [];
-                
+
                 updateGoogleStatusDisplay(data.data);
                 updateGoogleFeatureToggles(data.data);
-                
+
             } catch (error) {
                 console.error('Error loading Google status:', error);
-                document.getElementById('google-status').innerHTML = 
+                document.getElementById('google-status').innerHTML =
                     '<span style="color: #ff6b6b;">Error loading Google account status</span>';
             }
         }
@@ -1285,18 +1285,18 @@
         function updateGoogleStatusDisplay(statusData) {
             const statusElement = document.getElementById('google-status');
             const accountsList = document.getElementById('google-accounts-list');
-            
+
             const totalAccounts = statusData.total_accounts || 0;
-            
+
             if (totalAccounts > 0) {
                 statusElement.innerHTML = `<span style="color: #28a745;">✅ ${totalAccounts} Google account${totalAccounts > 1 ? 's' : ''} connected</span>`;
-                
+
                 // Display accounts
                 const accountsHtml = statusData.accounts.map(account => `
                     <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 15px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="color: var(--color-primary); font-weight: 500;">
-                                ${account.email} 
+                                ${account.email}
                                 ${account.is_primary ? '<span style="background: #28a745; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px;">PRIMARY</span>' : ''}
                             </div>
                             <div style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">
@@ -1307,8 +1307,8 @@
                             </div>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            ${!account.is_primary ? 
-                                `<button class="save-btn" onclick="setPrimaryGoogleAccount('${account.email}')" style="font-size: 0.8rem; padding: 6px 12px;">Set Primary</button>` : 
+                            ${!account.is_primary ?
+                                `<button class="save-btn" onclick="setPrimaryGoogleAccount('${account.email}')" style="font-size: 0.8rem; padding: 6px 12px;">Set Primary</button>` :
                                 ''
                             }
                             <button class="save-btn" onclick="setGoogleNickname('${account.email}')" style="font-size: 0.8rem; padding: 6px 12px; background: rgba(100,100,100,0.3);">Nickname</button>
@@ -1316,7 +1316,7 @@
                         </div>
                     </div>
                 `).join('');
-                
+
                 accountsList.innerHTML = accountsHtml;
             } else {
                 statusElement.innerHTML = '<span style="color: #ffc107;">⚠ No Google accounts connected</span>';
@@ -1335,12 +1335,12 @@
 
         function updateGoogleFeatureToggles(statusData) {
             const hasAccounts = statusData.total_accounts > 0;
-            
+
             // Enable/disable checkboxes based on account availability
             document.getElementById('gmail-enabled').disabled = !hasAccounts;
             document.getElementById('drive-enabled').disabled = !hasAccounts;
             document.getElementById('calendar-enabled').disabled = !hasAccounts;
-            
+
             // Load saved preferences (for now, default to enabled if accounts exist)
             document.getElementById('gmail-enabled').checked = hasAccounts;
             document.getElementById('drive-enabled').checked = hasAccounts;
@@ -1352,7 +1352,7 @@
                 // Store return URL information for callback
                 localStorage.setItem('google-oauth-return-url', 'settings.html');
                 localStorage.setItem('google-oauth-return-context', 'settings');
-                
+
                 const token = GoogleAuth.getToken();
                 const response = await fetch('/api/v1/google/auth/url?add_account=true', {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -1466,7 +1466,7 @@
         async function testGoogleIntegrations() {
             const resultsDiv = document.getElementById('google-test-results');
             const testBtn = document.getElementById('test-google-btn');
-            
+
             testBtn.disabled = true;
             testBtn.textContent = '🧪 Testing...';
             resultsDiv.innerHTML = '<div class="admin-note">Testing Google integrations...</div>';
@@ -1485,8 +1485,8 @@
                         tests.push({
                             service: 'Gmail',
                             status: data.messages ? 'success' : 'warning',
-                            message: data.messages && data.messages.length > 0 ? 
-                                `✅ Gmail: Found ${data.messages.length} messages` : 
+                            message: data.messages && data.messages.length > 0 ?
+                                `✅ Gmail: Found ${data.messages.length} messages` :
                                 '⚠ Gmail: Connected but no messages found'
                         });
                     } catch (error) {
@@ -1525,13 +1525,13 @@
 
                 // Display results
                 const resultsHtml = tests.map(test => `
-                    <div style="padding: 8px; margin: 5px 0; border-radius: 4px; 
-                         background: ${test.status === 'success' ? 'rgba(40,167,69,0.2)' : 
+                    <div style="padding: 8px; margin: 5px 0; border-radius: 4px;
+                         background: ${test.status === 'success' ? 'rgba(40,167,69,0.2)' :
                                     test.status === 'warning' ? 'rgba(255,193,7,0.2)' : 'rgba(220,53,69,0.2)'};">
                         ${test.message}
                     </div>
                 `).join('');
-                
+
                 resultsDiv.innerHTML = resultsHtml;
 
             } catch (error) {
@@ -1553,7 +1553,7 @@
             }
         });
     </script>
-    
+
     </div> <!-- End settings-content -->
 </body>
 </html>

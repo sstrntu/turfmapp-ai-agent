@@ -28,10 +28,10 @@ const GoogleAuth = {
     async signIn() {
         try {
             this.showStatus('Redirecting to Google...', 'info');
-            
+
             // Initiate Google OAuth flow
             await window.supabase.signInWithGoogle();
-            
+
         } catch (error) {
             console.error('Google sign in error:', error);
             this.showStatus('Failed to sign in with Google. Please try again.', 'error');
@@ -75,7 +75,7 @@ const GoogleAuth = {
             if (response.ok) {
                 const data = await response.json();
                 const hasGoogleAccounts = data.data.total_accounts > 0;
-                
+
                 if (!hasGoogleAccounts) {
                     // Show Google services prompt
                     this.showGoogleServicesPrompt();
@@ -102,7 +102,7 @@ const GoogleAuth = {
     showGoogleServicesPrompt() {
         const statusElement = document.getElementById('login-status');
         const loginForm = document.querySelector('.login-form');
-        
+
         if (statusElement && loginForm) {
             // Update the form to show Google services prompt
             loginForm.innerHTML = `
@@ -116,7 +116,7 @@ const GoogleAuth = {
                         <li>📁 Manage Google Drive files</li>
                         <li>📅 Access your calendar events</li>
                     </ul>
-                    <button type="button" id="connect-google-btn" class="google-signin-button" 
+                    <button type="button" id="connect-google-btn" class="google-signin-button"
                             style="margin: 15px 0;" onclick="GoogleAuth.connectGoogleServices()">
                         <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
                             <path fill="#4285f4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -126,8 +126,8 @@ const GoogleAuth = {
                         </svg>
                         <span class="button-text">Connect Google Services</span>
                     </button>
-                    <button type="button" style="background: #6c757d; color: white; padding: 10px 20px; 
-                                                  border: none; border-radius: 3px; margin: 5px; cursor: pointer;" 
+                    <button type="button" style="background: #6c757d; color: white; padding: 10px 20px;
+                                                  border: none; border-radius: 3px; margin: 5px; cursor: pointer;"
                             onclick="GoogleAuth.skipGoogleServices()">
                         Skip for Now
                     </button>
@@ -142,7 +142,7 @@ const GoogleAuth = {
     async connectGoogleServices() {
         try {
             this.showStatus('Connecting to Google services...', 'info');
-            
+
             const session = await window.supabase.getSession();
             const response = await fetch('/api/v1/google/auth/url', {
                 headers: {
@@ -184,10 +184,10 @@ const GoogleAuth = {
         try {
             // Clear admin cache on sign out
             this.clearAdminCache();
-            
+
             await window.supabase.signOut();
             this.showStatus('Signed out successfully', 'success');
-            
+
             // Redirect to login
             setTimeout(() => {
                 window.location.href = '/portal.html';
@@ -207,7 +207,7 @@ const GoogleAuth = {
         if (statusElement) {
             statusElement.textContent = message;
             statusElement.className = `status-message ${type}`;
-            
+
             // Clear message after delay (except for errors)
             if (type !== 'error') {
                 setTimeout(() => {
@@ -225,7 +225,7 @@ const GoogleAuth = {
         try {
             const response = await window.supabase.apiRequest('/api/v1/auth/status');
             const data = await response.json();
-            
+
             return data.authenticated ? data.user : null;
         } catch (error) {
             console.error('Auth status check error:', error);
@@ -289,7 +289,7 @@ const GoogleAuth = {
                 if (encryptedSession && sessionExpiry) {
                     const expiry = parseInt(sessionExpiry);
                     const isValid = Date.now() < expiry;
-                    console.log('Found stored session, valid:', isValid);
+                    //console.log('Found stored session, valid:', isValid);
                     return isValid;
                 }
 
@@ -299,7 +299,7 @@ const GoogleAuth = {
                     try {
                         const session = JSON.parse(legacySession);
                         const isValid = session.expires_at ? Date.now() < session.expires_at : false;
-                        console.log('Found legacy session, valid:', isValid);
+                        //console.log('Found legacy session, valid:', isValid);
                         return isValid;
                     } catch (e) {
                         console.error('Error parsing legacy session:', e);
@@ -351,14 +351,14 @@ const GoogleAuth = {
             if (response.ok) {
                 const user = await response.json();
                 const isAdminUser = ['admin', 'super_admin'].includes(user.role);
-                
+
                 // Cache the result
                 localStorage.setItem(cacheKey, JSON.stringify({
                     isAdmin: isAdminUser,
                     timestamp: Date.now(),
                     userToken: token
                 }));
-                
+
                 return isAdminUser;
             }
             return false;
@@ -375,7 +375,7 @@ const GoogleAuth = {
         try {
             // Wait for Supabase to be initialized if it's not ready
             if (!window.supabase && typeof window.initializeSupabase === 'function') {
-                console.log('⏳ [AUTH] Waiting for Supabase initialization...');
+                //console.log('⏳ [AUTH] Waiting for Supabase initialization...');
                 await window.initializeSupabase();
             }
 
@@ -386,19 +386,19 @@ const GoogleAuth = {
                 attempts++;
             }
 
-            console.log('🔍 [AUTH] Supabase ready:', !!window.supabase);
-            console.log('🔍 [AUTH] Session valid:', window.supabase?.isSessionValid());
+            //console.log('🔍 [AUTH] Supabase ready:', !!window.supabase);
+            //console.log('🔍 [AUTH] Session valid:', window.supabase?.isSessionValid());
 
             const isAuth = this.isAuthenticated();
-            console.log('🔍 [AUTH] Final authentication result:', isAuth);
+            //console.log('🔍 [AUTH] Final authentication result:', isAuth);
 
             if (!isAuth) {
-                console.log('❌ [AUTH] Authentication failed, redirecting to portal');
+                //console.log('❌ [AUTH] Authentication failed, redirecting to portal');
                 window.location.href = '/portal.html';
                 return false;
             }
 
-            console.log('✅ [AUTH] Authentication successful');
+            //console.log('✅ [AUTH] Authentication successful');
             return true;
         } catch (error) {
             console.error('❌ [AUTH] Error in requireAuth:', error);
@@ -413,7 +413,7 @@ const GoogleAuth = {
     async setupAdminUI() {
         // Get admin status (this will use cache if valid, or fetch fresh data)
         const isAdmin = await this.isAdmin();
-        
+
         // Apply UI changes only once after verification completes
         this.applyAdminUI(isAdmin);
 

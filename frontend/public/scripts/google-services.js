@@ -16,7 +16,7 @@ const GoogleServices = {
         try {
             const response = await window.supabase.apiRequest('/api/v1/google/auth/status');
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data.data;
             } else {
@@ -100,9 +100,9 @@ const GoogleServices = {
             const response = await window.supabase.apiRequest('/api/v1/google/auth/refresh', {
                 method: 'POST'
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok && data.success) {
                 return true;
             } else {
@@ -200,10 +200,10 @@ const GoogleServices = {
                 query,
                 max_results: maxResults.toString()
             });
-            
+
             const response = await window.supabase.apiRequest(`/api/v1/google/gmail/messages?${params}`);
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -222,7 +222,7 @@ const GoogleServices = {
         try {
             const response = await window.supabase.apiRequest(`/api/v1/google/gmail/messages/${messageId}`);
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -244,10 +244,10 @@ const GoogleServices = {
                 query,
                 max_results: maxResults.toString()
             });
-            
+
             const response = await window.supabase.apiRequest(`/api/v1/google/drive/files?${params}`);
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -269,10 +269,10 @@ const GoogleServices = {
                 calendar_id: calendarId,
                 max_results: maxResults.toString()
             });
-            
+
             const response = await window.supabase.apiRequest(`/api/v1/google/calendar/events?${params}`);
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -387,7 +387,7 @@ const GoogleServices = {
         try {
             const message = await this.getGmailMessage(messageId);
             // You can customize this to show in a modal or dedicated area
-            console.log('Message details:', message);
+            //console.log('Message details:', message);
             alert(`Message: ${message.snippet}`);
         } catch (error) {
             alert('Failed to load message details');
@@ -401,18 +401,18 @@ const GoogleServices = {
     async createFolderStructure(folderPath, rootFolder = 'TURFMAPP') {
         try {
             await this.ensureValidTokens();
-            
+
             const formData = new FormData();
             formData.append('folder_path', folderPath);
             formData.append('root_folder', rootFolder);
-            
+
             const response = await window.supabase.apiRequest('/api/v1/google/drive/create-folder', {
                 method: 'POST',
                 body: formData
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -430,20 +430,20 @@ const GoogleServices = {
     async uploadToDrive(file, folderPath = null) {
         try {
             await this.ensureValidTokens();
-            
+
             const formData = new FormData();
             formData.append('file', file);
             if (folderPath) {
                 formData.append('folder_path', folderPath);
             }
-            
+
             const response = await window.supabase.apiRequest('/api/v1/google/drive/upload', {
                 method: 'POST',
                 body: formData
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -461,13 +461,13 @@ const GoogleServices = {
     async deleteFromDrive(fileId) {
         try {
             await this.ensureValidTokens();
-            
+
             const response = await window.supabase.apiRequest(`/api/v1/google/drive/files/${fileId}`, {
                 method: 'DELETE'
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -485,10 +485,10 @@ const GoogleServices = {
     async listFilesInFolder(folderPath) {
         try {
             await this.ensureValidTokens();
-            
+
             const response = await window.supabase.apiRequest(`/api/v1/google/drive/folder/${encodeURIComponent(folderPath)}/files`);
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data;
             } else {
@@ -506,10 +506,10 @@ const GoogleServices = {
     async folderExists(folderPath) {
         try {
             await this.ensureValidTokens();
-            
+
             const response = await window.supabase.apiRequest(`/api/v1/google/drive/folder-exists/${encodeURIComponent(folderPath)}`);
             const data = await response.json();
-            
+
             if (response.ok) {
                 return data.exists;
             } else {
@@ -527,7 +527,7 @@ const GoogleServices = {
      */
     showUploadProgress(filename, progress) {
         // You can implement a progress UI here
-        console.log(`Uploading ${filename}: ${progress}%`);
+        //console.log(`Uploading ${filename}: ${progress}%`);
     },
 
     // Utility Methods
@@ -557,15 +557,15 @@ const GoogleServices = {
 
     formatEventTime(start, end) {
         if (!start) return '';
-        
+
         const startTime = start.dateTime ? new Date(start.dateTime) : new Date(start.date);
         const endTime = end ? (end.dateTime ? new Date(end.dateTime) : new Date(end.date)) : null;
-        
+
         let timeStr = startTime.toLocaleString();
         if (endTime && endTime.getTime() !== startTime.getTime()) {
             timeStr += ` - ${endTime.toLocaleString()}`;
         }
-        
+
         return timeStr;
     }
 };

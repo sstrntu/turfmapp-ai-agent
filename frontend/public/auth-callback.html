@@ -50,24 +50,24 @@
     <script>
         async function handleAuthCallback() {
             try {
-                console.log('🚀 Starting OAuth callback handling...');
-                console.log('🔍 Current window.supabase:', window.supabase);
-                console.log('🔍 typeof window.supabase:', typeof window.supabase);
+                //console.log('🚀 Starting OAuth callback handling...');
+                //console.log('🔍 Current window.supabase:', window.supabase);
+                //console.log('🔍 typeof window.supabase:', typeof window.supabase);
 
                 // Check if initializeSupabase function exists
                 if (typeof window.initializeSupabase === 'function') {
-                    console.log('📞 Calling initializeSupabase directly...');
+                    //console.log('📞 Calling initializeSupabase directly...');
                     await window.initializeSupabase();
                 } else {
-                    console.log('❌ initializeSupabase function not found');
+                    //console.log('❌ initializeSupabase function not found');
                 }
 
                 // Wait for Supabase to be initialized with more aggressive checking
                 let attempts = 0;
                 while (!window.supabase && attempts < 100) {
                     if (attempts % 10 === 0) {
-                        console.log(`⏳ Waiting for Supabase client... attempt ${attempts + 1}`);
-                        console.log('🔍 window keys:', Object.keys(window).filter(k => k.includes('supa') || k.includes('Supa')));
+                        //console.log(`⏳ Waiting for Supabase client... attempt ${attempts + 1}`);
+                        //console.log('🔍 window keys:', Object.keys(window).filter(k => k.includes('supa') || k.includes('Supa')));
                     }
                     await new Promise(resolve => setTimeout(resolve, 50));
                     attempts++;
@@ -75,41 +75,41 @@
 
                 if (!window.supabase) {
                     console.error('❌ Supabase client failed to initialize after 5 seconds');
-                    console.log('🔍 Final window keys:', Object.keys(window).filter(k => k.includes('supa') || k.includes('Supa') || k.includes('init')));
+                    //console.log('🔍 Final window keys:', Object.keys(window).filter(k => k.includes('supa') || k.includes('Supa') || k.includes('init')));
                     throw new Error('Supabase client failed to initialize');
                 }
 
-                console.log('✅ Supabase client found:', !!window.supabase);
-                console.log('🔍 Supabase client type:', typeof window.supabase);
-                console.log('🔍 Supabase client methods:', Object.getOwnPropertyNames(window.supabase).filter(prop => typeof window.supabase[prop] === 'function'));
-                console.log('🔍 handleAuthCallback method type:', typeof window.supabase.handleAuthCallback);
+                //console.log('✅ Supabase client found:', !!window.supabase);
+                //console.log('🔍 Supabase client type:', typeof window.supabase);
+                //console.log('🔍 Supabase client methods:', Object.getOwnPropertyNames(window.supabase).filter(prop => typeof window.supabase[prop] === 'function'));
+                //console.log('🔍 handleAuthCallback method type:', typeof window.supabase.handleAuthCallback);
 
                 if (typeof window.supabase.handleAuthCallback !== 'function') {
                     throw new Error('handleAuthCallback method not found on Supabase client');
                 }
 
-                console.log('🎯 Supabase client ready, processing callback...');
+                //console.log('🎯 Supabase client ready, processing callback...');
 
                 // Debug URL parameters
-                console.log('🔍 Current URL:', window.location.href);
-                console.log('🔍 URL hash:', window.location.hash);
-                console.log('🔍 URL search:', window.location.search);
+                //console.log('🔍 Current URL:', window.location.href);
+                //console.log('🔍 URL hash:', window.location.hash);
+                //console.log('🔍 URL search:', window.location.search);
 
                 // Handle the OAuth callback
                 const session = await window.supabase.handleAuthCallback();
-                
+
                 if (session && session.user) {
-                    console.log('Authentication successful:', {
+                    //console.log('Authentication successful:', {
                         user: session.user.email,
                         expires_at: session.expires_at
                     });
-                    
+
                     // Get the return URL that was stored before auth
                     const returnUrl = '/home.html';
                     localStorage.removeItem('auth-return-url'); // Clean up
-                    
-                    console.log('Redirecting to:', returnUrl);
-                    
+
+                    //console.log('Redirecting to:', returnUrl);
+
                     // Use replace to avoid showing intermediate pages/history entry
                     window.location.replace(returnUrl);
                 } else {
@@ -117,15 +117,15 @@
                 }
             } catch (error) {
                 console.error('Authentication error:', error);
-                
+
                 // Show error message
                 const errorDiv = document.getElementById('error-message');
                 errorDiv.textContent = `Authentication failed: ${error.message}`;
                 errorDiv.style.display = 'block';
-                
+
                 // Hide spinner
                 document.querySelector('.spinner').style.display = 'none';
-                
+
                 // Redirect to login after delay
                 setTimeout(() => {
                     window.location.href = '/portal.html';
