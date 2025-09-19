@@ -10,7 +10,7 @@ services:
       - tmaiagent_network
       - shared_network
     env_file:
-      - ./backend/.env
+      - ./.env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9043/healthz"]
       interval: 30s
