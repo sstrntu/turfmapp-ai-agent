@@ -11,6 +11,9 @@ import os
 import jwt
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Header
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_current_user_from_token(authorization: str = Header(None)) -> Dict[str, Any]:
