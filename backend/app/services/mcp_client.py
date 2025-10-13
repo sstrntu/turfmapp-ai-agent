@@ -12,6 +12,9 @@ from typing import Dict, Any, List, Optional
 
 from .google_oauth import google_oauth_service
 from ..api.v1.google_api import get_user_google_credentials
+from ..core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SimplifiedGoogleMCPClient:
@@ -211,10 +214,10 @@ class SimplifiedGoogleMCPClient:
                 "user@example.com", "example@gmail.com", "account email", "your account"
             ]
             if account and account.lower() in [p.lower() for p in placeholder_accounts]:
-                print(f"🔧 Filtering out placeholder account: '{account}' -> using primary account")
+                logger.debug(f"Filtering out placeholder account: '{account}' -> using primary account")
                 account = None  # Use primary account instead
                 
-            print(f"🔧 Processed account parameter: '{account}' (user_id: {user_id})")
+            logger.debug(f"Processed account parameter: '{account}'", extra={"user_id": user_id})
             
             # Get user credentials
             try:
@@ -587,7 +590,7 @@ class SimplifiedGoogleMCPClient:
                     folder_id = folder.get('id', '')
                     
                     # Debug logging
-                    print(f"🔍 Folder debug - ID: {folder_id}, webViewLink: {web_view_link}")
+                    logger.debug(f"Folder debug - ID: {folder_id}, webViewLink: {web_view_link}")
                     
                     if web_view_link:
                         response_text = f"Here's the link to the folder **\"{folder_name_result}\"**:\n\n"
@@ -616,7 +619,7 @@ class SimplifiedGoogleMCPClient:
     async def _handle_calendar_tool(self, name: str, credentials, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle Google Calendar tool calls."""
         try:
-            print(f"🗓️ Handling calendar tool '{name}' with arguments: {arguments}")
+            logger.info(f"Handling calendar tool '{name}'", extra={"arguments": arguments})
             if name == "calendar_list_events":
                 calendar_id = arguments.get("calendar_id", "primary")
                 max_results = arguments.get("max_results", 10)
@@ -653,21 +656,21 @@ class SimplifiedGoogleMCPClient:
             
             elif name == "calendar_upcoming_events":
                 days = arguments.get("days", 7)
-                print(f"🗓️ Getting upcoming calendar events for {days} days")
+                logger.debug(f"Getting upcoming calendar events for {days} days")
                 
                 # Get only upcoming events (future events from now)
                 result = await google_oauth_service.get_calendar_events(
                     credentials=credentials, calendar_id="primary", max_results=10, upcoming_only=True
                 )
                 
-                print(f"🗓️ Calendar API result: {result}")
+                logger.debug(f"Calendar API result: {result}")
                 
                 if "error" in result:
-                    print(f"❌ Calendar API error: {result['error']}")
+                    logger.error(f"Calendar API error: {result['error']}")
                     return {"success": False, "response": f"❌ Failed to get upcoming events: {result['error']}", "tool": name}
                 
                 events = result.get("events", [])
-                print(f"🗓️ Found {len(events)} calendar events")
+                logger.info(f"Found {len(events)} calendar events")
                 
                 if not events:
                     response_text = f"📅 No upcoming events in the next {days} days."
@@ -681,16 +684,16 @@ class SimplifiedGoogleMCPClient:
                         response_text += f"{i}. **{title}**\n"
                         response_text += f"   🕐 {start_date}\n\n"
                 
-                print(f"✅ Returning calendar response: {response_text[:100]}...")
+                logger.debug(f"Returning calendar response: {response_text[:100]}...")
                 return {"success": True, "response": response_text, "tool": name}
             
             else:
                 return {"success": False, "error": f"Unknown Calendar tool: {name}", "tool": name}
                 
         except Exception as e:
-            print(f"❌ Calendar tool exception: {str(e)}")
+            logger.error(f"Calendar tool exception: {str(e)}", exc_info=True)
             import traceback
-            print(f"❌ Calendar tool traceback: {traceback.format_exc()}")
+            # Traceback already included with exc_info=True above
             return {"success": False, "error": f"Calendar tool error: {str(e)}", "tool": name}
     
     async def get_available_tools_for_openai(self) -> List[Dict[str, Any]]:

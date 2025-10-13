@@ -44,17 +44,17 @@ async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
     """Verify Supabase JWT token and return user info with enhanced validation"""
     supabase_url = os.getenv("SUPABASE_URL")
     if not supabase_url:
-        print("❌ [AUTH] No Supabase URL configured")
+        logger.error("No Supabase URL configured")
         return None
 
     # Basic token validation
     if not token or len(token) < 10:
-        print("❌ [AUTH] Invalid token format")
+        logger.warning("Invalid token format")
         return None
 
     # Check for suspicious token patterns
     if token.startswith('fake_') or 'test' in token.lower() or len(token) > 2000:
-        print("❌ [AUTH] Suspicious token pattern detected")
+        logger.warning("Suspicious token pattern detected")
         return None
 
     headers = {
@@ -68,13 +68,13 @@ async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
             resp = await client.get(f"{supabase_url}/auth/v1/user", headers=headers)
 
             if resp.status_code == 401:
-                print("❌ [AUTH] Token expired or invalid")
+                logger.warning("Token expired or invalid")
                 return None
             elif resp.status_code == 429:
-                print("❌ [AUTH] Rate limited by Supabase")
+                logger.warning("Rate limited by Supabase")
                 return None
             elif resp.status_code != 200:
-                print(f"❌ [AUTH] Supabase auth failed with status: {resp.status_code}")
+                logger.error(f"Supabase auth failed with status: {resp.status_code}")
                 return None
 
             data = resp.json()
@@ -84,17 +84,17 @@ async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
             email = data.get("email")
 
             if not user_id or not email:
-                print("❌ [AUTH] Invalid user data from Supabase")
+                logger.error("Invalid user data from Supabase")
                 return None
 
             # Validate email format
             if "@" not in email or "." not in email.split("@")[-1]:
-                print("❌ [AUTH] Invalid email format")
+                logger.warning("Invalid email format")
                 return None
 
             # Check for email verification (optional but recommended)
             if not data.get("email_confirmed_at"):
-                print("⚠️ [AUTH] Email not confirmed, proceeding anyway")
+                logger.info("Email not confirmed, proceeding anyway")
 
             return {
                 "id": user_id,
@@ -106,13 +106,13 @@ async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
             }
 
     except httpx.TimeoutException:
-        print("❌ [AUTH] Timeout connecting to Supabase")
+        logger.error("Timeout connecting to Supabase", exc_info=True)
         return None
     except httpx.RequestError as e:
-        print(f"❌ [AUTH] Request error: {e}")
+        logger.error(f"Request error: {e}", exc_info=True)
         return None
     except Exception as e:
-        print(f"❌ [AUTH] Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}", exc_info=True)
         return None
 
 
@@ -125,7 +125,7 @@ async def get_current_user_supabase(
     if request:
         client_ip = request.client.host if request.client else "unknown"
         if not _check_rate_limit(client_ip):
-            print(f"❌ [AUTH] Rate limit exceeded for IP: {client_ip}")
+            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many authentication attempts. Please try again later."

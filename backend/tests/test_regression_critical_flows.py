@@ -132,8 +132,8 @@ class TestDataIntegrityRegression:
         """CRITICAL: Conversation creation must work."""
         chat_service = EnhancedChatService()
         
-        # Test with database fallback
-        with patch.object(chat_service, 'use_database_fallback', new_callable=AsyncMock) as mock_fallback:
+        # Test with database fallback - mock the conversation_manager's method
+        with patch.object(chat_service.conversation_manager, 'use_database_fallback', new_callable=AsyncMock) as mock_fallback:
             mock_fallback.return_value = {"id": "test-conv-123"}
             
             conv_id = await chat_service.create_conversation("test-user", "Test Title")
@@ -146,7 +146,8 @@ class TestDataIntegrityRegression:
         """CRITICAL: Message saving must work."""
         chat_service = EnhancedChatService()
         
-        with patch.object(chat_service, 'use_database_fallback', new_callable=AsyncMock) as mock_fallback:
+        # Mock the conversation_manager's method to avoid async event loop issues
+        with patch.object(chat_service.conversation_manager, 'use_database_fallback', new_callable=AsyncMock) as mock_fallback:
             mock_fallback.return_value = True
             
             result = await chat_service.save_message_to_conversation(

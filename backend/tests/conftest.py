@@ -8,6 +8,8 @@ Following code.md standards with proper type hints and docstrings.
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 import pytest
 from unittest.mock import Mock, AsyncMock, MagicMock
 from typing import Generator, Dict, Any, List
@@ -15,6 +17,11 @@ from datetime import datetime, timedelta
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+# Add parent directory to path for imports
+backend_dir = Path(__file__).parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 from app.main import app as main_app
 

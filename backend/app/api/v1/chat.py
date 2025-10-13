@@ -36,12 +36,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from ...core.simple_auth import get_current_user_from_token
+from ...core.logging_config import get_logger, log_error_with_context
 from ...services.chat_service import EnhancedChatService
 from ...services.tool_manager import tool_manager
 from ...database import ConversationService
 
 router = APIRouter()
 chat_service = EnhancedChatService()
+logger = get_logger(__name__)
 
 # Type definitions
 Role = Literal["system", "user", "assistant"]
@@ -125,7 +127,12 @@ async def send_chat_message(
         )
         
     except Exception as e:
-        print(f"❌ Chat error: {e}")
+        log_error_with_context(
+            logger,
+            "Chat message processing failed",
+            e,
+            {"user_id": user_id, "model": request.model}
+        )
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to process chat message: {str(e)}"
@@ -144,7 +151,12 @@ async def get_conversations(
         return ConversationListResponse(conversations=conversations)
         
     except Exception as e:
-        print(f"❌ Get conversations error: {e}")
+        log_error_with_context(
+            logger,
+            "Failed to retrieve conversations",
+            e,
+            {"user_id": user_id}
+        )
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve conversations: {str(e)}"

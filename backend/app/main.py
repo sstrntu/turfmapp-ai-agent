@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from typing import List
 from contextlib import asynccontextmanager
 
@@ -23,6 +24,11 @@ from .api.v1.settings import router as settings_router_v1
 from .api.v1.google_api import router as google_api_router_v1
 
 from .database import get_supabase_config
+from .core.logging_config import setup_logging, get_logger
+
+# Initialize logging
+setup_logging(level=os.getenv("LOG_LEVEL", "INFO"), enable_colors=True)
+logger = get_logger(__name__)
 
 
 def _get_cors_origins() -> List[str]:
@@ -38,13 +44,15 @@ def _get_cors_origins() -> List[str]:
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
+    logger.info("Application starting up")
     config = get_supabase_config()
-    print(f"Supabase configured: {bool(config['url'])}")
+    logger.info(f"Supabase configured: {bool(config['url'])}")
+    logger.info(f"CORS origins: {_get_cors_origins()}")
 
     yield
 
     # Shutdown
-    print("Application shutting down...")
+    logger.info("Application shutting down...")
 
 
 app = FastAPI(
