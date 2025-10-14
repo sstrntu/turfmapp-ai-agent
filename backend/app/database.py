@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import uuid
 import asyncpg
 import ssl
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 # Database configuration
 def _ensure_sslmode(url: str) -> str:
@@ -30,12 +33,12 @@ DATABASE_URL = os.getenv("DATABASE_URL") or SUPABASE_DB_URL
 if DATABASE_URL:
     DATABASE_URL = _ensure_sslmode(DATABASE_URL)
 
-print(f"Supabase URL: {SUPABASE_URL}")
-print(f"Service role key present: {bool(SUPABASE_SERVICE_ROLE_KEY)}")
-print(f"Database URL present: {bool(SUPABASE_DB_URL)}")
+logger.info(f"Supabase URL: {SUPABASE_URL}")
+logger.info(f"Service role key present: {bool(SUPABASE_SERVICE_ROLE_KEY)}")
+logger.info(f"Database URL present: {bool(SUPABASE_DB_URL)}")
 
 
-def get_supabase_config():
+def get_supabase_config() -> Dict[str, Any]:
     """Get Supabase configuration"""
     return {
         "url": SUPABASE_URL,
@@ -46,7 +49,7 @@ def get_supabase_config():
 # PostgreSQL connection pool
 _connection_pool = None
 
-async def get_db_pool():
+async def get_db_pool() -> Optional[asyncpg.Pool]:
     """Get or create PostgreSQL connection pool"""
     global _connection_pool
     if _connection_pool is None:
@@ -55,7 +58,7 @@ async def get_db_pool():
             
         try:
             db_url = _ensure_sslmode(SUPABASE_DB_URL)
-            print(f"Attempting to connect to: {db_url}")
+            logger.info(f"Attempting to connect to: {db_url}")
             # Ensure SSL is used for Supabase connections
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
@@ -69,25 +72,25 @@ async def get_db_pool():
                     'search_path': 'public'  # Start with public schema for now
                 }
             )
-            print("✅ PostgreSQL connection pool created successfully!")
-            
+            logger.info("✅ PostgreSQL connection pool created successfully!")
+
             # Test the connection
             async with _connection_pool.acquire() as connection:
                 await connection.fetchval('SELECT 1')
-                print("✅ Database connection test successful!")
-                
+                logger.info("✅ Database connection test successful!")
+
         except Exception as e:
-            print(f"❌ Failed to create PostgreSQL connection pool: {e}")
+            logger.error(f"❌ Failed to create PostgreSQL connection pool: {e}")
             raise RuntimeError(f"Failed to connect to Supabase database: {e}")
     return _connection_pool
 
-async def execute_query(query: str, *args):
+async def execute_query(query: str, *args) -> List[asyncpg.Record]:
     """Execute a query with the connection pool"""
     pool = await get_db_pool()
     async with pool.acquire() as connection:
         return await connection.fetch(query, *args)
 
-async def execute_query_one(query: str, *args):
+async def execute_query_one(query: str, *args) -> Optional[asyncpg.Record]:
     """Execute a query and return one row"""
     pool = await get_db_pool()
     async with pool.acquire() as connection:
@@ -110,10 +113,10 @@ class UserService:
             # Check if user exists in auth.users (required for foreign key)
             auth_query = "SELECT id, email FROM auth.users WHERE id = $1"
             auth_user = await execute_query_one(auth_query, user_id)
-            
+
             if not auth_user:
                 # User doesn't exist in auth.users, we can't create profile
-                print(f"User {user_id} not found in auth.users - user must authenticate first")
+                logger.warning(f"User {user_id} not found in auth.users - user must authenticate first")
                 return None
             
             # Create user profile using auth user data
@@ -126,7 +129,7 @@ class UserService:
             result = await execute_query_one(query, user_id, auth_email, name)
             return dict(result) if result else None
         except Exception as e:
-            print(f"Error creating/getting user: {e}")
+            logger.error(f"Error creating/getting user: {e}")
             return None
     
     @staticmethod
@@ -137,7 +140,7 @@ class UserService:
             result = await execute_query_one(query, user_id)
             return dict(result) if result else None
         except Exception as e:
-            print(f"Error getting user: {e}")
+            logger.error(f"Error getting user: {e}")
             return None
 
 class ConversationService:
@@ -150,7 +153,7 @@ class ConversationService:
             # Ensure user exists before creating conversation
             user = await UserService.create_or_get_user(user_id)
             if not user:
-                print(f"Failed to create/get user {user_id}")
+                logger.error(f"Failed to create/get user {user_id}")
                 return None
             
             conversation_id = str(uuid.uuid4())
@@ -169,7 +172,7 @@ class ConversationService:
             )
             return dict(result) if result else None
         except Exception as e:
-            print(f"Error creating conversation: {e}")
+            logger.error(f"Error creating conversation: {e}")
             return None
     
     @staticmethod
@@ -180,7 +183,7 @@ class ConversationService:
             result = await execute_query_one(query, conversation_id)
             return dict(result) if result else None
         except Exception as e:
-            print(f"Error getting conversation: {e}")
+            logger.error(f"Error getting conversation: {e}")
             return None
     
     @staticmethod
@@ -196,7 +199,7 @@ class ConversationService:
             results = await execute_query(query, user_id, limit)
             return [dict(row) for row in results] if results else []
         except Exception as e:
-            print(f"Error getting user conversations: {e}")
+            logger.error(f"Error getting user conversations: {e}")
             return []
     
     @staticmethod
@@ -213,7 +216,7 @@ class ConversationService:
                 await connection.execute(query, title, conversation_id)
             return True
         except Exception as e:
-            print(f"Error updating conversation title: {e}")
+            logger.error(f"Error updating conversation title: {e}")
             return False
     
     @staticmethod
@@ -245,7 +248,7 @@ class ConversationService:
                 return dict(result)
             return None
         except Exception as e:
-            print(f"Error adding message: {e}")
+            logger.error(f"Error adding message: {e}")
             return None
     
     @staticmethod
@@ -260,7 +263,7 @@ class ConversationService:
             results = await execute_query(query, conversation_id)
             return [dict(row) for row in results] if results else []
         except Exception as e:
-            print(f"Error getting conversation messages: {e}")
+            logger.error(f"Error getting conversation messages: {e}")
             return []
     
     @staticmethod
@@ -274,7 +277,7 @@ class ConversationService:
                 await connection.execute(query, conversation_id)
             return True
         except Exception as e:
-            print(f"Error deleting conversation: {e}")
+            logger.error(f"Error deleting conversation: {e}")
             return False
     
     @staticmethod

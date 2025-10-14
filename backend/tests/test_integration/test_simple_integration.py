@@ -43,7 +43,7 @@ class TestSimpleChatIntegration:
         for expected in expected_models:
             assert expected in model_ids, f"Expected model {expected} not found"
     
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     def test_send_message_requires_authentication(self, mock_auth, client):
         """Test that send message properly validates authentication"""
         # Test without auth header
@@ -77,7 +77,7 @@ class TestSimpleChatIntegration:
             assert "assistant_message" in data
             assert "sources" in data  # This would have failed before our fix!
     
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     def test_conversation_history_preserves_metadata(self, mock_auth, client):
         """Test that conversation history includes message metadata (sources)"""
         mock_auth.return_value = {"id": "user123", "email": "test@example.com"}

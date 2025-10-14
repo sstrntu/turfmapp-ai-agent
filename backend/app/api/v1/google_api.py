@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
@@ -8,10 +9,11 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from ...core.auth import get_current_user_supabase
-from typing import Dict, Any
 from ...services.google_oauth import google_oauth_service, GoogleTokens, GoogleAccount
 from ...services.google_db import google_accounts_db
 
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -95,11 +97,11 @@ async def handle_google_callback(
     """Handle Google OAuth callback."""
     try:
         # Debug logging
-        print(f"🔍 DEBUG - Callback received:")
-        print(f"  - request.code: {request.code[:20]}..." if request.code else "  - request.code: None")
-        print(f"  - request.state: {request.state}")
-        print(f"  - current_user id: {current_user.get('id')}")
-        print(f"  - current_user: {current_user}")
+        logger.debug("🔍 DEBUG - Callback received:")
+        logger.debug(f"  - request.code: {request.code[:20]}..." if request.code else "  - request.code: None")
+        logger.debug(f"  - request.state: {request.state}")
+        logger.debug(f"  - current_user id: {current_user.get('id')}")
+        logger.debug(f"  - current_user: {current_user}")
         
         # Parse state to get user_id and action
         try:
@@ -113,10 +115,10 @@ async def handle_google_callback(
         # Verify state matches current user
         current_user_id = str(current_user["id"])
         if state_user_id != current_user_id:
-            print(f"❌ State mismatch: '{state_user_id}' != '{current_user_id}'")
+            logger.error(f"❌ State mismatch: '{state_user_id}' != '{current_user_id}'")
             raise HTTPException(status_code=400, detail=f"Invalid state parameter. Expected: {current_user_id}, Got: {state_user_id}")
-        
-        print(f"✅ State validation passed: {state_user_id}, action: {action}")
+
+        logger.info(f"✅ State validation passed: {state_user_id}, action: {action}")
         
         # Exchange code for tokens
         token_data = await google_oauth_service.exchange_code_for_tokens(request.code, request.state)
@@ -155,9 +157,9 @@ async def handle_google_callback(
         
         # Get updated accounts list
         updated_accounts = await google_accounts_db.get_user_google_accounts(user_id_str)
-        
-        print(f"✅ Stored Google account {user_email} for user {user_id_str}")
-        print(f"🔧 User now has {len(updated_accounts)} Google accounts")
+
+        logger.info(f"✅ Stored Google account {user_email} for user {user_id_str}")
+        logger.info(f"🔧 User now has {len(updated_accounts)} Google accounts")
         
         return GoogleAuthResponse(
             success=True,
@@ -212,23 +214,23 @@ async def get_google_auth_status(
 
 async def get_user_google_credentials(user_id: str, account_email: str = None):
     """Get Google credentials for a user, optionally for a specific account."""
-    print(f"🔍 Looking for tokens for user_id: '{user_id}', account: '{account_email}'")
-    
+    logger.debug(f"🔍 Looking for tokens for user_id: '{user_id}', account: '{account_email}'")
+
     if account_email:
         # Specific account requested
         account = await google_accounts_db.get_account_by_email(user_id, account_email)
         if not account:
             raise HTTPException(status_code=404, detail=f"Google account {account_email} not found")
         tokens = account.tokens
-        print(f"✅ Found specific account {account_email}")
+        logger.info(f"✅ Found specific account {account_email}")
     else:
         # Use primary account
         primary_account = await google_accounts_db.get_primary_account(user_id)
         if not primary_account:
-            print(f"❌ No Google accounts found for user {user_id}")
+            logger.error(f"❌ No Google accounts found for user {user_id}")
             raise HTTPException(status_code=401, detail="Google authentication required. Please connect your Google account in Settings.")
         tokens = primary_account.tokens
-        print(f"✅ Using primary account {primary_account.email}")
+        logger.info(f"✅ Using primary account {primary_account.email}")
     
     return google_oauth_service.get_credentials_from_token(
         access_token=tokens.access_token,

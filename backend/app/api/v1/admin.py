@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import List, Annotated, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 import httpx
@@ -46,7 +46,7 @@ async def get_announcements(
 async def get_active_announcements():
     """Get active announcements (public endpoint)"""
     try:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         query = """
             SELECT id, created_by, content, expires_at, is_active, created_at
             FROM turfmapp_agent.announcements
@@ -183,7 +183,7 @@ async def get_admin_stats(
         
         # Get recent activity (last 30 days)
         from datetime import timedelta
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         
         recent_users = await execute_query_one("SELECT COUNT(*) as count FROM turfmapp_agent.users WHERE created_at >= $1", thirty_days_ago)
         recent_conversations = await execute_query_one("SELECT COUNT(*) as count FROM turfmapp_agent.conversations WHERE created_at >= $1", thirty_days_ago)

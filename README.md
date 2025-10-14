@@ -130,7 +130,7 @@ User Query → Context Analysis → Tool Selection → Execution → AI Analysis
 │   │   ├── core/              # Core functionality
 │   │   │   ├── auth.py        # Supabase authentication
 │   │   │   ├── config.py      # App configuration
-│   │   │   └── simple_auth.py # Legacy authentication
+│   │   │   └── jwt_auth.py    # Development JWT fallback auth
 │   │   ├── services/          # Business logic layer
 │   │   │   ├── enhanced_chat_service.py # Core agentic chat service
 │   │   │   ├── mcp_client_simple.py    # Google MCP integration

@@ -72,7 +72,7 @@ backend/
 │   ├── core/                      # Core Functionality
 │   │   ├── auth.py                # Supabase authentication
 │   │   ├── config.py              # Configuration management
-│   │   └── simple_auth.py         # Legacy auth support
+│   │   └── jwt_auth.py            # Development JWT fallback auth
 │   │
 │   ├── services/                  # Business Logic Layer
 │   │   ├── enhanced_chat_service.py     # 🤖 Core agentic service

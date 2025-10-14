@@ -28,6 +28,8 @@ Recent fixes (August 2025):
 
 from __future__ import annotations
 
+import logging
+
 from typing import List, Literal, Optional, Dict, Any
 from datetime import datetime
 import uuid
@@ -35,10 +37,13 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from ...core.simple_auth import get_current_user_from_token
+from ...core.jwt_auth import get_current_user_from_token
 from ...services.chat_service import EnhancedChatService
 from ...services.tool_manager import tool_manager
 from ...database import ConversationService
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 chat_service = EnhancedChatService()
@@ -125,7 +130,7 @@ async def send_chat_message(
         )
         
     except Exception as e:
-        print(f"❌ Chat error: {e}")
+        logger.error(f"❌ Chat error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to process chat message: {str(e)}"
@@ -144,7 +149,7 @@ async def get_conversations(
         return ConversationListResponse(conversations=conversations)
         
     except Exception as e:
-        print(f"❌ Get conversations error: {e}")
+        logger.error(f"❌ Get conversations error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve conversations: {str(e)}"
@@ -195,7 +200,7 @@ async def get_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Get conversation error: {e}")
+        logger.error(f"❌ Get conversation error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve conversation: {str(e)}"
@@ -221,7 +226,7 @@ async def delete_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Delete conversation error: {e}")
+        logger.error(f"❌ Delete conversation error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to delete conversation: {str(e)}"
@@ -253,7 +258,7 @@ async def add_message_to_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Add message error: {e}")
+        logger.error(f"❌ Add message error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to add message: {str(e)}"
@@ -330,7 +335,7 @@ async def get_available_tools():
         
     except Exception as e:
         # Fallback to traditional tools only
-        print(f"❌ Failed to get MCP tools: {e}")
+        logger.error(f"❌ Failed to get MCP tools: {e}")
         return {
             "tools": tool_manager.get_available_tools(),
             "descriptions": tool_manager.get_tool_descriptions(),

@@ -18,8 +18,6 @@ coverage
 .idea
 .next
 build
-dist
-package-lock.json
 yarn.lock
 public/*.mp4
 public/*.mov

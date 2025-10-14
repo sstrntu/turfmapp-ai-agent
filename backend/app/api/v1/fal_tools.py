@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -14,6 +16,9 @@ from typing import Dict, List, Any, Optional, Union
 import httpx
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field, validator
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -164,7 +169,7 @@ async def generate_sound_effect(
             "duration": request.duration
         }
         
-        print(f"Calling fal.ai with payload: {payload}")
+        logger.info(f"Calling fal.ai with payload: {payload}")
         
         # Call fal.ai API
         client = get_fal_client()
@@ -173,7 +178,7 @@ async def generate_sound_effect(
             payload
         )
         
-        print(f"FAL API response: {fal_response}")
+        logger.info(f"FAL API response: {fal_response}")
         
         # Extract audio URL from response
         if "audio_file" in fal_response and "url" in fal_response["audio_file"]:
@@ -202,7 +207,7 @@ async def generate_sound_effect(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error generating sound effect: {e}")
+        logger.info(f"Error generating sound effect: {e}")
         return ToolResult(
             success=False,
             tool_id="sound-effects",
@@ -250,6 +255,6 @@ async def cleanup_old_media():
             if file_age > 86400:
                 try:
                     file_path.unlink()
-                    print(f"Cleaned up old media file: {file_path.name}")
+                    logger.info(f"Cleaned up old media file: {file_path.name}")
                 except Exception as e:
-                    print(f"Error cleaning up file {file_path.name}: {e}")
+                    logger.info(f"Error cleaning up file {file_path.name}: {e}")

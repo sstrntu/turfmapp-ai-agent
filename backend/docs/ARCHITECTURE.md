@@ -129,7 +129,7 @@ class EnhancedChatService:
 
 **Components**:
 - `config.py`: Application configuration
-- `simple_auth.py`: Authentication middleware
+- `jwt_auth.py`: Development JWT authentication middleware
 - `security.py`: Security utilities
 
 **Responsibilities**:

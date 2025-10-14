@@ -1237,30 +1237,7 @@
     </aside>
 
     <script>
-        // Initialize left panel toggle functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const toggleBtn = document.getElementById('left-panel-toggle');
-            const closeBtn = document.getElementById('left-panel-close');
-            const panel = document.getElementById('left-panel');
-
-            if (toggleBtn && panel) {
-                toggleBtn.addEventListener('click', function() {
-                    panel.classList.toggle('open');
-                    toggleBtn.setAttribute('aria-expanded', panel.classList.contains('open'));
-                    panel.setAttribute('aria-hidden', !panel.classList.contains('open'));
-                    document.body.classList.toggle('panel-open', panel.classList.contains('open'));
-                });
-            }
-
-            if (closeBtn && panel) {
-                closeBtn.addEventListener('click', function() {
-                    panel.classList.remove('open');
-                    toggleBtn.setAttribute('aria-expanded', 'false');
-                    panel.setAttribute('aria-hidden', 'true');
-                    document.body.classList.remove('panel-open');
-                });
-            }
-        });
+        // Sidebar initialization is handled by scripts/ui.js
 
         // Google Account Management Functions
         let googleAccountsData = [];

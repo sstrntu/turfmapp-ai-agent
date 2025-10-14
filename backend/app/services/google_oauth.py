@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
@@ -14,6 +15,8 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 
 from ..models.auth import PublicUser
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleTokens(BaseModel):
@@ -115,7 +118,7 @@ class GoogleOAuthService:
 
             if not credentials.refresh_token:
                 # This can happen when user re-authorizes - try to handle gracefully
-                print(f"Warning: No refresh token received for {user_info.get('email', 'unknown')} - user may need to revoke app access first")
+                logger.warning(f"Warning: No refresh token received for {user_info.get('email', 'unknown')} - user may need to revoke app access first")
                 # For now, we'll allow this but log it for monitoring
 
             return {
@@ -127,7 +130,7 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error exchanging code for tokens: {e}")
+            logger.error(f"Error exchanging code for tokens: {e}")
             return None
     
     async def _get_user_info(self, credentials: Credentials) -> Dict[str, Any]:
@@ -146,7 +149,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting user info: {e}")
+            logger.error(f"Error getting user info: {e}")
             return {}
     
     def refresh_access_token(self, refresh_token: str) -> Optional[Dict[str, Any]]:
@@ -172,7 +175,7 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error refreshing access token: {e}")
+            logger.error(f"Error refreshing access token: {e}")
             return None
     
     def get_credentials_from_token(self, access_token: str, refresh_token: str = None) -> Credentials:
@@ -191,9 +194,9 @@ class GoogleOAuthService:
         if credentials.expired and credentials.refresh_token:
             try:
                 credentials.refresh(httpx.Request())
-                print(f"🔄 Refreshed expired Google credentials")
+                logger.info(f"🔄 Refreshed expired Google credentials")
             except Exception as e:
-                print(f"❌ Failed to refresh credentials: {e}")
+                logger.error(f"❌ Failed to refresh credentials: {e}")
                 raise
         return credentials
     
@@ -243,7 +246,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting Gmail messages: {e}")
+            logger.error(f"Error getting Gmail messages: {e}")
             return {'error': str(e), 'messages': []}
     
     def _extract_email_body(self, payload: Dict[str, Any]) -> str:
@@ -262,7 +265,7 @@ class GoogleOAuthService:
                 data = data.replace('-', '+').replace('_', '/')
                 return base64.b64decode(data).decode('utf-8')
             except Exception as e:
-                print(f"Error decoding base64url: {e}")
+                logger.error(f"Error decoding base64url: {e}")
                 return ""
         
         def extract_text_from_part(part: Dict[str, Any]) -> str:
@@ -324,7 +327,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting Gmail message content: {e}")
+            logger.error(f"Error getting Gmail message content: {e}")
             return {'error': str(e)}
     
     # Drive API methods
@@ -346,7 +349,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting Drive files: {e}")
+            logger.error(f"Error getting Drive files: {e}")
             return {'error': str(e), 'files': []}
     
     async def search_drive_files(self, credentials: Credentials, search_term: str = '', file_type: str = '', 
@@ -387,8 +390,8 @@ class GoogleOAuthService:
             
             # Combine query parts
             query = " AND ".join(query_parts) if query_parts else "trashed=false"
-            
-            print(f"🔍 Drive search query: {query}")
+
+            logger.debug(f"🔍 Drive search query: {query}")
             
             results = service.files().list(
                 q=query,
@@ -404,7 +407,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error searching Drive files: {e}")
+            logger.error(f"Error searching Drive files: {e}")
             return {'error': str(e), 'files': []}
     
     async def search_drive_folders(self, credentials: Credentials, folder_name: str, max_results: int = 10) -> Dict[str, Any]:
@@ -415,8 +418,8 @@ class GoogleOAuthService:
             
             # Search for folders with the specified name
             query = f"name contains '{folder_name}' AND mimeType = 'application/vnd.google-apps.folder' AND trashed=false"
-            
-            print(f"🔍 Drive folder search query: {query}")
+
+            logger.debug(f"🔍 Drive folder search query: {query}")
             
             results = service.files().list(
                 q=query,
@@ -432,7 +435,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error searching Drive folders: {e}")
+            logger.error(f"Error searching Drive folders: {e}")
             return {'error': str(e), 'folders': []}
     
     async def create_folder_structure(self, credentials: Credentials, folder_path: str, root_folder: str = "TURFMAPP") -> str:
@@ -452,7 +455,7 @@ class GoogleOAuthService:
             return current_parent
             
         except Exception as e:
-            print(f"Error creating folder structure: {e}")
+            logger.error(f"Error creating folder structure: {e}")
             raise
     
     async def _get_or_create_folder(self, service, folder_name: str, parent_id: str = None) -> str:
@@ -481,7 +484,7 @@ class GoogleOAuthService:
             return folder.get('id')
             
         except Exception as e:
-            print(f"Error getting/creating folder '{folder_name}': {e}")
+            logger.error(f"Error getting/creating folder '{folder_name}': {e}")
             raise
     
     async def upload_file_to_drive(self, credentials: Credentials, file_content: bytes, filename: str, folder_path: str = None) -> Dict[str, Any]:
@@ -539,7 +542,7 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error uploading file '{filename}': {e}")
+            logger.error(f"Error uploading file '{filename}': {e}")
             return {'success': False, 'error': str(e)}
     
     async def delete_file_from_drive(self, credentials: Credentials, file_id: str) -> Dict[str, Any]:
@@ -561,7 +564,7 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error deleting file '{file_id}': {e}")
+            logger.error(f"Error deleting file '{file_id}': {e}")
             return {'success': False, 'error': str(e)}
     
     async def list_files_in_folder(self, credentials: Credentials, folder_path: str) -> Dict[str, Any]:
@@ -588,7 +591,7 @@ class GoogleOAuthService:
             }
             
         except Exception as e:
-            print(f"Error listing files in '{folder_path}': {e}")
+            logger.error(f"Error listing files in '{folder_path}': {e}")
             return {'success': False, 'error': str(e), 'files': []}
     
     async def get_shared_drives(self, credentials: Credentials, max_results: int = 10) -> Dict[str, Any]:
@@ -609,7 +612,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting shared drives: {e}")
+            logger.error(f"Error getting shared drives: {e}")
             return {'error': str(e), 'drives': []}
     
     # Calendar API methods
@@ -631,7 +634,7 @@ class GoogleOAuthService:
                 from datetime import datetime, timezone
                 now = datetime.now(timezone.utc).isoformat()
                 query_params['timeMin'] = now
-                print(f"🗓️ Filtering calendar events from: {now}")
+                logger.debug(f"🗓️ Filtering calendar events from: {now}")
             
             events_result = service.events().list(**query_params).execute()
             
@@ -641,7 +644,7 @@ class GoogleOAuthService:
             }
             
         except HttpError as e:
-            print(f"Error getting Calendar events: {e}")
+            logger.error(f"Error getting Calendar events: {e}")
             return {'error': str(e), 'events': []}
 
 

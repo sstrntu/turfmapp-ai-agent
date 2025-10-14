@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from ...core.simple_auth import get_current_user_from_token
+from ...core.jwt_auth import get_current_user_from_token
 
 router = APIRouter()
 

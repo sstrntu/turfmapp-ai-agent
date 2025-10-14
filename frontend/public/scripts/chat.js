@@ -1605,36 +1605,8 @@
         });
     }
 
-    // Left panel toggle
-    const lpToggle = document.getElementById('left-panel-toggle');
-    const lp = document.getElementById('left-panel');
-    const lpClose = document.getElementById('left-panel-close');
-    if (lpToggle && lp) {
-        function setLeftPanel(open) {
-            lp.classList.toggle('open', open);
-            lp.setAttribute('aria-hidden', open ? 'false' : 'true');
-            lpToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-            // Toggle body class to shift main content like ChatGPT
-            document.body.classList.toggle('panel-open', open);
-        }
-        lpToggle.addEventListener('click', function(e){
-            e.preventDefault();
-            e.stopPropagation();
-            const isCurrentlyOpen = lp.classList.contains('open');
-            setLeftPanel(!isCurrentlyOpen);
-        });
-        lpClose?.addEventListener('click', function(){ setLeftPanel(false); });
-        document.addEventListener('keydown', function(e){ if (e.key === 'Escape') setLeftPanel(false); });
-
-        // Add global click handler to close panel when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!lp.classList.contains('open')) return;
-            const target = e.target;
-            if (!lp.contains(target) && target !== lpToggle && !lpToggle.contains(target)) {
-                setLeftPanel(false);
-            }
-        });
-    }
+    // Left panel toggle - MOVED TO ui.js for consistency across all pages
+    // The sidebar/hamburger menu is now initialized in scripts/ui.js
 
     // Panel actions: New chat + conversation history
     (function(){

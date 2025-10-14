@@ -1,16 +1,21 @@
 """
-Simple Authentication Module
+JWT Authentication Module
 
-Provides basic JWT token validation for testing and fallback authentication.
+Provides basic JWT token validation for development and fallback authentication.
 Following code.md standards with proper type hints and docstrings.
 """
 
 from __future__ import annotations
 
+import logging
+
 import os
 import jwt
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Header
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 def get_current_user_from_token(authorization: str = Header(None)) -> Dict[str, Any]:
@@ -49,7 +54,7 @@ def get_current_user_from_token(authorization: str = Header(None)) -> Dict[str, 
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
         
-        print(f"🔑 Authenticated user: {user_id} ({email})")
+        logger.info(f"🔑 Authenticated user: {user_id} ({email})")
         
         return {
             "id": user_id,
@@ -58,14 +63,14 @@ def get_current_user_from_token(authorization: str = Header(None)) -> Dict[str, 
         }
     except jwt.InvalidTokenError:
         # Fallback for development/testing with fixed test user
-        print("⚠️  JWT decode failed, using test user")
+        logger.info("⚠️  JWT decode failed, using test user")
         return {
             "id": "c36d55aa-1704-4fdf-a1e5-55e8fce8656f",
             "email": "sira@turfmapp.com", 
             "name": "Test User"
         }
     except Exception as e:
-        print(f"Auth error: {e}")
+        logger.info(f"Auth error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -113,7 +118,7 @@ def create_test_token(user_id: str, email: str, name: Optional[str] = None) -> s
         "exp": 9999999999   # Far future expiry for testing
     }
     
-    # Use a simple secret for testing
+    # Use a predictable secret for testing
     secret = os.getenv("JWT_SECRET", "test-secret-key")
     
     return jwt.encode(payload, secret, algorithm="HS256")
