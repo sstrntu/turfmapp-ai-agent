@@ -23,9 +23,154 @@
     const menuToggle = document.getElementById('menu-toggle');
     const menuPanel = document.getElementById('top-menu');
     const hasChat = !!(list && form && input);
+    const MODEL_LABELS = {
+        "gpt-4o": "GPT-4o",
+        "gpt-4o-mini": "GPT-4o Mini",
+        "gpt-5-mini": "GPT-5 Mini",
+        "claude-3-haiku-20240307": "Claude 3 Haiku",
+        "claude-sonnet-4-20250514": "Claude Sonnet 4",
+        "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
+        "claude-opus-4-1-20250805": "Claude Opus 4.1"
+    };
+
+    function normalizeMetadata(meta) {
+        if (!meta) {
+            return {};
+        }
+        if (typeof meta === 'string') {
+            try {
+                return JSON.parse(meta);
+            } catch (_) {
+                return {};
+            }
+        }
+        return meta;
+    }
+
+    function inferProvider(modelId, provider) {
+        if (provider) {
+            return provider;
+        }
+        if (!modelId) {
+            return undefined;
+        }
+        if (modelId.startsWith('claude')) {
+            return 'anthropic';
+        }
+        if (modelId.startsWith('gpt') || modelId.startsWith('o1')) {
+            return 'openai';
+        }
+        return provider;
+    }
+
+    function buildModelInfo(modelId, provider) {
+        const resolvedProvider = inferProvider(modelId, provider);
+        const label = MODEL_LABELS[modelId] || modelId || '';
+        const providerLabel = resolvedProvider
+            ? resolvedProvider.charAt(0).toUpperCase() + resolvedProvider.slice(1)
+            : '';
+        if (!label && !providerLabel) {
+            return null;
+        }
+        return {
+            id: modelId || null,
+            provider: resolvedProvider || null,
+            label: label || providerLabel || '',
+            display: providerLabel ? `${label || modelId} • ${providerLabel}` : (label || modelId)
+        };
+    }
+
+    function renderModelBadge(container, modelInfo) {
+        if (!container || !modelInfo || !modelInfo.display) {
+            return;
+        }
+        if (container.querySelector('.model-badge')) {
+            return;
+        }
+        const badge = document.createElement('div');
+        badge.className = 'model-badge';
+        badge.textContent = modelInfo.display;
+        badge.style.marginBottom = '10px';
+        badge.style.padding = '4px 10px';
+        badge.style.display = 'inline-flex';
+        badge.style.alignItems = 'center';
+        badge.style.gap = '6px';
+        badge.style.fontSize = '12px';
+        badge.style.fontWeight = '600';
+        badge.style.borderRadius = '999px';
+        badge.style.background =
+            modelInfo.provider === 'anthropic'
+                ? 'rgba(251, 196, 141, 0.18)'
+                : modelInfo.provider === 'google_mcp'
+                    ? 'rgba(66, 133, 244, 0.15)'
+                    : 'rgba(147, 197, 253, 0.18)';
+        badge.style.color =
+            modelInfo.provider === 'anthropic'
+                ? 'rgba(251, 196, 141, 0.95)'
+                : modelInfo.provider === 'google_mcp'
+                    ? 'rgba(66, 133, 244, 0.95)'
+                    : 'rgba(147, 197, 253, 0.95)';
+        badge.style.letterSpacing = '0.3px';
+        badge.style.textTransform = 'uppercase';
+        badge.style.alignSelf = 'flex-start';
+        container.prepend(badge);
+    }
 
     // Conversation tracking
     let currentConversationId = null;
+    let modelIndicatorEl = null;
+
+    function ensureModelIndicator() {
+        if (!hasChat || !form) {
+            return null;
+        }
+        if (!modelIndicatorEl) {
+            modelIndicatorEl = document.createElement('div');
+            modelIndicatorEl.id = 'tm-model-indicator';
+            modelIndicatorEl.style.display = 'none';
+            modelIndicatorEl.style.margin = '0 0 12px 0';
+            modelIndicatorEl.style.padding = '6px 12px';
+            modelIndicatorEl.style.fontSize = '12px';
+            modelIndicatorEl.style.fontWeight = '600';
+            modelIndicatorEl.style.letterSpacing = '0.3px';
+            modelIndicatorEl.style.textTransform = 'uppercase';
+            modelIndicatorEl.style.borderRadius = '999px';
+            modelIndicatorEl.style.background = 'rgba(255,255,255,0.08)';
+            modelIndicatorEl.style.color = 'rgba(255,255,255,0.85)';
+            modelIndicatorEl.style.alignSelf = 'flex-start';
+            const formParent = form.parentNode;
+            if (formParent) {
+                formParent.insertBefore(modelIndicatorEl, form);
+            }
+        }
+        return modelIndicatorEl;
+    }
+
+    function updateModelIndicator(modelInfo) {
+        const el = ensureModelIndicator();
+        if (!el) return;
+        if (!modelInfo || !modelInfo.display) {
+            el.style.display = 'none';
+            el.textContent = '';
+            return;
+        }
+        el.style.display = 'inline-flex';
+        el.textContent = `Model • ${modelInfo.display}`;
+        if (modelInfo.provider === 'anthropic') {
+            el.style.background = 'rgba(251, 196, 141, 0.18)';
+            el.style.color = 'rgba(251, 196, 141, 0.95)';
+        } else if (modelInfo.provider === 'google_mcp') {
+            el.style.background = 'rgba(66, 133, 244, 0.15)';
+            el.style.color = 'rgba(66, 133, 244, 0.95)';
+        } else {
+            el.style.background = 'rgba(147, 197, 253, 0.18)';
+            el.style.color = 'rgba(147, 197, 253, 0.95)';
+        }
+    }
+
+    if (hasChat) {
+        updateModelIndicator(buildModelInfo(localStorage.getItem('tm_model'), null));
+    }
 
     // Make these functions globally accessible for conversation loading
     function scrollToBottom() {
@@ -60,18 +205,18 @@
         // Helper to robustly extract sources from metadata
         function extractSources(meta) {
             try {
-                if (!meta || typeof meta !== 'object') return [];
-                if (Array.isArray(meta.sources)) return meta.sources;
-                if (typeof meta.sources === 'string') {
+                const normalized = normalizeMetadata(meta);
+                if (!normalized || typeof normalized !== 'object') return [];
+                if (Array.isArray(normalized.sources)) return normalized.sources;
+                if (typeof normalized.sources === 'string') {
                     try {
-                        const parsed = JSON.parse(meta.sources);
+                        const parsed = JSON.parse(normalized.sources);
                         if (Array.isArray(parsed)) return parsed;
                     } catch (_) {}
                 }
-                // Fallback: find case-insensitive key that equals "sources"
-                const key = Object.keys(meta).find(function(k){ return k && k.trim().toLowerCase() === 'sources'; });
+                const key = Object.keys(normalized).find(function(k){ return k && k.trim().toLowerCase() === 'sources'; });
                 if (key) {
-                    const val = meta[key];
+                    const val = normalized[key];
                     if (Array.isArray(val)) return val;
                     if (typeof val === 'string') {
                         try {
@@ -101,8 +246,14 @@
 
                 list.appendChild(msg);
 
+                const normalizedMeta = normalizeMetadata(metadata);
+                const modelInfo = buildModelInfo(normalizedMeta.model, normalizedMeta.provider);
+                if (modelInfo) {
+                    renderModelBadge(msg, modelInfo);
+                }
+
                 // Add sources if available
-                var extracted = extractSources(metadata);
+                var extracted = extractSources(normalizedMeta);
                 //console.log('Sources check:', {
                 //     sources: metadata.sources,
                 //     isArray: Array.isArray(metadata.sources),
@@ -113,9 +264,9 @@
                 // });
 
                 // Render reasoning first (if any), then sources last
-                if (metadata.reasoning) {
+                if (normalizedMeta.reasoning) {
                     //console.log('Adding reasoning to loaded message');
-                    renderReasoning(msg, metadata.reasoning);
+                    renderReasoning(msg, normalizedMeta.reasoning);
                 }
 
                 if (Array.isArray(extracted) && extracted.length > 0) {
@@ -523,6 +674,45 @@
         }
 
     if (hasChat) {
+        async function hydrateUserPreferences() {
+            try {
+                if (!window.supabase || !window.supabase.isSessionValid()) {
+                    return;
+                }
+                const token = window.supabase.getAccessToken();
+                if (!token) {
+                    return;
+                }
+                // Load preferences from database via settings endpoint
+                const response = await fetch('/api/v1/settings/preferences', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (!response.ok) {
+                    return;
+                }
+                const preferences = await response.json();
+                if (preferences?.default_model) {
+                    // Update localStorage as cache, but database is source of truth
+                    localStorage.setItem('tm_model', preferences.default_model);
+                    updateModelIndicator(buildModelInfo(preferences.default_model, preferences.provider));
+                } else {
+                    // Fallback to localStorage if no database preference
+                    updateModelIndicator(buildModelInfo(localStorage.getItem('tm_model'), null));
+                }
+                if (preferences?.system_prompt) {
+                    localStorage.setItem('tm_system_prompt', preferences.system_prompt);
+                }
+            } catch (error) {
+                console.warn('Failed to hydrate user preferences:', error);
+                // Fallback to localStorage on error
+                updateModelIndicator(buildModelInfo(localStorage.getItem('tm_model'), null));
+            }
+        }
+
+        hydrateUserPreferences();
+
         function createAssistantPlaceholder() {
             const msg = document.createElement('div');
             // Start as a compact typing bubble; promote to full-width on finish()
@@ -550,7 +740,7 @@
             scrollToBottom();
 
             return {
-                finish(answer, reasoning, sources) {
+                finish(answer, reasoning, sources, modelInfo) {
                     // Promote to full-width assistant panel and render content
                     msg.classList.remove('typing-bubble');
                     msg.classList.add('assistant-message');
@@ -559,16 +749,24 @@
                     let content = String(answer || '');
                     content = this.normalizeMarkdown(content);
 
+                    if (modelInfo) {
+                        renderModelBadge(msg, modelInfo);
+                    }
+
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.className = 'assistant-content-wrapper';
+                    msg.appendChild(contentWrapper);
+
                     const looksLikeNews = Array.isArray(sources) && sources.length > 0 || /\bBreakdown:\b/i.test(content);
 
                     if (looksLikeNews) {
-                        this.renderStructuredMessage(msg, content, sources);
+                        this.renderStructuredMessage(contentWrapper, content, sources);
                         this.renderReasoning(msg, reasoning);
                         renderSources(msg, sources);  // Use global function
                         scrollToBottom();
                     } else {
                         // Always render full answer without collapsing
-                        this.typewriterEffect(msg, content, () => {
+                        this.typewriterEffect(contentWrapper, content, () => {
                             this.renderReasoning(msg, reasoning);
                             renderSources(msg, sources);  // Use global function
                             scrollToBottom();
@@ -964,7 +1162,7 @@
         function loadAllSettings() {
             try {
                 return {
-                    model: localStorage.getItem('tm_model') || 'gpt-5-mini',
+                    model: localStorage.getItem('tm_model') || 'gpt-4o',
                     developerInstructions: '',
                     assistantContext: '',
                     textFormat: localStorage.getItem('tm_text_format') || 'text',
@@ -989,7 +1187,7 @@
 
         function getDefaultSettings() {
             return {
-                model: 'gpt-5-mini',
+                model: 'gpt-4o',
                 developerInstructions: '',
                 assistantContext: '',
                 textFormat: 'text',
@@ -1467,8 +1665,11 @@
             input.value = '';
             autoResizeTextarea(input);
 
-            // Load all settings from localStorage
+            // Get model from localStorage (which was synced from database on page load)
+            // Note: Backend will use database value if available, localStorage is just for UI display
             const settings = loadAllSettings();
+            const modelToUse = settings.model; // This comes from localStorage, but backend uses database
+            updateModelIndicator(buildModelInfo(modelToUse, null));
 
             // create live placeholder with thinking dots
             var placeholder = createAssistantPlaceholder();
@@ -1488,7 +1689,7 @@
             const requestBody = {
                 message: value,
                 conversation_id: currentConversationId, // Use current conversation or null for new
-                model: settings.model || "gpt-5-mini",
+                model: settings.model || "gpt-4o",
                 tools: tools.length > 0 ? tools : null,
                 tool_choice: isWebSearch ? 'required' : 'auto',
                 assistant_context: systemInstructions, // Add system instructions to guide tool usage
@@ -1554,7 +1755,9 @@
                         //console.log('🔍 Sources type:', typeof sources);
                         //console.log('🔍 Sources length:', Array.isArray(sources) ? sources.length : 'Not array');
 
-                        placeholder.finish(messageContent, reasoning, sources);
+                        const modelInfo = buildModelInfo(res.model || settings.model, res.provider);
+                        placeholder.finish(messageContent, reasoning, sources, modelInfo);
+                        updateModelIndicator(modelInfo);
 
                         // Clear attachments and reset tool buttons after successful response
                         attachments = [];
@@ -1835,6 +2038,17 @@
                         renderLoadedMessage(msg.role, msg.content, parsedMetadata);
                     }
                 });
+
+                // Scroll to bottom and focus input after loading conversation
+                scrollToBottom();
+                const chatInput = document.getElementById('chat-input');
+                if (chatInput) {
+                    // Small delay to ensure DOM is fully rendered
+                    setTimeout(() => {
+                        chatInput.focus();
+                        scrollToBottom();
+                    }, 100);
+                }
 
             } catch (error) {
                 console.error('Error loading conversation:', error);

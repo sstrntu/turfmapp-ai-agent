@@ -289,15 +289,23 @@ export class TurfmappChatAdapter {
     // Get attachments from global window object if available
     const attachments = window.pendingAttachments || null;
 
+    // Use the selected model from the dropdown if available
+    const selectedModel = window.selectedModel || settings.model || "gpt-4o";
+    console.log('🔍 Adapter: Using model:', selectedModel);
+    console.log('🔍 Adapter: window.selectedModel =', window.selectedModel);
+    console.log('🔍 Adapter: settings.model =', settings.model);
+
     const payload = {
       message: userText,
       conversation_id: this.conversationId,
-      model: settings.model || "gpt-4o",
+      model: selectedModel,
       tools: tools.length > 0 ? tools : null,
       tool_choice: forceFlags.search ? "required" : "auto",
       assistant_context: systemInstructions || settings.assistantContext || null,
       attachments: attachments,
     };
+
+    console.log('🔍 Adapter: Full payload:', JSON.stringify(payload, null, 2));
 
     const response = await fetch(CHAT_ENDPOINT, {
       method: "POST",

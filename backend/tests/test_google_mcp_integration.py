@@ -6,7 +6,7 @@ This module tests the Google MCP client and its integration with the chat system
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 from typing import Dict, Any, List
 
 from app.services.mcp_client import google_mcp_client
@@ -141,20 +141,28 @@ class TestGoogleMCPChatIntegration:
         """Test chat request with Gmail tool explicitly activated."""
         chat_service = EnhancedChatService()
         
-        # Mock Google MCP response
-        mock_mcp_response = {
-            "success": True,
-            "response": "📧 **Gmail**: You have 3 new emails:\n1. From: boss@company.com - Subject: Urgent: Project Update\n2. From: client@business.com - Subject: Meeting Confirmation",
-            "tools_used": ["gmail_recent"],
-            "sources": []
+        mock_api_response = {
+            "id": "resp-555",
+            "status": "completed",
+            "output": [
+                {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "Here are your latest emails."
+                        }
+                    ]
+                }
+            ],
+            "output_text": "Here are your latest emails."
         }
         
-        with patch.object(chat_service, '_handle_google_mcp_request', new_callable=AsyncMock) as mock_handle, \
+        with patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api, \
              patch.object(chat_service, 'create_conversation', return_value="conv-123"), \
              patch.object(chat_service, 'get_conversation_history', return_value=[]), \
              patch.object(chat_service, 'save_message_to_conversation', return_value=True):
             
-            mock_handle.return_value = mock_mcp_response
+            mock_api.return_value = mock_api_response
             
             # Simulate tools parameter with Gmail activated
             result = await chat_service.process_chat_request(
@@ -171,28 +179,43 @@ class TestGoogleMCPChatIntegration:
                 }]
             )
             
-            assert result["assistant_message"]["content"] == mock_mcp_response["response"]
-            assert "📧 **Gmail**" in result["assistant_message"]["content"]
-            mock_handle.assert_called_once()
+            assert "latest emails" in result["assistant_message"]["content"]
+            assert result["provider"] == "openai"
+            assert result["model"] == "gpt-4o"
+            mock_api.assert_awaited_once()
+
+            tools_sent = mock_api.await_args.kwargs.get("tools") or []
+            tool_names = {tool.get("function", {}).get("name") for tool in tools_sent if isinstance(tool, dict)}
+            assert "gmail_recent" in tool_names
+            assert "gmail_search" in tool_names
 
     @pytest.mark.asyncio
     async def test_chat_with_multiple_google_tools(self):
         """Test chat request with multiple Google tools activated."""
         chat_service = EnhancedChatService()
         
-        mock_mcp_response = {
-            "success": True,
-            "response": "📧 **Gmail**: 2 new emails\n\n📅 **Calendar**: Meeting at 3pm today\n\n💾 **Drive**: 5 recent files",
-            "tools_used": ["gmail_recent", "calendar_upcoming", "drive_list_files"],
-            "sources": []
+        mock_api_response = {
+            "id": "resp-777",
+            "status": "completed",
+            "output": [
+                {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "Let me know which Google service you'd like to explore."
+                        }
+                    ]
+                }
+            ],
+            "output_text": "Let me know which Google service you'd like to explore."
         }
         
-        with patch.object(chat_service, '_handle_google_mcp_request', new_callable=AsyncMock) as mock_handle, \
+        with patch.object(chat_service, 'call_responses_api', new_callable=AsyncMock) as mock_api, \
              patch.object(chat_service, 'create_conversation', return_value="conv-123"), \
              patch.object(chat_service, 'get_conversation_history', return_value=[]), \
              patch.object(chat_service, 'save_message_to_conversation', return_value=True):
             
-            mock_handle.return_value = mock_mcp_response
+            mock_api.return_value = mock_api_response
             
             result = await chat_service.process_chat_request(
                 message="Show me my emails, calendar, and files",
@@ -208,19 +231,22 @@ class TestGoogleMCPChatIntegration:
                 }]
             )
             
-            assert "📧 **Gmail**" in result["assistant_message"]["content"]
-            assert "📅 **Calendar**" in result["assistant_message"]["content"] 
-            assert "💾 **Drive**" in result["assistant_message"]["content"]
+            assert result["provider"] == "openai"
+            assert result["model"] == "gpt-4o"
+            mock_api.assert_awaited_once()
+
+            tool_names = {
+                tool.get("function", {}).get("name")
+                for tool in (mock_api.await_args.kwargs.get("tools") or [])
+                if isinstance(tool, dict)
+            }
+            assert {"gmail_recent", "calendar_upcoming_events", "drive_list_files"}.issubset(tool_names)
 
     @pytest.mark.asyncio
-    async def test_google_mcp_fallback_to_regular_chat(self):
-        """Test fallback to regular chat when Google MCP fails."""
+    async def test_google_mcp_request_routes_through_ai(self):
+        """Google MCP flag should allow AI to decide which tools to call."""
         chat_service = EnhancedChatService()
         
-        # Mock MCP failure
-        mock_mcp_response = {"success": False, "response": "Google services unavailable"}
-        
-        # Mock regular API response
         mock_api_response = {
             "id": "resp-789",
             "status": "completed", 
@@ -233,7 +259,6 @@ class TestGoogleMCPChatIntegration:
              patch.object(chat_service, 'get_conversation_history', return_value=[]), \
              patch.object(chat_service, 'save_message_to_conversation', return_value=True):
             
-            mock_handle.return_value = mock_mcp_response
             mock_api.return_value = mock_api_response
             
             result = await chat_service.process_chat_request(
@@ -246,8 +271,10 @@ class TestGoogleMCPChatIntegration:
                 }]
             )
             
-            # Should fall back to regular API call
+            mock_handle.assert_not_awaited()
             assert "can't access your personal Gmail" in result["assistant_message"]["content"]
+            assert result["provider"] == "openai"
+            assert result["model"] == "gpt-4o"
             mock_api.assert_called_once()
 
     @pytest.mark.asyncio

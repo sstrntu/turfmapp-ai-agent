@@ -23,25 +23,194 @@ Recent improvements (August 2025):
 
 from __future__ import annotations
 
-import os
 import asyncio
-import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterable
 from datetime import datetime, timezone
 import uuid
-import httpx
+import json
+import re
+from collections import deque
 
-from ..database import ConversationService, UserService
-from ..utils.chat_utils import stringify_text, extract_sources_from_response, format_chat_history
-from ..api.v1.preferences import user_preferences
-from .tool_manager import tool_manager
+from fastapi import HTTPException
+from ..database import ConversationService
+from ..utils.chat_utils import format_chat_history
 from .mcp_client import google_mcp_client, get_all_google_tools
 from .chat_api_client import chat_api_client
 from .chat_tool_handler import ChatToolHandler
+from .anthropic_client import anthropic_client
+from .chat_instructions import build_system_instructions
+from urllib.parse import urlparse
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+_URL_PATTERN = re.compile(r"https?://[^\s\]\)\"'>]+")
+
+
+def _build_source_entry(url: Optional[str], title: Optional[str] = None) -> Optional[Dict[str, str]]:
+    """Build a normalized source entry from URL and title."""
+    if not isinstance(url, str):
+        return None
+
+    url = url.strip()
+    if not url:
+        return None
+
+    if url.startswith("//"):
+        url = f"https:{url}"
+    elif not url.lower().startswith(("http://", "https://")):
+        url = f"https://{url}"
+
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+
+    site = parsed.netloc
+    display_title = title.strip() if isinstance(title, str) and title.strip() else site
+
+    return {
+        "url": url,
+        "title": display_title,
+        "site": site,
+        "favicon": f"https://www.google.com/s2/favicons?domain={site}&sz=64",
+    }
+
+
+def _dedupe_sources(sources: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Deduplicate sources, preserving order and limiting count."""
+    unique: List[Dict[str, str]] = []
+    seen = set()
+
+    for source in sources:
+        url = source.get("url")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        unique.append(source)
+        if len(unique) >= 8:
+            break
+
+    return unique
+
+
+def _extract_sources_from_text(text: str) -> List[Dict[str, str]]:
+    """Extract HTTP(S) URLs from plain text and convert to sources."""
+    if not isinstance(text, str):
+        return []
+
+    matches = _URL_PATTERN.findall(text)
+    sources = []
+    for match in matches:
+        cleaned = match.rstrip(".,);]")
+        source = _build_source_entry(cleaned)
+        if source:
+            sources.append(source)
+    return sources
+
+
+def _extract_sources_from_object(obj: Any) -> List[Dict[str, str]]:
+    """Recursively extract source entries from nested data structures."""
+    sources: List[Dict[str, str]] = []
+    queue: deque[Any] = deque([obj])
+
+    while queue:
+        current = queue.popleft()
+
+        if isinstance(current, dict):
+            url = current.get("url") or current.get("link") or current.get("href")
+            title = current.get("title") or current.get("name") or current.get("headline") or current.get("text")
+
+            source = _build_source_entry(url, title)
+            if source:
+                sources.append(source)
+
+            for value in current.values():
+                if isinstance(value, (list, dict, str)):
+                    queue.append(value)
+
+        elif isinstance(current, list):
+            for item in current:
+                if isinstance(item, (list, dict, str)):
+                    queue.append(item)
+
+        elif isinstance(current, str):
+            try:
+                parsed = json.loads(current)
+            except (TypeError, ValueError):
+                sources.extend(_extract_sources_from_text(current))
+            else:
+                queue.append(parsed)
+
+    return sources
+
+
+def _extract_sources_from_tool_result(tool_result: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Extract sources from a tool result payload."""
+    if not isinstance(tool_result, dict):
+        return []
+
+    candidate_values: List[Any] = []
+    for key in ("output", "content", "outputs", "results", "data", "value"):
+        value = tool_result.get(key)
+        if value:
+            candidate_values.append(value)
+
+    tool_info = tool_result.get("tool")
+    if isinstance(tool_info, dict):
+        for key in ("output", "outputs", "results"):
+            if tool_info.get(key):
+                candidate_values.append(tool_info[key])
+
+    sources: List[Dict[str, str]] = []
+    for candidate in candidate_values:
+        sources.extend(_extract_sources_from_object(candidate))
+
+    return _dedupe_sources(sources)
+
+
+def _extract_sources_from_claude_response(response: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Extract sources from Claude response payload."""
+    sources: List[Dict[str, str]] = []
+
+    content_blocks = response.get("content", [])
+    if isinstance(content_blocks, list):
+        for block in content_blocks:
+            if not isinstance(block, dict):
+                continue
+
+            citations = block.get("citations") or block.get("metadata", {}).get("citations")
+            if isinstance(citations, list):
+                for citation in citations:
+                    if isinstance(citation, dict):
+                        source = _build_source_entry(
+                            citation.get("url") or citation.get("source_url") or citation.get("source"),
+                            citation.get("title") or citation.get("text"),
+                        )
+                        if source:
+                            sources.append(source)
+
+            if block.get("type") == "tool_result":
+                sources.extend(_extract_sources_from_tool_result(block))
+
+            sources.extend(_extract_sources_from_object(block.get("search_results")))
+
+    top_level_citations = response.get("citations")
+    if isinstance(top_level_citations, list):
+        for citation in top_level_citations:
+            if isinstance(citation, dict):
+                source = _build_source_entry(
+                    citation.get("url") or citation.get("source_url") or citation.get("source"),
+                    citation.get("title") or citation.get("text"),
+                )
+                if source:
+                    sources.append(source)
+
+    return _dedupe_sources(sources)
 
 
 class EnhancedChatService:
@@ -147,15 +316,38 @@ class EnhancedChatService:
         self.fallback_conversations[conversation_id] = []
         return conversation_id
     
-    def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
-        """Get user preferences for chat configuration."""
-        return user_preferences.get(user_id, {
+    async def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
+        """Get user preferences for chat configuration from database."""
+        try:
+            # Try to get preferences from database first
+            from ..database import execute_query_one
+            query = """
+                SELECT default_model, system_prompt, settings
+                FROM turfmapp_agent.user_preferences
+                WHERE user_id = $1
+            """
+            db_prefs = await execute_query_one(query, user_id)
+
+            if db_prefs:
+                return {
+                    "model": db_prefs.get("default_model", "gpt-4o"),
+                    "system_prompt": db_prefs.get("system_prompt"),
+                    "include_reasoning": False,
+                    "text_format": "text",
+                    "text_verbosity": "medium",
+                    "reasoning_effort": "medium"
+                }
+        except Exception as e:
+            logger.warning(f"Failed to load user preferences from database: {e}")
+
+        # Return default preferences if database query fails
+        return {
             "model": "gpt-4o",
             "include_reasoning": False,
             "text_format": "text",
             "text_verbosity": "medium",
             "reasoning_effort": "medium"
-        })
+        }
     
     async def _handle_google_mcp_request(
         self,
@@ -189,6 +381,67 @@ class EnhancedChatService:
         return await chat_api_client.call_responses_api(
             messages, model, include_reasoning, **kwargs
         )
+
+    async def call_claude_api(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        include_reasoning: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Call Anthropic Claude via the shared client with optional tool support."""
+        if not anthropic_client.api_key:
+            raise HTTPException(
+                status_code=500,
+                detail="Anthropic API key not configured; Claude models unavailable."
+            )
+
+        claude_tools = kwargs.get("tools") or []
+        # Build the same consolidated instructions we provide to other providers
+        instructions = build_system_instructions(
+            tools=claude_tools,
+            developer_instructions=kwargs.get("developer_instructions"),
+            assistant_context=kwargs.get("assistant_context"),
+        )
+
+        temperature = kwargs.get("temperature", 0.7)
+        max_tokens = kwargs.get("max_tokens", 4096)
+
+        try:
+            response = await anthropic_client.call_messages_api(
+                messages,
+                model=model,
+                system=instructions or None,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                tools=claude_tools or None,
+            )
+        except Exception as error:
+            logger.error("❌ Claude API call failed: %s", error)
+            raise HTTPException(
+                status_code=500,
+                detail="Claude API request failed"
+            ) from error
+
+        sources = _extract_sources_from_claude_response(response)
+
+        text_blocks = [
+            block.get("text", "")
+            for block in response.get("content", [])
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+
+        output_text = "\n\n".join(block for block in text_blocks if block)
+
+        return {
+            "provider": "anthropic",
+            "output_text": output_text,
+            "output": [],
+            "raw_response": response,
+            "content": response.get("content"),
+            "usage": response.get("usage"),
+            "sources": sources,
+        }
     
     async def process_chat_request(
         self, 
@@ -206,13 +459,18 @@ class EnhancedChatService:
         
         # Get conversation history
         history = await self.get_conversation_history(conversation_id, user_id)
-        
-        # Get user preferences
-        preferences = self.get_user_preferences(user_id)
-        
+
+        # Get user preferences from database
+        preferences = await self.get_user_preferences(user_id)
+        logger.info(f"🔍 DEBUG: User preferences from DB: {preferences}")
+
         # Merge preferences with request parameters
         model = kwargs.get("model", preferences.get("model", "gpt-4o"))
         include_reasoning = kwargs.get("include_reasoning", preferences.get("include_reasoning", False))
+        logger.info(f"🔍 DEBUG: Model from kwargs: {kwargs.get('model')}")
+        logger.info(f"🔍 DEBUG: Model from preferences: {preferences.get('model')}")
+        logger.info(f"🔍 DEBUG: Final model to use: {model}")
+        logger.info(f"🔍 DEBUG: User ID: {user_id}")
         
         # Format messages for API with smart context management
         formatted_history = format_chat_history(history, max_context=20)
@@ -226,106 +484,68 @@ class EnhancedChatService:
             conversation_id, user_id, "user", message
         )
         
-        # Check if Google MCP tools are explicitly requested
-        google_mcp_tools = None
-        logger.debug(f"🔍 kwargs keys: {list(kwargs.keys())}")
-        logger.debug(f"🔍 tools in kwargs: {'tools' in kwargs}")
-        if 'tools' in kwargs:
-            logger.debug(f"🔍 tools content: {kwargs['tools']}")
+        raw_tools = kwargs.get("tools") or []
+        expanded_tools: List[Dict[str, Any]] = []
 
-        if 'tools' in kwargs and kwargs['tools']:
-            for tool in kwargs['tools']:
-                logger.debug(f"🔍 Processing tool: {tool}")
-                if tool.get('type') == 'google_mcp':
-                    google_mcp_tools = tool.get('enabled_tools', {})
-                    logger.debug(f"🔍 Found Google MCP tools: {google_mcp_tools}")
-                    break
+        for tool in raw_tools:
+            if isinstance(tool, dict) and tool.get("type") == "google_mcp":
+                enabled = tool.get("enabled_tools") or {}
+                expanded_tools.extend(self.tool_handler.build_google_function_tools(enabled))
+            else:
+                expanded_tools.append(tool)
 
-        logger.debug(f"🔍 Final google_mcp_tools: {google_mcp_tools}")
-        
-        if google_mcp_tools and any(google_mcp_tools.values()):
-            logger.debug(f"🔧 Google MCP tools explicitly requested: {google_mcp_tools}")
-            
-            # Handle Google MCP tools directly
-            try:
-                mcp_result = await self._handle_google_mcp_request(
-                    user_message=message,
-                    conversation_history=formatted_history,
-                    user_id=user_id,
-                    enabled_tools=google_mcp_tools,
-                    **kwargs
-                )
-                
-                if mcp_result.get("success"):
-                    assistant_content = mcp_result.get("response", "")
-                    
-                    # Save assistant message
-                    await self.save_message_to_conversation(
-                        conversation_id, user_id, "assistant", assistant_content,
-                        {
-                            "google_mcp_used": True,
-                            "enabled_tools": google_mcp_tools,
-                            "tools_used": mcp_result.get("tools_used", []),
-                            "model": model
-                        }
-                    )
-                    
-                    # Create response messages
-                    user_message = {
-                        "id": str(uuid.uuid4()),
-                        "role": "user", 
-                        "content": message,
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    
-                    assistant_message = {
-                        "id": str(uuid.uuid4()),
-                        "role": "assistant",
-                        "content": assistant_content,
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    
-                    return {
-                        "conversation_id": conversation_id,
-                        "user_message": user_message,
-                        "assistant_message": assistant_message,
-                        "reasoning": None,
-                        "sources": mcp_result.get("sources", [])
-                    }
-                else:
-                    logger.warning("❌ Google MCP failed, falling back to original behavior")
-            except Exception as e:
-                logger.error(f"❌ Google MCP error: {e}, falling back to original behavior")
+        tools_to_include = expanded_tools
+        is_claude_model = model.startswith("claude-")
 
-        # Use original behavior - direct API call like the original repo
-        logger.info("🚀 Using original behavior - calling Responses API directly")
-        
-        # Prepare tools for API call (from original repo logic - use web search tools if requested)
-        tools_to_include = kwargs.get("tools", [])
-        
-        # Call API directly (original repo behavior)
+        logger.info(
+            "🚀 🚀 🚀 ROUTING CHAT REQUEST via %s model: %s 🚀 🚀 🚀",
+            "Claude" if is_claude_model else "OpenAI",
+            model,
+        )
+        logger.info(f"🔍 DEBUG: is_claude_model = {is_claude_model}")
+        logger.info(f"🔍 DEBUG: model value = '{model}'")
+        logger.info(f"🔍 DEBUG: model.startswith('claude-') = {model.startswith('claude-')}")
+
         try:
-            api_response = await self.call_responses_api(
-                messages=all_messages,
-                model=model,
-                include_reasoning=include_reasoning,
-                tools=tools_to_include,
-                **{k: v for k, v in kwargs.items() if k not in ["model", "include_reasoning", "tools"]}
-            )
-            
-            # Extract assistant response from Responses API format (original repo logic)
+            if is_claude_model:
+                api_response = await self.call_claude_api(
+                    messages=all_messages,
+                    model=model,
+                    include_reasoning=include_reasoning,
+                    tools=tools_to_include,
+                    **{k: v for k, v in kwargs.items() if k not in ["model", "include_reasoning", "tools"]}
+                )
+            else:
+                api_response = await self.call_responses_api(
+                    messages=all_messages,
+                    model=model,
+                    include_reasoning=include_reasoning,
+                    tools=tools_to_include,
+                    **{k: v for k, v in kwargs.items() if k not in ["model", "include_reasoning", "tools"]}
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ AI model error: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to call AI model: {str(e)}"
+            ) from e
+
+        try:
+            # Extract assistant response from model output
             assistant_content = ""
             reasoning = None
-            sources = []  # Initialize sources list
+            sources = list(api_response.get("sources", [])) if isinstance(api_response, dict) else []
             
-            # Parse Responses API output with debugging for GPT-5-mini
-            logger.debug(f"🔍 API Response for model {model}:", api_response)
+            # Parse API output with debugging
+            logger.debug("🔍 API Response for model %s: %s", model, api_response)
             
             # Check if there are any tool calls in the response
             if "tool_calls" in api_response:
-                logger.debug(f"🔧 Tool calls found in response: {api_response['tool_calls']}")
+                logger.debug("🔧 Tool calls found in response: %s", api_response["tool_calls"])
             else:
-                logger.debug(f"🔧 No tool calls found in response")
+                logger.debug("🔧 No tool calls found in response")
             
             # Check the output structure for function calls
             output_items = api_response.get("output", [])
@@ -333,6 +553,7 @@ class EnhancedChatService:
             
             # Handle function calls from the API response (original repo logic)
             function_calls = []
+            tool_results: List[Dict[str, Any]] = []
             for i, item in enumerate(output_items):
                 if isinstance(item, dict):
                     item_type = item.get("type")
@@ -343,6 +564,9 @@ class EnhancedChatService:
                     elif item_type == "tool_call":
                         logger.debug(f"🔧 Tool call found: {item}")
                         function_calls.append(item)
+                    elif item_type == "tool_result":
+                        logger.debug(f"🔧 Tool result found: {item}")
+                        tool_results.append(item)
                     elif item_type == "message":
                         content = item.get("content", [])
                         logger.debug(f"🔧 Message content: {content}")
@@ -362,26 +586,20 @@ class EnhancedChatService:
                                             logger.debug(f"🔧 Found {len(annotations)} annotations")
                                             for annotation in annotations:
                                                 if annotation.get("type") == "url_citation":
-                                                    url = annotation.get("url", "")
-                                                    title = annotation.get("title", "")
-                                                    if url:
-                                                        # Extract domain for favicon
-                                                        from urllib.parse import urlparse
-                                                        try:
-                                                            parsed = urlparse(url)
-                                                            domain = parsed.netloc
-                                                            
-                                                            source = {
-                                                                "url": url,
-                                                                "title": title if title else domain,
-                                                                "site": domain,
-                                                                "favicon": f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
-                                                            }
-                                                            sources.append(source)
-                                                            logger.debug(f"🔧 Added source: {domain}")
-                                                        except Exception as e:
-                                                            logger.error(f"❌ Failed to parse URL {url}: {e}")
+                                                    source = _build_source_entry(
+                                                        annotation.get("url", ""),
+                                                        annotation.get("title"),
+                                                    )
+                                                    if source:
+                                                        sources.append(source)
+                                                        logger.debug(f"🔧 Added annotated source: {source['site']}")
                                         break
+
+            for tool_item in tool_results:
+                extracted_sources = _extract_sources_from_tool_result(tool_item)
+                if extracted_sources:
+                    logger.debug(f"🔧 Extracted {len(extracted_sources)} sources from tool result")
+                    sources.extend(extracted_sources)
             
             # Only get default response text if we haven't set assistant_content from function calls
             if not assistant_content:
@@ -389,37 +607,10 @@ class EnhancedChatService:
             
             # Extract sources from URLs in text content (like original repo)
             if isinstance(assistant_content, str) and assistant_content and not sources:
-                import re
-                from urllib.parse import urlparse
-                
-                # Find URLs in the response text
-                raw_urls = re.findall(r"https?://[^\s)]+", assistant_content)
-                logger.debug(f"🔍 Found {len(raw_urls)} URLs in response text")
-                seen = set()
-                for u in raw_urls:
-                    cleaned = u.rstrip('.,);]')
-                    if cleaned in seen:
-                        continue
-                    seen.add(cleaned)
-                    try:
-                        parsed = urlparse(cleaned)
-                        if parsed.scheme in {"http", "https"} and parsed.netloc:
-                            source = {
-                                "url": cleaned,
-                                "title": parsed.netloc,
-                                "site": parsed.netloc,
-                                "favicon": f"https://www.google.com/s2/favicons?domain={parsed.netloc}&sz=64"
-                            }
-                            sources.append(source)
-                            logger.debug(f"🔧 Added URL source: {parsed.netloc}")
-                    except Exception as e:
-                        logger.error(f"❌ Failed to parse URL {cleaned}: {e}")
-                        continue
-                
-                # Limit sources
-                if sources:
-                    sources = sources[:8]
-                    logger.info(f"✅ Extracted {len(sources)} sources from URLs")
+                text_sources = _extract_sources_from_text(assistant_content)
+                if text_sources:
+                    logger.debug(f"🔍 Extracted {len(text_sources)} sources from assistant text")
+                    sources.extend(text_sources)
             
             # Handle incomplete responses (like GPT-5-mini hitting token limit)
             status = api_response.get("status")
@@ -429,6 +620,9 @@ class EnhancedChatService:
             # Extract reasoning if available
             if include_reasoning and "reasoning" in api_response:
                 reasoning = api_response["reasoning"]
+
+            if sources:
+                sources = _dedupe_sources(sources)
             
             logger.debug(f"🔍 Final assistant content length: {len(assistant_content) if assistant_content else 0}")
             
@@ -437,16 +631,23 @@ class EnhancedChatService:
             assistant_content = f"I apologize, but I encountered an error while processing your request: {str(e)}"
             reasoning = None
             sources = []
+            function_calls = []
         
         # Save assistant message
         await self.save_message_to_conversation(
-            conversation_id, user_id, "assistant", assistant_content,
+            conversation_id,
+            user_id,
+            "assistant",
+            assistant_content,
             {
                 "model": model,
+                "provider": "anthropic" if is_claude_model else "openai",
                 "include_reasoning": include_reasoning,
-                "original_api_used": True,
-                "sources": sources
-            }
+                "original_api_used": not is_claude_model,
+                "sources": sources,
+                "function_calls": function_calls,
+                "tool_calls": function_calls,
+            },
         )
         
         # Create response messages
@@ -469,7 +670,9 @@ class EnhancedChatService:
             "user_message": user_message,
             "assistant_message": assistant_message,
             "reasoning": reasoning,
-            "sources": sources
+            "sources": sources,
+            "model": model,
+            "provider": "anthropic" if is_claude_model else "openai"
         }
     
     def stringify_text(self, text) -> str:

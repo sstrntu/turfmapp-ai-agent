@@ -37,6 +37,20 @@ export const ChatThread = () => {
   const [activeTool, setActiveTool] = React.useState(null);
   const [placeholder, setPlaceholder] = React.useState('Type your message…');
   const [attachments, setAttachments] = React.useState([]);
+  const [selectedModel, setSelectedModel] = React.useState(() => {
+    return localStorage.getItem('tm_model') || 'gpt-4o';
+  });
+
+  // Available models
+  const models = [
+    { id: 'gpt-4o', name: 'GPT-4O', provider: 'OpenAI' },
+    { id: 'gpt-4o-mini', name: 'GPT-4O Mini', provider: 'OpenAI' },
+    { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', provider: 'Anthropic' },
+    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'Anthropic' },
+    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'Anthropic' },
+    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', provider: 'Anthropic' },
+  ];
 
   React.useEffect(() => {
     const node = listRef.current;
@@ -61,6 +75,10 @@ export const ChatThread = () => {
       return;
     }
 
+    // Store model selection globally so adapter can access it
+    window.selectedModel = selectedModel;
+    console.log('🔍 Frontend: Selected model for this request:', selectedModel);
+
     // Store attachments globally so adapter can access them
     if (attachments.length > 0) {
       window.pendingAttachments = attachments.map(att => ({
@@ -77,10 +95,39 @@ export const ChatThread = () => {
     delete window.pendingAttachments;
   };
 
+  const handleModelChange = async (event) => {
+    const newModel = event.target.value;
+    setSelectedModel(newModel);
+    localStorage.setItem('tm_model', newModel);
+    console.log('🔍 Frontend: Model changed to:', newModel);
+
+    // Also save to database
+    try {
+      const token = window?.supabase?.getAccessToken?.();
+      if (token) {
+        await fetch('/api/v1/settings/preferences', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ default_model: newModel })
+        });
+        console.log('✅ Model preference saved to database');
+      }
+    } catch (error) {
+      console.error('Failed to save model preference:', error);
+    }
+  };
+
   const handleKeyDown = (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       preventShiftEnter(event);
       if (!composerIsEmpty) {
+        // Store model selection globally so adapter can access it
+        window.selectedModel = selectedModel;
+        console.log('🔍 Frontend (Enter key): Selected model for this request:', selectedModel);
+
         // Store attachments globally so adapter can access them
         if (attachments.length > 0) {
           window.pendingAttachments = attachments.map(att => ({
@@ -100,6 +147,10 @@ export const ChatThread = () => {
   };
 
   const handleSuggestion = (suggestion) => {
+    // Store model selection globally so adapter can access it
+    window.selectedModel = selectedModel;
+    console.log('🔍 Frontend (Suggestion): Selected model for this request:', selectedModel);
+
     runtime.composer.setText(suggestion.text);
     runtime.composer.send();
   };
@@ -278,6 +329,20 @@ export const ChatThread = () => {
           </div>
 
           <div className="input-actions input-actions-below">
+            <div className="model-selector-container">
+              <select
+                className="model-selector"
+                value={selectedModel}
+                onChange={handleModelChange}
+                aria-label="Select AI model"
+              >
+                {models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name} • {model.provider}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               className="tool-btn"

@@ -16,7 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # New modular API structure
 from .api.v1.chat import router as chat_router_v1
-from .api.v1.preferences import router as preferences_router_v1
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
@@ -104,7 +103,6 @@ def get_frontend_config():
 
 # API v1 routes
 app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
-app.include_router(preferences_router_v1, prefix="/api/v1/preferences", tags=["preferences"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
 
 # Additional v1 routes

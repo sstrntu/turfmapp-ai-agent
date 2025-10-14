@@ -23,6 +23,8 @@ from typing import List, Dict, Any
 
 import httpx
 
+from .chat_instructions import build_system_instructions
+
 # Configure logger
 logger = logging.getLogger(__name__)
 
@@ -131,79 +133,14 @@ class ChatApiClient:
         else:
             logger.debug(f"🔧 No tools provided in API call")
 
-        # Add instructions for additional context
-        instructions = []
-
-        # Add critical tool usage rule at the top
-        instructions.append("""
-CRITICAL TOOL USAGE RULE:
-- Gmail, Drive, and Calendar tools are ONLY for personal data (emails, files, calendar events)
-- NEVER use these tools for general knowledge questions, sports scores, news, weather, or any non-personal data
-- For general knowledge questions, use web search or answer from your training data
-- Examples of what NOT to use Google tools for: "Who is the top scorer?", "What's the weather?", "Latest news"
-
-CONVERSATION CONTEXT RULES:
-1. The current user question is marked as "CURRENT USER QUESTION:" - THIS is what you must respond to
-2. Use conversation history for context, but ALWAYS address the current question directly
-3. Never return a previous answer when asked a new question, even if they seem similar
-4. For time-sensitive data (sports scores, news, weather), always perform fresh searches regardless of history
-5. If the current question asks about personal data (emails, calendar, files), use the appropriate tools even if similar questions were asked before
-""")
-
-        if "developer_instructions" in kwargs and kwargs["developer_instructions"]:
-            instructions.append(kwargs["developer_instructions"])
-        if "assistant_context" in kwargs and kwargs["assistant_context"]:
-            instructions.append(kwargs["assistant_context"])
-
-        # Add web search tool instructions if available
-        web_search_available = any(tool.get("type") == "web_search_preview" for tool in payload.get("tools", []))
-        if web_search_available:
-            web_search_instructions = """
-You have tools available. Use them when they would provide better, more current information than your training data. Use web search for current information: sports scores, news, weather, current season data, latest facts, or when users ask 'who is', 'what is the latest', 'this season', 'this year'."""
-            instructions.append(web_search_instructions)
-
-        # Add Google service tool instructions if available
-        google_tools_available = any(tool.get("name", "").startswith(("gmail_", "drive_", "calendar_")) for tool in payload.get("tools", []))
-        if google_tools_available:
-            google_instructions = f"""
-You have access to Google service tools (Gmail, Drive, Calendar) that can help users with their personal data.
-
-CRITICAL RULE: These tools are ONLY for personal data (emails, files, calendar events). NEVER use these tools for general knowledge questions, sports scores, news, weather, or any non-personal data queries.
-
-Gmail tools (ONLY for personal emails):
-- gmail_recent: Get recent Gmail messages
-- gmail_search: Search Gmail messages with query parameters
-- gmail_get_message: Get full content of a specific Gmail message
-- gmail_important: Get important/starred Gmail messages
-
-Drive tools (ONLY for personal files):
-- drive_list_files: List files in Google Drive
-- drive_create_folder: Create folder structure in Google Drive
-- drive_list_folder_files: List files in a specific Drive folder
-
-Calendar tools (ONLY for personal schedule):
-- calendar_list_events: List Google Calendar events
-- calendar_upcoming_events: Get upcoming calendar events
-
-Examples of when to use Google tools:
-- "Show me my recent emails"
-- "What files do I have in my Drive?"
-- "What's on my calendar today?"
-- "Find emails from John"
-
-Examples of when NOT to use Google tools:
-- "Who is the top scorer in J1?" (general knowledge - use web search instead)
-- "Who is the top J2 scorer in 2025 season?" (general knowledge - use web search instead)
-- "What is the capital of France?" (general knowledge)
-- "Tell me about the latest news" (general knowledge - use web search instead)
-- "What's the weather like?" (general knowledge - use web search instead)
-
-For general knowledge questions, use web search or answer from your training data.
-"""
-            instructions.append(google_instructions)
+        instructions = build_system_instructions(
+            tools=payload.get("tools"),
+            developer_instructions=kwargs.get("developer_instructions"),
+            assistant_context=kwargs.get("assistant_context"),
+        )
 
         if instructions:
-            payload["instructions"] = "\n\n".join(instructions)
+            payload["instructions"] = instructions
 
         # Add reasoning for o1 models
         if include_reasoning and model in ["o1", "o1-mini", "o1-preview"]:

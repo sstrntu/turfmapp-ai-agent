@@ -39,7 +39,17 @@ class TestSimpleChatIntegration:
         model_ids = [m["id"] for m in models]
         
         # These should be the actual models from the endpoint
-        expected_models = ["gpt-4o", "gpt-4o-mini", "o1", "o1-mini", "o1-preview"]
+        expected_models = [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "o1",
+            "o1-mini",
+            "o1-preview",
+            "claude-3-haiku-20240307",
+            "claude-sonnet-4-20250514",
+            "claude-sonnet-4-5-20250929",
+            "claude-opus-4-1-20250805",
+        ]
         for expected in expected_models:
             assert expected in model_ids, f"Expected model {expected} not found"
     
