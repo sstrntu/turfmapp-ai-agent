@@ -173,6 +173,225 @@ def _extract_sources_from_tool_result(tool_result: Dict[str, Any]) -> List[Dict[
     return _dedupe_sources(sources)
 
 
+def _extract_tool_payloads(tool_result: Dict[str, Any]) -> List[Any]:
+    """Extract raw payloads from tool result for block rendering."""
+    if not isinstance(tool_result, dict):
+        return []
+
+    payloads: List[Any] = []
+
+    def _add_payload(value: Any) -> None:
+        if value is None:
+            return
+        payloads.append(value)
+
+    content_items = tool_result.get("content")
+    if isinstance(content_items, list):
+        for entry in content_items:
+            if not isinstance(entry, dict):
+                continue
+            entry_type = entry.get("type")
+            if entry_type in {"json", "json_object"} and entry.get("json") is not None:
+                _add_payload(entry.get("json"))
+            elif entry_type in {"text", "output_text"}:
+                text = entry.get("text")
+                if not text:
+                    continue
+                try:
+                    _add_payload(json.loads(text))
+                except (TypeError, ValueError):
+                    _add_payload(text)
+
+    for key in ("result", "output", "data", "value"):
+        if key in tool_result and tool_result[key]:
+            _add_payload(tool_result[key])
+
+    return payloads
+
+
+def _serialise_args(args: Any) -> Optional[str]:
+    """Serialise tool arguments for display."""
+    if args is None:
+        return None
+    if isinstance(args, str):
+        return args
+    try:
+        return json.dumps(args, ensure_ascii=False, indent=2)
+    except TypeError:
+        return str(args)
+
+
+def _build_blocks_from_tool_results(
+    tool_results: Iterable[Dict[str, Any]],
+    tool_call_inputs: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Convert tool results into structured blocks for frontend rendering."""
+    blocks: List[Dict[str, Any]] = []
+
+    if tool_call_inputs is None:
+        tool_call_inputs = {}
+
+    for index, tool_result in enumerate(tool_results):
+        if not isinstance(tool_result, dict):
+            continue
+
+        call_id = (
+            tool_result.get("tool_call_id")
+            or tool_result.get("id")
+            or tool_result.get("tool_use_id")
+        )
+        tool_name = (
+            tool_result.get("name")
+            or tool_result.get("tool_name")
+            or tool_call_inputs.get(call_id, {}).get("name")
+        )
+
+        args_info = tool_call_inputs.get(call_id, {})
+        args_payload = args_info.get("args")
+        args_text = args_info.get("args_text") or _serialise_args(args_payload)
+
+        payloads = _extract_tool_payloads(tool_result)
+
+        block_id_prefix = (tool_name or "tool").replace(" ", "-").lower()
+        base_common = {
+            "toolName": tool_name,
+            "args": args_payload,
+            "argsText": args_text,
+            "callId": call_id,
+        }
+
+        created_block = False
+        for payload in payloads:
+            if isinstance(payload, dict):
+                results = None
+                for key in ("results", "search_results", "items"):
+                    candidate = payload.get(key)
+                    if isinstance(candidate, list) and candidate:
+                        results = candidate
+                        break
+
+                if results:
+                    normalised_results = []
+                    for item in results:
+                        if isinstance(item, dict):
+                            source = _build_source_entry(
+                                item.get("url")
+                                or item.get("link")
+                                or item.get("source_url"),
+                                item.get("title") or item.get("name"),
+                            )
+                            snippet = (
+                                item.get("snippet")
+                                or item.get("description")
+                                or item.get("text")
+                            )
+                            entry = {
+                                "title": source["title"] if source else (item.get("title") or item.get("name") or "Result"),
+                                "url": source["url"] if source else item.get("url") or item.get("link"),
+                                "snippet": snippet,
+                                "site": source["site"] if source else item.get("site"),
+                                "favicon": source["favicon"] if source else item.get("favicon"),
+                            }
+                            normalised_results.append(entry)
+                        elif isinstance(item, str):
+                            normalised_results.append(
+                                {
+                                    "title": item,
+                                    "url": None,
+                                    "snippet": None,
+                                }
+                            )
+
+                    if normalised_results:
+                        blocks.append(
+                            {
+                                "id": f"{block_id_prefix}-search-{index}",
+                                "type": "search-results",
+                                "title": payload.get("title")
+                                or payload.get("query")
+                                or payload.get("topic")
+                                or (tool_name or "Search results"),
+                                "results": normalised_results,
+                                **base_common,
+                            }
+                        )
+                        created_block = True
+                        continue
+
+                # Fallback to key-value representation for structured dicts
+                pairs = []
+                for key, value in payload.items():
+                    if isinstance(value, (dict, list)):
+                        value_repr = json.dumps(value, ensure_ascii=False, indent=2)
+                    else:
+                        value_repr = str(value)
+                    pairs.append({"label": key, "value": value_repr})
+
+                if pairs:
+                    blocks.append(
+                        {
+                            "id": f"{block_id_prefix}-object-{index}",
+                            "type": "key-value",
+                            "title": payload.get("title") or (tool_name or "Tool output"),
+                            "pairs": pairs,
+                            **base_common,
+                        }
+                    )
+                    created_block = True
+                    continue
+
+            elif isinstance(payload, str):
+                text = payload.strip()
+                if text:
+                    blocks.append(
+                        {
+                            "id": f"{block_id_prefix}-markdown-{index}",
+                            "type": "markdown",
+                            "text": text,
+                            **base_common,
+                        }
+                    )
+                    created_block = True
+                    continue
+
+        if not created_block:
+            fallback_payload = payloads[0] if payloads else tool_result
+            blocks.append(
+                {
+                    "id": f"{block_id_prefix}-raw-{index}",
+                    "type": "tool-call",
+                    "title": tool_name or "Tool response",
+                    "result": fallback_payload,
+                    **base_common,
+                }
+            )
+
+    return _dedupe_blocks(blocks)
+
+
+def _dedupe_blocks(blocks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove duplicate blocks while preserving order."""
+    cleaned: List[Dict[str, Any]] = []
+    seen: set = set()
+
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_id = block.get("id")
+        if block_id:
+            key = ("id", block_id)
+        else:
+            key = ("hash", block.get("type"), block.get("toolName"), block.get("title"))
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(block)
+        if len(cleaned) >= 8:
+            break
+
+    return cleaned
+
+
 def _extract_sources_from_claude_response(response: Dict[str, Any]) -> List[Dict[str, str]]:
     """Extract sources from Claude response payload."""
     sources: List[Dict[str, str]] = []
@@ -423,13 +642,33 @@ class EnhancedChatService:
                 detail="Claude API request failed"
             ) from error
 
-        sources = _extract_sources_from_claude_response(response)
+        content_items = response.get("content", [])
+        text_blocks: List[str] = []
+        claude_tool_inputs: Dict[str, Dict[str, Any]] = {}
+        claude_tool_results: List[Dict[str, Any]] = []
 
-        text_blocks = [
-            block.get("text", "")
-            for block in response.get("content", [])
-            if isinstance(block, dict) and block.get("type") == "text"
-        ]
+        for block in content_items:
+            if not isinstance(block, dict):
+                continue
+
+            block_type = block.get("type")
+            if block_type == "text":
+                text = block.get("text", "")
+                if text:
+                    text_blocks.append(text)
+            elif block_type == "tool_use":
+                tool_id = block.get("id")
+                if tool_id:
+                    claude_tool_inputs[tool_id] = {
+                        "name": block.get("name"),
+                        "args": block.get("input"),
+                        "args_text": _serialise_args(block.get("input")),
+                    }
+            elif block_type == "tool_result":
+                claude_tool_results.append(block)
+
+        sources = _extract_sources_from_claude_response(response)
+        claude_blocks = _build_blocks_from_tool_results(claude_tool_results, claude_tool_inputs)
 
         output_text = "\n\n".join(block for block in text_blocks if block)
 
@@ -441,6 +680,7 @@ class EnhancedChatService:
             "content": response.get("content"),
             "usage": response.get("usage"),
             "sources": sources,
+            "blocks": claude_blocks,
         }
     
     async def process_chat_request(
@@ -537,6 +777,11 @@ class EnhancedChatService:
             assistant_content = ""
             reasoning = None
             sources = list(api_response.get("sources", [])) if isinstance(api_response, dict) else []
+            message_blocks: List[Dict[str, Any]] = []
+            if isinstance(api_response, dict):
+                initial_blocks = api_response.get("blocks")
+                if isinstance(initial_blocks, list):
+                    message_blocks.extend(initial_blocks)
             
             # Parse API output with debugging
             logger.debug("🔍 API Response for model %s: %s", model, api_response)
@@ -554,6 +799,7 @@ class EnhancedChatService:
             # Handle function calls from the API response (original repo logic)
             function_calls = []
             tool_results: List[Dict[str, Any]] = []
+            tool_call_inputs: Dict[str, Dict[str, Any]] = {}
             for i, item in enumerate(output_items):
                 if isinstance(item, dict):
                     item_type = item.get("type")
@@ -564,6 +810,20 @@ class EnhancedChatService:
                     elif item_type == "tool_call":
                         logger.debug(f"🔧 Tool call found: {item}")
                         function_calls.append(item)
+                        call_id = item.get("id") or item.get("tool_call_id") or item.get("call_id")
+                        if call_id:
+                            arguments = item.get("arguments") or item.get("input")
+                            parsed_args = None
+                            if isinstance(arguments, str):
+                                try:
+                                    parsed_args = json.loads(arguments)
+                                except (TypeError, ValueError):
+                                    parsed_args = None
+                            tool_call_inputs[call_id] = {
+                                "name": item.get("name"),
+                                "args": parsed_args if parsed_args is not None else arguments,
+                                "args_text": _serialise_args(parsed_args if parsed_args is not None else arguments),
+                            }
                     elif item_type == "tool_result":
                         logger.debug(f"🔧 Tool result found: {item}")
                         tool_results.append(item)
@@ -595,6 +855,11 @@ class EnhancedChatService:
                                                         logger.debug(f"🔧 Added annotated source: {source['site']}")
                                         break
 
+            if tool_results:
+                tool_blocks = _build_blocks_from_tool_results(tool_results, tool_call_inputs)
+                if tool_blocks:
+                    message_blocks.extend(tool_blocks)
+
             for tool_item in tool_results:
                 extracted_sources = _extract_sources_from_tool_result(tool_item)
                 if extracted_sources:
@@ -623,6 +888,8 @@ class EnhancedChatService:
 
             if sources:
                 sources = _dedupe_sources(sources)
+            if message_blocks:
+                message_blocks = _dedupe_blocks(message_blocks)
             
             logger.debug(f"🔍 Final assistant content length: {len(assistant_content) if assistant_content else 0}")
             
@@ -632,7 +899,8 @@ class EnhancedChatService:
             reasoning = None
             sources = []
             function_calls = []
-        
+            message_blocks = []
+    
         # Save assistant message
         await self.save_message_to_conversation(
             conversation_id,
@@ -647,6 +915,7 @@ class EnhancedChatService:
                 "sources": sources,
                 "function_calls": function_calls,
                 "tool_calls": function_calls,
+                "blocks": message_blocks,
             },
         )
         
@@ -671,6 +940,7 @@ class EnhancedChatService:
             "assistant_message": assistant_message,
             "reasoning": reasoning,
             "sources": sources,
+            "blocks": message_blocks,
             "model": model,
             "provider": "anthropic" if is_claude_model else "openai"
         }

@@ -203,6 +203,8 @@ class TestEnhancedChatServiceToolHandling:
         assert result["provider"] == "anthropic"
         assert "latest headlines" in result["output_text"]
         assert result["sources"] == []
+        assert result["blocks"] == []
+        assert result["sources"] == []
 
 
 class TestEnhancedChatServiceConversationManagement:
