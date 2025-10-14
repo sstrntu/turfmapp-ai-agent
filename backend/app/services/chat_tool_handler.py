@@ -676,7 +676,7 @@ Respond as if you're having a natural conversation with the user."""
 
         # Import here to avoid circular dependency
         from .mcp_client import google_mcp_client
-        from ..tools.tool_manager import tool_manager
+        from .tool_manager import tool_manager
 
         for tool_call in tool_calls:
             try:
