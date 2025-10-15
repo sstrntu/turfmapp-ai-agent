@@ -19,69 +19,89 @@ const ErrorState = () => (
 );
 
 const ChatRuntime = ({ adapter }) => {
-  const [initialMessages, setInitialMessages] = React.useState([]);
-  const [key, setKey] = React.useState(0);
-  const [isLoading, setIsLoading] = React.useState(false);
-
-  const runtime = useLocalRuntime(adapter, {
-    initialMessages: initialMessages,
+  const [state, setState] = React.useState({
+    initialMessages: null,
+    isLoading: true,
   });
 
-  // Expose adapter and runtime globally for conversation loading
+  // Check for conversation ID in localStorage on mount
   React.useEffect(() => {
-    if (adapter && runtime) {
-      window.chatAdapter = adapter;
-      window.chatRuntime = runtime;
+    const loadConvId = localStorage.getItem('loadConversationId');
+    if (loadConvId && adapter) {
+      console.log('Loading conversation from localStorage:', loadConvId);
 
-      // Global function to load a conversation
+      adapter.loadConversation(loadConvId)
+        .then(messages => {
+          console.log('Loaded messages:', messages);
+          // Clear the flag after loading
+          localStorage.removeItem('loadConversationId');
+          setState({ initialMessages: messages, isLoading: false });
+        })
+        .catch(error => {
+          console.error('Failed to load conversation:', error);
+          localStorage.removeItem('loadConversationId');
+          setState({ initialMessages: [], isLoading: false });
+        });
+    } else {
+      // No conversation to load, start with empty messages
+      setState({ initialMessages: [], isLoading: false });
+    }
+  }, [adapter]);
+
+  // Expose global function for conversation loading
+  React.useEffect(() => {
+    if (adapter) {
+      // Global function to load a conversation - uses page reload
       window.loadConversation = async (conversationId) => {
         try {
-          console.log('Loading conversation:', conversationId);
-
-          // Show loading state immediately using flushSync for synchronous update
-          flushSync(() => {
-            setIsLoading(true);
-          });
-
-          const messages = await adapter.loadConversation(conversationId);
-
-          // Update messages and key synchronously to ensure immediate UI update
-          flushSync(() => {
-            setInitialMessages(messages);
-            setKey(k => k + 1); // Force recreation of runtime
-          });
-
-          // Small delay to allow runtime to initialize with new messages
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-          // Hide loading state
-          flushSync(() => {
-            setIsLoading(false);
-          });
-
-          console.log('✅ Conversation loaded successfully');
+          console.log('Requesting to load conversation:', conversationId);
+          // Store conversation ID in localStorage
+          localStorage.setItem('loadConversationId', conversationId);
+          // Reload the page to properly reinitialize everything
+          window.location.reload();
         } catch (error) {
-          console.error('Failed to load conversation:', error);
-          flushSync(() => {
-            setIsLoading(false);
-          });
-          throw error;
+          console.error('Failed to prepare conversation load:', error);
+          alert('Failed to load conversation. Please try again.');
         }
       };
     }
     return () => {
+      delete window.loadConversation;
+    };
+  }, [adapter]);
+
+  // Show loading state until messages are loaded
+  if (state.isLoading || state.initialMessages === null) {
+    return <LoadingState message="Loading conversation…" />;
+  }
+
+  // Now render the runtime with the loaded messages
+  return <ChatRuntimeWithMessages adapter={adapter} initialMessages={state.initialMessages} />;
+};
+
+const ChatRuntimeWithMessages = ({ adapter, initialMessages }) => {
+  const runtime = useLocalRuntime(adapter, {
+    initialMessages: initialMessages,
+  });
+
+  // Expose adapter and runtime globally
+  React.useEffect(() => {
+    if (adapter && runtime) {
+      window.chatAdapter = adapter;
+      window.chatRuntime = runtime;
+    }
+    return () => {
       delete window.chatAdapter;
       delete window.chatRuntime;
-      delete window.loadConversation;
     };
   }, [adapter, runtime]);
 
-  if (!runtime || isLoading) {
-    return <LoadingState message={isLoading ? "Loading conversation…" : "Initializing chat…"} />;
+  if (!runtime) {
+    return <LoadingState message="Initializing chat…" />;
   }
 
   return (
-    <AssistantRuntimeProvider key={key} runtime={runtime}>
+    <AssistantRuntimeProvider runtime={runtime}>
       <ChatThread />
     </AssistantRuntimeProvider>
   );
