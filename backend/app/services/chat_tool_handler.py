@@ -28,15 +28,51 @@ class ChatToolHandler:
     """Handler for chat tool execution and Google MCP integration."""
 
     def __init__(self, chat_api_client):
-        """Initialize tool handler with API client dependency.
+        """Initialize the ChatToolHandler with required dependencies.
+
+        Sets up the tool handler with a ChatApiClient instance that will be used
+        for AI-driven tool selection and function calling capabilities.
 
         Args:
-            chat_api_client: ChatApiClient instance for AI-driven tool selection
+            chat_api_client: ChatApiClient instance that provides access to the
+                AI API for tool selection and message processing. Must support
+                call_responses_api method for function calling.
+
+        Returns:
+            None
+
+        Example:
+            >>> from app.services.chat_api_client import ChatApiClient
+            >>> api_client = ChatApiClient()
+            >>> handler = ChatToolHandler(api_client)
         """
         self.chat_api_client = chat_api_client
 
     def build_google_function_tools(self, enabled_tools: Dict[str, bool]) -> List[Dict[str, Any]]:
-        """Build function tool definitions for enabled Google services."""
+        """Build function tool definitions for enabled Google services.
+
+        Constructs a list of function tool definitions based on which Google services
+        are enabled. Each service (Gmail, Calendar, Drive) provides multiple tool
+        definitions with their parameters and descriptions for AI function calling.
+
+        Args:
+            enabled_tools (Dict[str, bool]): Dictionary mapping service names to their
+                enabled state. Supported keys are 'gmail', 'calendar', and 'drive'.
+                Example: {'gmail': True, 'calendar': False, 'drive': True}
+
+        Returns:
+            List[Dict[str, Any]]: List of tool definitions in the format expected by
+                AI function calling APIs. Each tool definition includes:
+                - type: Always 'function'
+                - function: Object containing name, description, and parameters
+                Returns empty list if no tools are enabled.
+
+        Example:
+            >>> handler = ChatToolHandler(api_client)
+            >>> tools = handler.build_google_function_tools({'gmail': True, 'drive': False})
+            >>> len(tools)  # Returns number of Gmail tools
+            4
+        """
         available_tools: List[Dict[str, Any]] = []
 
         if not enabled_tools:
@@ -325,7 +361,49 @@ class ChatToolHandler:
         enabled_tools: Dict[str, bool],
         **kwargs
     ) -> Dict[str, Any]:
-        """Handle Google MCP request using AI-driven tool selection."""
+        """Handle Google MCP request using AI-driven tool selection.
+
+        Processes user requests for Google services by:
+        1. Building available tool definitions based on enabled services
+        2. Using AI to select the most appropriate tool(s) for the user's request
+        3. Executing the selected tools via the Google MCP client
+        4. Analyzing and summarizing results with AI
+        5. Providing intelligent fallback responses when tools aren't enabled
+
+        The function supports parallel tool execution and provides contextual
+        suggestions when required tools are not enabled.
+
+        Args:
+            user_message (str): The user's natural language request or question.
+            conversation_history (List[Dict[str, Any]]): Previous messages in the
+                conversation for context. Each message should have 'role' and 'content'.
+            user_id (str): Unique identifier for the user making the request. Used
+                for authentication with Google services.
+            enabled_tools (Dict[str, bool]): Dictionary of enabled Google services.
+                Keys: 'gmail', 'calendar', 'drive'. Values: True if enabled.
+            **kwargs: Additional keyword arguments for future extensibility.
+
+        Returns:
+            Dict[str, Any]: Response dictionary containing:
+                - success (bool): Whether the request was successful
+                - response (str): The formatted response message for the user
+                - tools_used (List[str], optional): List of tools that were executed
+                - suggested_tools (List[str], optional): Suggested tools when none enabled
+                - sources (List, optional): Source references for the response
+
+        Raises:
+            Exception: Catches and logs all exceptions, returning error response dict.
+
+        Example:
+            >>> result = await handler.handle_google_mcp_request(
+            ...     user_message="What's my latest email?",
+            ...     conversation_history=[],
+            ...     user_id="user123",
+            ...     enabled_tools={'gmail': True, 'calendar': False, 'drive': False}
+            ... )
+            >>> result['success']
+            True
+        """
         try:
             # Create function definitions for available tools based on enabled_tools
             available_tools = self.build_google_function_tools(enabled_tools)
@@ -639,7 +717,29 @@ Respond as if you're having a natural conversation with the user."""
             }
 
     def extract_gmail_search_query(self, user_message: str) -> str:
-        """Extract search query from user message for Gmail search."""
+        """Extract search query from user message for Gmail search.
+
+        Parses natural language user messages to extract meaningful search terms
+        for Gmail queries. Uses pattern matching to identify common search patterns
+        (e.g., "emails about X", "find emails from Y") and strips common prefixes
+        to produce clean search queries.
+
+        Args:
+            user_message (str): The user's natural language message containing a
+                search request. Can be in various formats like "find emails about X",
+                "show me messages from Y", etc.
+
+        Returns:
+            str: Extracted search query string, limited to 100 characters. Returns
+                the cleaned search terms without common prefixes like "show me",
+                "find", "search", etc.
+
+        Example:
+            >>> handler.extract_gmail_search_query("find emails about project deadline")
+            'project deadline'
+            >>> handler.extract_gmail_search_query("emails from john@example.com")
+            'john@example.com'
+        """
         message_lower = user_message.lower()
 
         # Look for common search patterns
@@ -671,7 +771,48 @@ Respond as if you're having a natural conversation with the user."""
         return query[:100]  # Limit query length
 
     async def handle_tool_calls(self, user_id: str, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Handle tool calls from the AI assistant with MCP integration."""
+        """Handle tool calls from the AI assistant with MCP integration.
+
+        Processes a list of tool calls generated by the AI assistant, routing each
+        call to the appropriate execution backend:
+        - Google MCP client for Google services (Gmail, Drive, Calendar)
+        - Traditional tool manager for other tools
+
+        Ensures the MCP client is connected before executing Google tools and
+        handles errors gracefully by returning error results instead of raising
+        exceptions.
+
+        Args:
+            user_id (str): Unique identifier for the user making the request. Used
+                for authentication and authorization with tool backends.
+            tool_calls (List[Dict[str, Any]]): List of tool call dictionaries from
+                the AI assistant. Each should contain:
+                - id: Unique identifier for the tool call
+                - function: Dict with 'name' and 'arguments' (string or dict)
+
+        Returns:
+            List[Dict[str, Any]]: List of tool execution results. Each result contains:
+                - tool_call_id (str): The ID of the tool call
+                - tool_name (str): Name of the executed tool
+                - result (Dict[str, Any]): Execution result with 'success' and either
+                  'response' or 'error' fields
+
+        Raises:
+            Does not raise exceptions. All errors are caught and returned as error
+            results in the output list.
+
+        Example:
+            >>> tool_calls = [{
+            ...     'id': 'call_123',
+            ...     'function': {
+            ...         'name': 'gmail_recent',
+            ...         'arguments': '{"max_results": 5}'
+            ...     }
+            ... }]
+            >>> results = await handler.handle_tool_calls('user123', tool_calls)
+            >>> results[0]['result']['success']
+            True
+        """
         tool_results = []
 
         # Import here to avoid circular dependency

@@ -32,7 +32,23 @@ class SimplifiedGoogleMCPClient:
         pass
     
     async def list_tools(self) -> List[Dict[str, Any]]:
-        """Get list of available tools."""
+        """Get list of available Google service tools with their schemas.
+
+        Returns a comprehensive list of all available tools for Gmail, Google Drive,
+        and Google Calendar. Results are cached after the first call for efficiency.
+
+        Returns:
+            List[Dict[str, Any]]: A list of tool definitions, where each tool is a dictionary containing:
+                - name (str): The unique identifier for the tool
+                - description (str): Human-readable description of what the tool does
+                - inputSchema (dict): JSON schema defining the tool's input parameters including:
+                    - type (str): Schema type (typically "object")
+                    - properties (dict): Parameter definitions with types and descriptions
+                    - required (list): List of required parameter names
+
+        Raises:
+            None: This method does not raise exceptions.
+        """
         if self._tools_cache:
             return self._tools_cache
         
@@ -200,7 +216,30 @@ class SimplifiedGoogleMCPClient:
         return tools
     
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Call a tool by name with arguments."""
+        """Call a tool by name with arguments, handling authentication and routing.
+
+        Central dispatcher for all tool calls. Validates user credentials, filters
+        placeholder account values, and routes requests to the appropriate service
+        handler (Gmail, Drive, or Calendar).
+
+        Args:
+            tool_name (str): The name of the tool to execute (e.g., "gmail_search",
+                "drive_list_files", "calendar_upcoming_events").
+            arguments (Dict[str, Any]): Arguments for the tool call. Must include:
+                - user_id (str): Required user ID for authentication
+                - account (str, optional): Specific account email to use
+                Additional arguments depend on the specific tool being called.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing:
+                - success (bool): Whether the operation succeeded
+                - response (str, optional): Formatted response text if successful
+                - error (str, optional): Error message if success is False
+                - tool (str): The name of the tool that was executed
+
+        Raises:
+            Exception: Caught internally and returned as error in response dict.
+        """
         try:
             user_id = arguments.get("user_id")
             if not user_id:
@@ -239,7 +278,34 @@ class SimplifiedGoogleMCPClient:
             return {"success": False, "error": f"Tool execution failed: {str(e)}", "tool": tool_name}
     
     async def _handle_gmail_tool(self, name: str, credentials, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle Gmail tool calls."""
+        """Handle Gmail tool calls by routing to appropriate Gmail service methods.
+
+        Processes Gmail-related tool requests including search, get message, recent emails,
+        and important emails. Formats the results into user-friendly response text with
+        message details, sender information, and content snippets.
+
+        Args:
+            name (str): The name of the Gmail tool to execute. Supported values are:
+                - "gmail_search": Search Gmail messages with query parameters
+                - "gmail_get_message": Get full content of a specific message
+                - "gmail_recent": Get recent Gmail messages
+                - "gmail_important": Get important/starred Gmail messages
+            credentials: Google OAuth credentials object for authenticating API calls.
+            arguments (Dict[str, Any]): Tool-specific arguments which may include:
+                - query (str, optional): Search query for gmail_search
+                - max_results (int, optional): Maximum number of results to return
+                - message_id (str): Required for gmail_get_message
+
+        Returns:
+            Dict[str, Any]: A dictionary containing:
+                - success (bool): Whether the operation succeeded
+                - response (str): Formatted response text with email details
+                - tool (str): The name of the tool that was executed
+                - error (str, optional): Error message if success is False
+
+        Raises:
+            Exception: Caught internally and returned as error in response dict.
+        """
         try:
             if name == "gmail_search":
                 query = arguments.get("query", "")
@@ -366,7 +432,41 @@ class SimplifiedGoogleMCPClient:
             return {"success": False, "error": f"Gmail tool error: {str(e)}", "tool": name}
     
     async def _handle_drive_tool(self, name: str, credentials, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle Google Drive tool calls."""
+        """Handle Google Drive tool calls by routing to appropriate Drive service methods.
+
+        Processes Google Drive-related tool requests including file listing, folder creation,
+        searching, and accessing shared drives. Formats results with file metadata, icons,
+        and web links for user-friendly display.
+
+        Args:
+            name (str): The name of the Drive tool to execute. Supported values are:
+                - "drive_list_files": List files in Google Drive
+                - "drive_create_folder": Create folder structure in Drive
+                - "drive_list_folder_files": List files in a specific folder
+                - "drive_shared_drives": List shared/team drives
+                - "drive_search": Advanced search with filters for content, type, and year
+                - "drive_search_folders": Search specifically for folders by name
+            credentials: Google OAuth credentials object for authenticating API calls.
+            arguments (Dict[str, Any]): Tool-specific arguments which may include:
+                - query (str, optional): Search query for drive_list_files
+                - max_results (int, optional): Maximum number of results to return
+                - folder_path (str): Required for drive_create_folder and drive_list_folder_files
+                - root_folder (str, optional): Root folder name for folder creation
+                - search_term (str, optional): Search term for drive_search
+                - file_type (str, optional): File type filter for drive_search
+                - year (str, optional): Year filter for drive_search
+                - folder_name (str): Required for drive_search_folders
+
+        Returns:
+            Dict[str, Any]: A dictionary containing:
+                - success (bool): Whether the operation succeeded
+                - response (str): Formatted response text with file/folder details
+                - tool (str): The name of the tool that was executed
+                - error (str, optional): Error message if success is False
+
+        Raises:
+            Exception: Caught internally and returned as error in response dict.
+        """
         try:
             if name == "drive_list_files":
                 query = arguments.get("query", "")
@@ -617,7 +717,32 @@ class SimplifiedGoogleMCPClient:
             return {"success": False, "error": f"Drive tool error: {str(e)}", "tool": name}
     
     async def _handle_calendar_tool(self, name: str, credentials, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle Google Calendar tool calls."""
+        """Handle Google Calendar tool calls by routing to appropriate Calendar service methods.
+
+        Processes Google Calendar-related tool requests including listing events and
+        fetching upcoming events. Formats results with event details including title,
+        start time, and location information.
+
+        Args:
+            name (str): The name of the Calendar tool to execute. Supported values are:
+                - "calendar_list_events": List calendar events from a specific calendar
+                - "calendar_upcoming_events": Get upcoming events for the next N days
+            credentials: Google OAuth credentials object for authenticating API calls.
+            arguments (Dict[str, Any]): Tool-specific arguments which may include:
+                - calendar_id (str, optional): Calendar ID to list events from (default: "primary")
+                - max_results (int, optional): Maximum number of results to return
+                - days (int, optional): Number of days to look ahead for upcoming events
+
+        Returns:
+            Dict[str, Any]: A dictionary containing:
+                - success (bool): Whether the operation succeeded
+                - response (str): Formatted response text with event details
+                - tool (str): The name of the tool that was executed
+                - error (str, optional): Error message if success is False
+
+        Raises:
+            Exception: Caught internally and returned as error in response dict.
+        """
         try:
             logger.debug(f"🗓️ Handling calendar tool '{name}' with arguments: {arguments}")
             if name == "calendar_list_events":
@@ -697,7 +822,22 @@ class SimplifiedGoogleMCPClient:
             return {"success": False, "error": f"Calendar tool error: {str(e)}", "tool": name}
     
     async def get_available_tools_for_openai(self) -> List[Dict[str, Any]]:
-        """Get tools formatted for OpenAI function calling."""
+        """Get tools formatted for OpenAI function calling API.
+
+        Transforms internal tool definitions into the format expected by OpenAI's
+        function calling API. Each tool is converted to include a "type" field and
+        renamed fields to match OpenAI's schema.
+
+        Returns:
+            List[Dict[str, Any]]: A list of tool definitions formatted for OpenAI, where each tool contains:
+                - type (str): Always "function" for OpenAI function calling
+                - name (str): The function name
+                - description (str): The function description
+                - parameters (dict): The input schema (renamed from inputSchema)
+
+        Raises:
+            Exception: May propagate exceptions from list_tools().
+        """
         tools = await self.list_tools()
         
         openai_tools = []
@@ -713,7 +853,33 @@ class SimplifiedGoogleMCPClient:
         return openai_tools
     
     async def execute_google_tool(self, action: str, user_id: str, **kwargs) -> Dict[str, Any]:
-        """Execute a Google service tool with simplified interface."""
+        """Execute a Google service tool with simplified interface using action mapping.
+
+        Provides a high-level interface for executing Google service tools by mapping
+        user-friendly action names to internal tool names. This method simplifies
+        tool execution by accepting action strings instead of full tool names.
+
+        Args:
+            action (str): The action to perform. Supported actions include:
+                - Gmail: "search", "recent", "find_recent", "important", "find_important",
+                  "read", "get_message"
+                - Drive: "list_files", "create_folder", "list_folder_files"
+                - Calendar: "list_events", "upcoming_events"
+            user_id (str): The user ID for authentication and credential lookup.
+            **kwargs: Additional keyword arguments to pass to the underlying tool,
+                such as query parameters, max_results, folder_path, etc.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing:
+                - success (bool): Whether the operation succeeded
+                - response (str): Formatted response text with results
+                - tool (str): The name of the tool that was executed
+                - error (str, optional): Error message if success is False
+                - action (str, optional): The action name if it was unknown
+
+        Raises:
+            Exception: Caught internally by call_tool and returned as error in response dict.
+        """
         # Map actions to tool names
         tool_mapping = {
             "search": "gmail_search",
@@ -746,31 +912,96 @@ google_mcp_client = SimplifiedGoogleMCPClient()
 
 
 async def get_mcp_client() -> SimplifiedGoogleMCPClient:
-    """Get the global MCP client instance, ensuring it's connected."""
+    """Get the global MCP client instance, ensuring it's connected.
+
+    Returns the singleton instance of SimplifiedGoogleMCPClient and ensures
+    it is properly connected before returning.
+
+    Returns:
+        SimplifiedGoogleMCPClient: The global MCP client instance ready for use.
+
+    Raises:
+        Exception: May propagate exceptions from connect() method.
+    """
     await google_mcp_client.connect()
     return google_mcp_client
 
 
 # Convenience functions for common operations
 async def execute_gmail_action(action: str, user_id: str, **kwargs) -> Dict[str, Any]:
-    """Execute a Gmail action through MCP."""
+    """Execute a Gmail action through MCP client.
+
+    Convenience function for executing Gmail-specific actions. This is a wrapper
+    around the MCP client's execute_google_tool method.
+
+    Args:
+        action (str): The Gmail action to perform (e.g., "search", "recent", "important").
+        user_id (str): The user ID for authentication.
+        **kwargs: Additional keyword arguments to pass to the tool (e.g., query, max_results).
+
+    Returns:
+        Dict[str, Any]: Response dictionary from the tool execution containing success status and results.
+
+    Raises:
+        Exception: May propagate exceptions from get_mcp_client() or execute_google_tool().
+    """
     client = await get_mcp_client()
     return await client.execute_google_tool(action, user_id, **kwargs)
 
 
 async def execute_drive_action(action: str, user_id: str, **kwargs) -> Dict[str, Any]:
-    """Execute a Google Drive action through MCP."""
+    """Execute a Google Drive action through MCP client.
+
+    Convenience function for executing Google Drive-specific actions. This is a wrapper
+    around the MCP client's execute_google_tool method.
+
+    Args:
+        action (str): The Drive action to perform (e.g., "list_files", "create_folder").
+        user_id (str): The user ID for authentication.
+        **kwargs: Additional keyword arguments to pass to the tool (e.g., query, folder_path).
+
+    Returns:
+        Dict[str, Any]: Response dictionary from the tool execution containing success status and results.
+
+    Raises:
+        Exception: May propagate exceptions from get_mcp_client() or execute_google_tool().
+    """
     client = await get_mcp_client()
     return await client.execute_google_tool(action, user_id, **kwargs)
 
 
 async def execute_calendar_action(action: str, user_id: str, **kwargs) -> Dict[str, Any]:
-    """Execute a Google Calendar action through MCP."""
+    """Execute a Google Calendar action through MCP client.
+
+    Convenience function for executing Google Calendar-specific actions. This is a wrapper
+    around the MCP client's execute_google_tool method.
+
+    Args:
+        action (str): The Calendar action to perform (e.g., "list_events", "upcoming_events").
+        user_id (str): The user ID for authentication.
+        **kwargs: Additional keyword arguments to pass to the tool (e.g., calendar_id, days).
+
+    Returns:
+        Dict[str, Any]: Response dictionary from the tool execution containing success status and results.
+
+    Raises:
+        Exception: May propagate exceptions from get_mcp_client() or execute_google_tool().
+    """
     client = await get_mcp_client()
     return await client.execute_google_tool(action, user_id, **kwargs)
 
 
 async def get_all_google_tools() -> List[Dict[str, Any]]:
-    """Get all available Google tools in raw MCP format."""
+    """Get all available Google tools in raw MCP format.
+
+    Convenience function to retrieve the complete list of available Google service tools
+    in their internal MCP format.
+
+    Returns:
+        List[Dict[str, Any]]: List of tool definitions with names, descriptions, and input schemas.
+
+    Raises:
+        Exception: May propagate exceptions from get_mcp_client() or list_tools().
+    """
     client = await get_mcp_client()
     return await client.list_tools()

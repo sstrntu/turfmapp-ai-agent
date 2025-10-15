@@ -49,7 +49,16 @@ _URL_PATTERN = re.compile(r"https?://[^\s\]\)\"'>]+")
 
 
 def _build_source_entry(url: Optional[str], title: Optional[str] = None) -> Optional[Dict[str, str]]:
-    """Build a normalized source entry from URL and title."""
+    """
+    Build a normalized source entry from URL and title.
+
+    Args:
+        url: The URL to normalize and validate
+        title: Optional display title for the source
+
+    Returns:
+        Dictionary with url, title, site, and favicon keys, or None if invalid
+    """
     if not isinstance(url, str):
         return None
 
@@ -82,7 +91,15 @@ def _build_source_entry(url: Optional[str], title: Optional[str] = None) -> Opti
 
 
 def _dedupe_sources(sources: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
-    """Deduplicate sources, preserving order and limiting count."""
+    """
+    Deduplicate sources, preserving order and limiting count.
+
+    Args:
+        sources: Iterable of source dictionaries with 'url' keys
+
+    Returns:
+        List of unique sources, limited to 8 items maximum
+    """
     unique: List[Dict[str, str]] = []
     seen = set()
 
@@ -99,7 +116,26 @@ def _dedupe_sources(sources: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
 
 
 def _extract_sources_from_text(text: str) -> List[Dict[str, str]]:
-    """Extract HTTP(S) URLs from plain text and convert to sources."""
+    """Extract HTTP(S) URLs from plain text and convert to sources.
+
+    Scans the provided text for HTTP(S) URLs using regex pattern matching,
+    cleans each URL by removing trailing punctuation, validates and normalizes
+    them into source entries with metadata.
+
+    Args:
+        text: Plain text string to search for URLs.
+
+    Returns:
+        List of source dictionaries, each containing 'url', 'title', 'site',
+        and 'favicon' keys. Returns empty list if input is not a string or
+        contains no valid URLs.
+
+    Example:
+        >>> text = "Check out https://example.com and https://test.org!"
+        >>> sources = _extract_sources_from_text(text)
+        >>> len(sources)
+        2
+    """
     if not isinstance(text, str):
         return []
 
@@ -114,7 +150,27 @@ def _extract_sources_from_text(text: str) -> List[Dict[str, str]]:
 
 
 def _extract_sources_from_object(obj: Any) -> List[Dict[str, str]]:
-    """Recursively extract source entries from nested data structures."""
+    """Recursively extract source entries from nested data structures.
+
+    Performs breadth-first traversal of nested dictionaries, lists, and JSON strings
+    to find and extract URL-based source entries. Handles multiple URL field names
+    (url, link, href) and title field names (title, name, headline, text).
+
+    Args:
+        obj: Any data structure to search - can be dict, list, str (JSON), or
+            any nested combination thereof.
+
+    Returns:
+        List of source dictionaries extracted from the object tree, each containing
+        'url', 'title', 'site', and 'favicon' keys. Returns empty list if no valid
+        sources found.
+
+    Example:
+        >>> data = {"results": [{"url": "https://example.com", "title": "Example"}]}
+        >>> sources = _extract_sources_from_object(data)
+        >>> sources[0]['site']
+        'example.com'
+    """
     sources: List[Dict[str, str]] = []
     queue: deque[Any] = deque([obj])
 
@@ -150,7 +206,27 @@ def _extract_sources_from_object(obj: Any) -> List[Dict[str, str]]:
 
 
 def _extract_sources_from_tool_result(tool_result: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Extract sources from a tool result payload."""
+    """Extract sources from a tool result payload.
+
+    Searches tool result dictionaries for common output fields (output, content,
+    outputs, results, data, value) and extracts URL sources from each. Also checks
+    nested 'tool' object for additional output fields.
+
+    Args:
+        tool_result: Dictionary containing tool execution results, typically with
+            fields like 'output', 'content', or 'results' containing response data.
+
+    Returns:
+        Deduplicated list of source dictionaries (max 8 items), each containing
+        'url', 'title', 'site', and 'favicon' keys. Returns empty list if input
+        is not a dict or contains no valid sources.
+
+    Example:
+        >>> result = {"output": {"url": "https://example.com", "title": "Test"}}
+        >>> sources = _extract_sources_from_tool_result(result)
+        >>> len(sources)
+        1
+    """
     if not isinstance(tool_result, dict):
         return []
 
@@ -174,7 +250,27 @@ def _extract_sources_from_tool_result(tool_result: Dict[str, Any]) -> List[Dict[
 
 
 def _extract_tool_payloads(tool_result: Dict[str, Any]) -> List[Any]:
-    """Extract raw payloads from tool result for block rendering."""
+    """Extract raw payloads from tool result for block rendering.
+
+    Extracts structured and text payloads from tool results for frontend display.
+    Handles both content arrays (with type-specific extraction) and direct output
+    fields. JSON text is parsed, while plain text is preserved as-is.
+
+    Args:
+        tool_result: Dictionary containing tool execution results with 'content'
+            array or direct output fields ('result', 'output', 'data', 'value').
+
+    Returns:
+        List of payload values extracted from the tool result. Can contain mixed
+        types (dicts, strings, etc.). Returns empty list if input is not a dict
+        or contains no extractable payloads.
+
+    Example:
+        >>> result = {"content": [{"type": "json", "json": {"key": "value"}}]}
+        >>> payloads = _extract_tool_payloads(result)
+        >>> payloads[0]
+        {'key': 'value'}
+    """
     if not isinstance(tool_result, dict):
         return []
 
@@ -210,7 +306,28 @@ def _extract_tool_payloads(tool_result: Dict[str, Any]) -> List[Any]:
 
 
 def _serialise_args(args: Any) -> Optional[str]:
-    """Serialise tool arguments for display."""
+    """Serialise tool arguments for display.
+
+    Converts tool call arguments to a human-readable string format for UI display.
+    Handles strings (pass-through), JSON-serializable objects (pretty-print), and
+    non-serializable objects (fallback to str()).
+
+    Args:
+        args: Tool arguments to serialize - can be None, str, dict, list, or any
+            other type.
+
+    Returns:
+        String representation of the arguments formatted for display, or None if
+        args is None. JSON objects are indented for readability.
+
+    Example:
+        >>> _serialise_args({"query": "test", "limit": 10})
+        '{\\n  "query": "test",\\n  "limit": 10\\n}'
+        >>> _serialise_args("already a string")
+        'already a string'
+        >>> _serialise_args(None)
+        None
+    """
     if args is None:
         return None
     if isinstance(args, str):
@@ -225,7 +342,35 @@ def _build_blocks_from_tool_results(
     tool_results: Iterable[Dict[str, Any]],
     tool_call_inputs: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Convert tool results into structured blocks for frontend rendering."""
+    """Convert tool results into structured blocks for frontend rendering.
+
+    Transforms raw tool execution results into UI-friendly block structures with
+    appropriate types (search-results, key-value, markdown, tool-call) based on
+    the payload content. Enriches blocks with metadata from tool call inputs.
+
+    Args:
+        tool_results: Iterable of tool result dictionaries, each typically containing
+            'tool_call_id', 'name', and result data in various formats.
+        tool_call_inputs: Optional mapping of tool call IDs to their input metadata
+            (name, args, args_text). Used to enrich blocks with call context.
+            Defaults to empty dict if not provided.
+
+    Returns:
+        Deduplicated list of block dictionaries (max 8 items), each containing:
+        - id: Unique block identifier
+        - type: Block type (search-results, key-value, markdown, tool-call)
+        - toolName: Name of the tool that generated this block
+        - args: Original tool arguments
+        - argsText: Serialized display version of arguments
+        - callId: Tool call identifier
+        - Additional type-specific fields (results, pairs, text, result, title)
+
+    Example:
+        >>> results = [{"tool_call_id": "1", "name": "search", "result": {...}}]
+        >>> blocks = _build_blocks_from_tool_results(results)
+        >>> blocks[0]['type']
+        'search-results'
+    """
     blocks: List[Dict[str, Any]] = []
 
     if tool_call_inputs is None:
@@ -370,7 +515,31 @@ def _build_blocks_from_tool_results(
 
 
 def _dedupe_blocks(blocks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Remove duplicate blocks while preserving order."""
+    """Remove duplicate blocks while preserving order.
+
+    Deduplicates block dictionaries using either explicit 'id' field or a composite
+    hash of (type, toolName, title) for blocks without IDs. Limits output to
+    maximum of 8 blocks.
+
+    Args:
+        blocks: Iterable of block dictionaries to deduplicate. Non-dict items are
+            silently skipped.
+
+    Returns:
+        List of unique blocks in original order, limited to 8 items maximum.
+        Uniqueness determined by 'id' field if present, otherwise by composite
+        key of block metadata.
+
+    Example:
+        >>> blocks = [
+        ...     {"id": "1", "type": "search"},
+        ...     {"id": "1", "type": "search"},  # duplicate
+        ...     {"id": "2", "type": "tool"}
+        ... ]
+        >>> deduped = _dedupe_blocks(blocks)
+        >>> len(deduped)
+        2
+    """
     cleaned: List[Dict[str, Any]] = []
     seen: set = set()
 
@@ -393,7 +562,32 @@ def _dedupe_blocks(blocks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def _extract_sources_from_claude_response(response: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Extract sources from Claude response payload."""
+    """Extract sources from Claude response payload.
+
+    Searches Claude API response for sources in multiple locations:
+    - Content block citations (both direct and in metadata)
+    - Tool result blocks
+    - Search results within blocks
+    - Top-level citations array
+
+    Args:
+        response: Claude API response dictionary, typically containing 'content'
+            array with text blocks, tool results, and optional 'citations' field.
+
+    Returns:
+        Deduplicated list of source dictionaries (max 8 items), each containing
+        'url', 'title', 'site', and 'favicon' keys. Returns empty list if no
+        valid sources found in response.
+
+    Example:
+        >>> response = {
+        ...     "content": [{"citations": [{"url": "https://example.com", "title": "Test"}]}],
+        ...     "citations": [{"url": "https://test.org"}]
+        ... }
+        >>> sources = _extract_sources_from_claude_response(response)
+        >>> len(sources)
+        2
+    """
     sources: List[Dict[str, str]] = []
 
     content_blocks = response.get("content", [])

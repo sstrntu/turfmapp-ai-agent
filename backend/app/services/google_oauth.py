@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
 import io
 import json
 import logging
 import os
+import re
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
 
@@ -202,7 +205,35 @@ class GoogleOAuthService:
     
     # Gmail API methods
     async def get_gmail_messages(self, credentials: Credentials, query: str = '', max_results: int = 10) -> Dict[str, Any]:
-        """Get Gmail messages for the authenticated user."""
+        """Retrieve Gmail messages with full content for the authenticated user.
+
+        Fetches a list of Gmail messages matching the search query and retrieves full
+        message details including headers and decoded body content for each message.
+
+        Args:
+            credentials (Credentials): Google OAuth2 credentials for authentication.
+            query (str, optional): Gmail search query using Gmail search operators
+                (e.g., "is:unread", "from:example@gmail.com"). Defaults to empty string
+                which returns all messages.
+            max_results (int, optional): Maximum number of messages to retrieve.
+                Defaults to 10.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing:
+                - messages (list): List of message dictionaries with keys:
+                    - id (str): Message ID
+                    - threadId (str): Thread ID
+                    - from (str): Sender email address
+                    - subject (str): Email subject
+                    - date (str): Date header value
+                    - snippet (str): Short message preview
+                    - body (str): Full decoded email body
+                - resultSizeEstimate (int): Estimated total matching messages
+                - error (str, optional): Error message if request fails
+
+        Raises:
+            HttpError: If Gmail API request fails (caught and logged).
+        """
         try:
             service = build('gmail', 'v1', credentials=credentials)
             
@@ -250,13 +281,26 @@ class GoogleOAuthService:
             return {'error': str(e), 'messages': []}
     
     def _extract_email_body(self, payload: Dict[str, Any]) -> str:
-        """Extract email body content from Gmail API payload."""
+        """Extract and decode email body content from Gmail API payload.
+
+        This function recursively traverses the payload structure to extract text content
+        from emails, handling both plain text and HTML formats, as well as multipart
+        messages. Base64url encoded data is decoded and HTML tags are stripped from
+        HTML content.
+
+        Args:
+            payload (Dict[str, Any]): The payload object from a Gmail API message response,
+                containing the message structure and body data.
+
+        Returns:
+            str: The decoded and formatted email body text. Returns empty string if no
+                content can be extracted. Falls back to snippet if main extraction fails.
+        """
         body_content = ""
         
         def decode_base64url(data: str) -> str:
             """Decode base64url encoded data."""
             try:
-                import base64
                 # Add padding if needed
                 missing_padding = len(data) % 4
                 if missing_padding:
@@ -283,7 +327,6 @@ class GoogleOAuthService:
                     # For HTML, we'll take it but prefer plain text
                     html_content = decode_base64url(data)
                     # Basic HTML tag removal for readability
-                    import re
                     text_content = re.sub(r'<[^>]+>', '', html_content)
                     text_content = re.sub(r'\s+', ' ', text_content).strip()
                     return text_content
@@ -309,7 +352,23 @@ class GoogleOAuthService:
         return body_content.strip()
     
     async def get_gmail_message_content(self, credentials: Credentials, message_id: str) -> Dict[str, Any]:
-        """Get full content of a Gmail message."""
+        """Retrieve the full content and metadata of a specific Gmail message.
+
+        Args:
+            credentials (Credentials): Google OAuth2 credentials for authentication.
+            message_id (str): The unique identifier of the message to retrieve.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing:
+                - id (str): Message ID
+                - threadId (str): Thread ID this message belongs to
+                - payload (dict): Complete message payload with headers and body
+                - snippet (str): Short message preview
+                - error (str, optional): Error message if request fails
+
+        Raises:
+            HttpError: If Gmail API request fails (caught and logged).
+        """
         try:
             service = build('gmail', 'v1', credentials=credentials)
             
@@ -332,7 +391,29 @@ class GoogleOAuthService:
     
     # Drive API methods
     async def get_drive_files(self, credentials: Credentials, query: str = '', max_results: int = 10) -> Dict[str, Any]:
-        """Get Google Drive files for the authenticated user."""
+        """Retrieve Google Drive files matching the specified query.
+
+        Fetches a list of Drive files with their metadata including links and thumbnails.
+        Automatically refreshes credentials if needed.
+
+        Args:
+            credentials (Credentials): Google OAuth2 credentials for authentication.
+            query (str, optional): Drive API search query using Drive query syntax
+                (e.g., "name contains 'report'", "mimeType='application/pdf'").
+                Defaults to empty string which returns all accessible files.
+            max_results (int, optional): Maximum number of files to retrieve.
+                Defaults to 10.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing:
+                - files (list): List of file objects with metadata (id, name, mimeType,
+                    createdTime, modifiedTime, size, webViewLink, webContentLink, thumbnailLink)
+                - nextPageToken (str, optional): Token for pagination
+                - error (str, optional): Error message if request fails
+
+        Raises:
+            HttpError: If Drive API request fails (caught and logged).
+        """
         try:
             credentials = self.refresh_credentials_if_needed(credentials)
             service = build('drive', 'v3', credentials=credentials)
@@ -352,9 +433,40 @@ class GoogleOAuthService:
             logger.error(f"Error getting Drive files: {e}")
             return {'error': str(e), 'files': []}
     
-    async def search_drive_files(self, credentials: Credentials, search_term: str = '', file_type: str = '', 
+    async def search_drive_files(self, credentials: Credentials, search_term: str = '', file_type: str = '',
                                 year: str = '', max_results: int = 10) -> Dict[str, Any]:
-        """Advanced search for Google Drive files with filters for type, year, and content."""
+        """Perform advanced search on Google Drive with content, type, and date filters.
+
+        Builds a complex query to search Drive files by content/name, file type, and
+        modification year. Supports common file type aliases (e.g., 'photo', 'document').
+        Results are ordered by modification time descending.
+
+        Args:
+            credentials (Credentials): Google OAuth2 credentials for authentication.
+            search_term (str, optional): Text to search for in file names and content.
+                Defaults to empty string.
+            file_type (str, optional): Filter by file type. Supports aliases:
+                - 'photo'/'photos'/'image'/'images': All image files
+                - 'document'/'doc'/'docs': Documents and PDFs
+                - 'video'/'videos': Video files
+                - 'folder'/'folders': Folders only
+                - Custom: Any MIME type substring (e.g., 'spreadsheet')
+                Defaults to empty string (no type filter).
+            year (str, optional): Filter by modification year (e.g., '2024').
+                Defaults to empty string (no year filter).
+            max_results (int, optional): Maximum number of files to retrieve.
+                Defaults to 10.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing:
+                - files (list): List of matching file objects with full metadata
+                - nextPageToken (str, optional): Token for pagination
+                - query (str): The actual Drive API query string used
+                - error (str, optional): Error message if request fails
+
+        Raises:
+            HttpError: If Drive API request fails (caught and logged).
+        """
         try:
             credentials = self.refresh_credentials_if_needed(credentials)
             service = build('drive', 'v3', credentials=credentials)
@@ -411,7 +523,28 @@ class GoogleOAuthService:
             return {'error': str(e), 'files': []}
     
     async def search_drive_folders(self, credentials: Credentials, folder_name: str, max_results: int = 10) -> Dict[str, Any]:
-        """Search specifically for folders in Google Drive."""
+        """Search for folders in Google Drive by name.
+
+        Searches specifically for folder objects (not files) matching the provided name.
+        Results are ordered by modification time descending.
+
+        Args:
+            credentials (Credentials): Google OAuth2 credentials for authentication.
+            folder_name (str): Folder name or partial name to search for.
+            max_results (int, optional): Maximum number of folders to retrieve.
+                Defaults to 10.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing:
+                - folders (list): List of matching folder objects with metadata
+                    (id, name, mimeType, createdTime, modifiedTime, webViewLink, parents)
+                - nextPageToken (str, optional): Token for pagination
+                - query (str): The actual Drive API query string used
+                - error (str, optional): Error message if request fails
+
+        Raises:
+            HttpError: If Drive API request fails (caught and logged).
+        """
         try:
             credentials = self.refresh_credentials_if_needed(credentials)
             service = build('drive', 'v3', credentials=credentials)
@@ -439,7 +572,25 @@ class GoogleOAuthService:
             return {'error': str(e), 'folders': []}
     
     async def create_folder_structure(self, credentials: Credentials, folder_path: str, root_folder: str = "TURFMAPP") -> str:
-        """Create nested folder structure in user's Drive (e.g., TURFMAPP/Projects/Client)."""
+        """Create nested folder hierarchy in Google Drive.
+
+        Creates a complete folder path in the user's Drive, including all intermediate
+        folders. If folders already exist, they are reused. The path is automatically
+        prefixed with the root folder.
+
+        Args:
+            credentials (Credentials): Google OAuth2 credentials for authentication.
+            folder_path (str): Folder path to create, separated by slashes
+                (e.g., "Projects/Client/2024"). Path parts are trimmed of whitespace.
+            root_folder (str, optional): Root folder name to prefix the path.
+                Defaults to "TURFMAPP".
+
+        Returns:
+            str: The folder ID of the final (deepest) folder in the hierarchy.
+
+        Raises:
+            Exception: If folder creation fails at any level.
+        """
         try:
             credentials = self.refresh_credentials_if_needed(credentials)
             service = build('drive', 'v3', credentials=credentials)
@@ -459,7 +610,20 @@ class GoogleOAuthService:
             raise
     
     async def _get_or_create_folder(self, service, folder_name: str, parent_id: str = None) -> str:
-        """Get existing folder or create new one."""
+        """Find an existing folder by name and parent, or create it if not found.
+
+        Args:
+            service: Google Drive API service instance.
+            folder_name (str): Name of the folder to find or create.
+            parent_id (str, optional): Parent folder ID. If None, searches/creates
+                in the root directory. Defaults to None.
+
+        Returns:
+            str: The folder ID of the found or newly created folder.
+
+        Raises:
+            Exception: If folder search or creation fails.
+        """
         try:
             # Search for existing folder
             query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
@@ -631,7 +795,6 @@ class GoogleOAuthService:
             
             # Add time filtering for upcoming events only
             if upcoming_only:
-                from datetime import datetime, timezone
                 now = datetime.now(timezone.utc).isoformat()
                 query_params['timeMin'] = now
                 logger.debug(f"🗓️ Filtering calendar events from: {now}")
