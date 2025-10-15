@@ -1,4 +1,5 @@
 import React from "react";
+import { flushSync } from "react-dom";
 import {
   AssistantRuntimeProvider,
   useLocalRuntime,
@@ -20,6 +21,7 @@ const ErrorState = () => (
 const ChatRuntime = ({ adapter }) => {
   const [initialMessages, setInitialMessages] = React.useState([]);
   const [key, setKey] = React.useState(0);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const runtime = useLocalRuntime(adapter, {
     initialMessages: initialMessages,
@@ -35,12 +37,34 @@ const ChatRuntime = ({ adapter }) => {
       window.loadConversation = async (conversationId) => {
         try {
           console.log('Loading conversation:', conversationId);
+
+          // Show loading state immediately using flushSync for synchronous update
+          flushSync(() => {
+            setIsLoading(true);
+          });
+
           const messages = await adapter.loadConversation(conversationId);
-          setInitialMessages(messages);
-          setKey(k => k + 1); // Force recreation of runtime
+
+          // Update messages and key synchronously to ensure immediate UI update
+          flushSync(() => {
+            setInitialMessages(messages);
+            setKey(k => k + 1); // Force recreation of runtime
+          });
+
+          // Small delay to allow runtime to initialize with new messages
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          // Hide loading state
+          flushSync(() => {
+            setIsLoading(false);
+          });
+
           console.log('✅ Conversation loaded successfully');
         } catch (error) {
           console.error('Failed to load conversation:', error);
+          flushSync(() => {
+            setIsLoading(false);
+          });
           throw error;
         }
       };
@@ -52,8 +76,8 @@ const ChatRuntime = ({ adapter }) => {
     };
   }, [adapter, runtime]);
 
-  if (!runtime) {
-    return <LoadingState />;
+  if (!runtime || isLoading) {
+    return <LoadingState message={isLoading ? "Loading conversation…" : "Initializing chat…"} />;
   }
 
   return (

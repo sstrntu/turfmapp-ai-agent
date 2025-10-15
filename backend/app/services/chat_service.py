@@ -776,12 +776,30 @@ Respond as if you're having a natural conversation with the user."""
                         ])
 
             # Flag to skip raw extraction if tools were already summarized by AI
-            tools_already_summarized = bool((claude_tool_uses or openai_function_calls) and assistant_content)
+            # Only skip if we actually have assistant content (the summarization worked)
+            tools_already_summarized = bool((claude_tool_uses or openai_function_calls) and assistant_content and len(assistant_content) > 0)
 
             if tool_results:
-                tool_blocks = build_blocks_from_tool_results(tool_results, tool_call_inputs)
-                if tool_blocks:
-                    message_blocks.extend(tool_blocks)
+                # Filter out MCP tool results - they return formatted text, not structured data for blocks
+                # MCP tools have results with {success, response, tool} structure
+                non_mcp_results = []
+                for result in tool_results:
+                    result_data = result.get("result", result)
+                    # Check if this is an MCP result (has success, response, tool fields)
+                    is_mcp_result = (
+                        isinstance(result_data, dict) and
+                        "success" in result_data and
+                        "response" in result_data and
+                        "tool" in result_data
+                    )
+                    if not is_mcp_result:
+                        non_mcp_results.append(result)
+
+                # Only create blocks from non-MCP tools (web search, image generation, etc.)
+                if non_mcp_results:
+                    tool_blocks = build_blocks_from_tool_results(non_mcp_results, tool_call_inputs)
+                    if tool_blocks:
+                        message_blocks.extend(tool_blocks)
 
                 # Extract text content from tool results (skip if already summarized by AI)
                 if not tools_already_summarized:

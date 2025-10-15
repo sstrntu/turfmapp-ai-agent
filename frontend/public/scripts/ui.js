@@ -170,6 +170,9 @@ window.UI.loadConversationHistory = async function loadConversationHistory(retry
                 button.setAttribute('data-conversation-id', conv.id);
 
                 button.addEventListener('click', async function() {
+                    // Remove focus from button before closing sidebar to avoid aria-hidden accessibility warning
+                    this.blur();
+
                     // Close sidebar
                     const lp = document.getElementById('left-panel');
                     if (lp) {
