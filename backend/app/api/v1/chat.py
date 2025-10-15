@@ -28,6 +28,8 @@ Recent fixes (August 2025):
 
 from __future__ import annotations
 
+import logging
+
 from typing import List, Literal, Optional, Dict, Any
 from datetime import datetime
 import uuid
@@ -35,10 +37,13 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from ...core.simple_auth import get_current_user_from_token
+from ...core.jwt_auth import get_current_user_from_token
 from ...services.chat_service import EnhancedChatService
 from ...services.tool_manager import tool_manager
 from ...database import ConversationService
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 chat_service = EnhancedChatService()
@@ -56,7 +61,7 @@ class ChatRequest(BaseModel):
     """Enhanced chat request supporting conversation context and tools"""
     message: str
     conversation_id: Optional[str] = None
-    model: Optional[str] = "gpt-4o"
+    model: Optional[str] = None  # Changed: No default, so database preference takes precedence
     attachments: Optional[List[dict]] = None
     include_reasoning: bool = False
     developer_instructions: Optional[str] = None
@@ -77,6 +82,8 @@ class ChatResponse(BaseModel):
     assistant_message: dict
     reasoning: Optional[str] = None
     sources: Optional[List[dict]] = None
+    model: Optional[str] = None
+    provider: Optional[str] = None
 
 
 class ConversationListResponse(BaseModel):
@@ -99,12 +106,18 @@ async def send_chat_message(
     """Send a chat message with advanced features including conversation context"""
     try:
         user_id = current_user["id"]
-        
+
+        # Get user preferences from database to determine model if not specified
+        user_prefs = await chat_service.get_user_preferences(user_id)
+
+        # Use model from request if provided, otherwise use user's default from database
+        model_to_use = request.model if request.model else user_prefs.get("model", "gpt-4o")
+
         result = await chat_service.process_chat_request(
             user_id=user_id,
             message=request.message,
             conversation_id=request.conversation_id,
-            model=request.model,
+            model=model_to_use,
             include_reasoning=request.include_reasoning,
             attachments=request.attachments,
             developer_instructions=request.developer_instructions,
@@ -121,11 +134,13 @@ async def send_chat_message(
             user_message=result["user_message"],
             assistant_message=result["assistant_message"],
             reasoning=result.get("reasoning"),
-            sources=result.get("sources", [])
+            sources=result.get("sources", []),
+            model=result.get("model"),
+            provider=result.get("provider")
         )
         
     except Exception as e:
-        print(f"❌ Chat error: {e}")
+        logger.error(f"❌ Chat error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to process chat message: {str(e)}"
@@ -144,7 +159,7 @@ async def get_conversations(
         return ConversationListResponse(conversations=conversations)
         
     except Exception as e:
-        print(f"❌ Get conversations error: {e}")
+        logger.error(f"❌ Get conversations error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve conversations: {str(e)}"
@@ -195,7 +210,7 @@ async def get_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Get conversation error: {e}")
+        logger.error(f"❌ Get conversation error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve conversation: {str(e)}"
@@ -221,7 +236,7 @@ async def delete_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Delete conversation error: {e}")
+        logger.error(f"❌ Delete conversation error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to delete conversation: {str(e)}"
@@ -253,7 +268,7 @@ async def add_message_to_conversation(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Add message error: {e}")
+        logger.error(f"❌ Add message error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to add message: {str(e)}"
@@ -279,7 +294,11 @@ async def get_available_models():
             {"id": "gpt-4o-mini", "name": "GPT-4O Mini", "description": "Fast and efficient"},
             {"id": "o1", "name": "O1", "description": "Advanced reasoning"},
             {"id": "o1-mini", "name": "O1 Mini", "description": "Reasoning optimized"},
-            {"id": "o1-preview", "name": "O1 Preview", "description": "Latest reasoning model"}
+            {"id": "o1-preview", "name": "O1 Preview", "description": "Latest reasoning model"},
+            {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku", "description": "Anthropic Claude – fastest option"},
+            {"id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4", "description": "Anthropic Claude – balanced"},
+            {"id": "claude-sonnet-4-5-20250929", "name": "Claude Sonnet 4.5", "description": "Anthropic Claude – enhanced reasoning"},
+            {"id": "claude-opus-4-1-20250805", "name": "Claude Opus 4.1", "description": "Anthropic Claude – most capable"}
         ]
     }
 
@@ -330,7 +349,7 @@ async def get_available_tools():
         
     except Exception as e:
         # Fallback to traditional tools only
-        print(f"❌ Failed to get MCP tools: {e}")
+        logger.error(f"❌ Failed to get MCP tools: {e}")
         return {
             "tools": tool_manager.get_available_tools(),
             "descriptions": tool_manager.get_tool_descriptions(),

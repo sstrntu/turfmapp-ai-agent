@@ -51,38 +51,11 @@
                     <!-- Minimal Chat Section -->
                     <section class="chat-section" aria-label="Messages">
                         <div class="chat-card">
-                            <div id="chat-list" class="chat-list" role="log" aria-live="polite"></div>
-                            <form id="chat-form" class="chat-form" autocomplete="off">
-                                <div class="input-container">
-                                    <div class="attachment-area" id="attachment-area"></div>
-                                    <div class="input-row">
-                                        <textarea id="chat-input" class="chat-input" placeholder="Type your message…" aria-label="Message" required rows="1"></textarea>
-                                        <button type="submit" class="chat-send-btn" aria-label="Send">➤</button>
-                                    </div>
-                                    <div class="input-actions input-actions-below">
-                                        <button type="button" class="tool-btn" id="attach-file-btn" title="Attach file" aria-label="Attach">+</button>
-                                        <button type="button" class="tool-btn" id="image-gen-btn" title="Image generation" aria-pressed="false" aria-label="Generate images">
-                                            <img src="/icons/Picture.png" alt="Image generation" class="icon-img" width="22" height="22">
-                                        </button>
-                                        <button type="button" class="tool-btn" id="web-search-btn" title="Web search" aria-pressed="false" aria-label="Web search">
-                                            <img src="/icons/websearchicon.png" alt="Web search" class="icon-img" width="22" height="22">
-                                        </button>
-                                        <button type="button" class="tool-btn" id="gmail-btn" title="Gmail" aria-pressed="false" aria-label="Gmail">
-                                            <img src="/icons/Gmail.png" alt="Gmail" class="icon-img" width="22" height="22">
-                                        </button>
-                                        <button type="button" class="tool-btn" id="calendar-btn" title="Google Calendar" aria-pressed="false" aria-label="Google Calendar">
-                                            <img src="/icons/Calendar.png" alt="Google Calendar" class="icon-img" width="22" height="22">
-                                        </button>
-                                        <button type="button" class="tool-btn" id="drive-btn" title="Google Drive" aria-pressed="false" aria-label="Google Drive">
-                                            <img src="/icons/Google Drive.png" alt="Google Drive" class="icon-img" width="22" height="22">
-                                        </button>
-                                        <button type="button" class="tool-btn fal-tool" id="sound-effects-btn" title="Sound Effects Generator" aria-pressed="false" aria-label="Generate sound effects" data-tool="sound-effects">
-                                            <img src="/icons/soundeffecticon.png" alt="Sound effects" class="icon-img" width="22" height="22">
-                                        </button>
-                                    </div>
-                                    <input type="file" id="file-input" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.json,.csv" style="display: none;">
-                                </div>
-                            </form>
+                            <div id="react-chat-root" class="chat-react-root">
+                                <noscript>
+                                    Enable JavaScript to use the TURFMAPP assistant experience.
+                                </noscript>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -147,7 +120,7 @@
     <script src="scripts/supabase-client.js"></script>
     <script src="scripts/google-auth.js"></script>
     <script src="scripts/ui.js"></script>
-    <script src="scripts/chat.js"></script>
+    <script type="module" src="/src/main.jsx"></script>
     <script>
         // Single-pass authentication guard for home page
         document.addEventListener('DOMContentLoaded', async () => {

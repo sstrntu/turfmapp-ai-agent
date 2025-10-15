@@ -66,20 +66,39 @@ backend/
 │   │   ├── admin.py               # Admin management
 │   │   ├── auth.py                # Authentication
 │   │   ├── chat.py                # Chat interface
+│   │   ├── google_api.py          # Google services endpoints
 │   │   ├── preferences.py         # User preferences
 │   │   └── settings.py            # Settings management
 │   │
 │   ├── core/                      # Core Functionality
 │   │   ├── auth.py                # Supabase authentication
 │   │   ├── config.py              # Configuration management
-│   │   └── simple_auth.py         # Legacy auth support
+│   │   └── jwt_auth.py            # Development JWT fallback auth
 │   │
-│   ├── services/                  # Business Logic Layer
-│   │   ├── enhanced_chat_service.py     # 🤖 Core agentic service
-│   │   ├── mcp_client_simple.py         # 🔗 Google MCP integration
-│   │   ├── tool_manager.py              # 🛠️ Traditional tools
-│   │   ├── master_agent.py              # 🎯 Agent orchestration
-│   │   └── conversation_context_agent.py # 💭 Context analysis
+│   ├── services/                  # Business Logic Layer (Refactored Phase 3)
+│   │   ├── chat_service.py                 # 🤖 Core chat service (facade)
+│   │   ├── chat_source_extractor.py        # URL/source extraction
+│   │   ├── chat_block_builder.py           # UI block building
+│   │   ├── chat_response_parser.py         # Response parsing
+│   │   │
+│   │   ├── chat_tool_handler.py            # 🛠️ Tool handler (facade)
+│   │   ├── chat_tool_definitions.py        # Google tool schemas
+│   │   ├── chat_mcp_handler.py             # AI-driven tool selection
+│   │   ├── chat_tool_executor.py           # Generic tool routing
+│   │   │
+│   │   ├── mcp_client.py                   # 🔗 MCP client (facade)
+│   │   ├── mcp/                            # MCP handler modules
+│   │   │   ├── mcp_gmail_handler.py        # Gmail operations
+│   │   │   ├── mcp_drive_handler.py        # Drive operations
+│   │   │   └── mcp_calendar_handler.py     # Calendar operations
+│   │   │
+│   │   ├── google_oauth.py                 # Google OAuth (facade)
+│   │   ├── google_oauth_core.py            # OAuth & authentication
+│   │   ├── google_gmail_ops.py             # Gmail API operations
+│   │   ├── google_drive_ops.py             # Drive API operations
+│   │   ├── google_calendar_ops.py          # Calendar API operations
+│   │   │
+│   │   └── tool_manager.py                 # Traditional tool manager
 │   │
 │   ├── database/                  # Data Layer
 │   │   ├── __init__.py            # Service exports
@@ -98,23 +117,46 @@ backend/
 │   ├── test_api_ping/                             # API endpoint tests
 │   └── test_integration/                          # End-to-end tests
 │
-├── API_DOCUMENTATION.md           # Comprehensive API docs
+├── docs/                          # Documentation
+│   ├── ARCHITECTURE.md            # System architecture
+│   ├── REFACTORING.md             # Phase 3 refactoring docs
+│   └── API_DOCUMENTATION.md       # API reference
+│
 ├── README_TESTING.md              # Testing documentation
 ├── requirements.txt               # Dependencies
-├── pytest.ini                    # Test configuration
+├── pytest.ini                     # Test configuration
 ├── .coveragerc                    # Coverage configuration
 └── Dockerfile                     # Container configuration
 ```
 
+> **📖 Phase 3 Refactoring (January 2025)**: Services are now organized into focused, single-responsibility modules following the facade pattern. See [docs/REFACTORING.md](./docs/REFACTORING.md) for complete details.
+
 ## 🔧 Service Layer Details
+
+### **Modular Architecture (Phase 3 Refactoring)**
+
+The service layer has been refactored into focused, single-responsibility modules:
+
+#### **Design Patterns Used**
+1. **Facade Pattern**: Main services (`chat_service.py`, `mcp_client.py`, `chat_tool_handler.py`, `google_oauth.py`) act as facades that delegate to specialized modules while maintaining backward compatibility
+2. **Handler Pattern**: MCP handlers route requests to appropriate Google service operations
+3. **Functional Decomposition**: Complex logic broken down into focused, reusable functions
+4. **Dependency Injection**: Functions accept dependencies as parameters for loose coupling
+
+#### **Benefits**
+- ✅ All files under 500 lines (code.md compliance)
+- ✅ Improved maintainability through single-responsibility modules
+- ✅ Enhanced testability with focused functions
+- ✅ Zero breaking changes - full backward compatibility
+- ✅ Clear module boundaries reduce cognitive load
 
 ### **Enhanced Chat Service Architecture**
 
 #### **Key Methods**
 - `process_chat_request()`: Main entry point for chat processing
-- `_handle_google_mcp_request()`: Agentic Google tools workflow
+- `_handle_google_mcp_request()`: Agentic Google tools workflow (delegates to `chat_mcp_handler`)
 - `call_responses_api()`: OpenAI Responses API integration
-- `handle_tool_calls()`: Traditional tool execution (legacy)
+- `handle_tool_calls()`: Traditional tool execution (delegates to `chat_tool_executor`)
 
 #### **Agentic Workflow Implementation**
 ```python
@@ -266,6 +308,28 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 - **Input Validation**: Pydantic models for request/response validation
 - **SQL Injection Prevention**: Parameterized queries
 - **Secret Management**: Environment-based configuration
+
+---
+
+## 📚 Related Documentation
+
+- **[docs/REFACTORING.md](./docs/REFACTORING.md)**: Complete Phase 3 refactoring documentation
+  - Module-by-module breakdown of all refactored services
+  - Design patterns and architectural decisions
+  - Migration guides for developers (backward compatible vs. direct module access)
+  - Before/after metrics showing all files now under 500 lines
+
+- **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**: System architecture overview
+  - High-level architecture diagrams
+  - Data flow and sequence diagrams
+  - Security and performance architecture
+  - Database schema and optimization strategies
+
+- **[docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md)**: API reference
+  - Complete endpoint documentation
+  - Request/response schemas
+  - Authentication flows
+  - Error handling examples
 
 ---
 

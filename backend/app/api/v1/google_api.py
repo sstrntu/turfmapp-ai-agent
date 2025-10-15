@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import logging
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
@@ -9,10 +10,11 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from ...core.auth import get_current_user_supabase
-from typing import Dict, Any
 from ...services.google_oauth import google_oauth_service, GoogleTokens, GoogleAccount
 from ...services.google_db import google_accounts_db
 
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -248,7 +250,7 @@ async def get_user_google_credentials(user_id: str, account_email: str = None):
                 status_code=404, detail=f"Google account {account_email} not found"
             )
         tokens = account.tokens
-        print(f"✅ Found specific account {account_email}")
+        logger.info(f"✅ Found specific account {account_email}")
     else:
         # Use primary account
         primary_account = await google_accounts_db.get_primary_account(user_id)

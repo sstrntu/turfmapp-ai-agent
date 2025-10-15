@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import os
 from typing import List
 from contextlib import asynccontextmanager
@@ -14,7 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # New modular API structure
 from .api.v1.chat import router as chat_router_v1
-from .api.v1.preferences import router as preferences_router_v1
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
@@ -24,14 +25,21 @@ from .api.v1.google_api import router as google_api_router_v1
 
 from .database import get_supabase_config
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
 
 def _get_cors_origins() -> List[str]:
     origins_env = os.getenv("BACKEND_CORS_ORIGINS", "")
     if origins_env:
-        return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
+        origins = [origin.strip() for origin in origins_env.split(",") if origin.strip()]
+        logger.info(f"🌐 CORS origins from env: {origins}")
+        return origins
 
     # Default CORS origins
-    return ["http://localhost:3005", "http://localhost:3000"]
+    default_origins = ["http://localhost:3005", "http://localhost:3000"]
+    logger.info(f"🌐 CORS origins (default): {default_origins}")
+    return default_origins
 
 
 @asynccontextmanager
@@ -39,12 +47,12 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     config = get_supabase_config()
-    print(f"Supabase configured: {bool(config['url'])}")
+    logger.info(f"Supabase configured: {bool(config['url'])}")
 
     yield
 
     # Shutdown
-    print("Application shutting down...")
+    logger.info("Application shutting down...")
 
 
 app = FastAPI(
@@ -95,7 +103,6 @@ def get_frontend_config():
 
 # API v1 routes
 app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
-app.include_router(preferences_router_v1, prefix="/api/v1/preferences", tags=["preferences"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
 
 # Additional v1 routes

@@ -56,6 +56,11 @@ frontend/uploads/
 *.tmp
 tmp/
 
+# Large background images (should be served from CDN/cloud storage)
+frontend/public/*Background.jpg
+frontend/public/*Background.png
+frontend/public/*Background.jpeg
+
 # --- Docker/local volumes ---
 docker-data/
 volumes/

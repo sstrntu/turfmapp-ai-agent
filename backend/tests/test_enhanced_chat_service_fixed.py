@@ -11,6 +11,12 @@ from typing import Dict, Any, List
 import json
 
 from app.services.chat_service import EnhancedChatService
+from app.services.chat_source_extractor import (
+    extract_sources_from_tool_result,
+    extract_sources_from_claude_response,
+    dedupe_sources,
+)
+from app.services.anthropic_client import AnthropicClient, anthropic_client
 
 
 class TestEnhancedChatServiceCore:
@@ -54,6 +60,8 @@ class TestEnhancedChatServiceCore:
             
             assert "Hello! How can I help you today?" in result["assistant_message"]["content"]
             assert result["conversation_id"] == "conv-123"
+            assert result["model"] == "gpt-4o"
+            assert result["provider"] == "openai"
             mock_api.assert_called_once()
     
     @pytest.mark.asyncio
@@ -97,6 +105,8 @@ class TestEnhancedChatServiceCore:
             
             assert result["conversation_id"] == "conv-existing"
             assert "Based on our previous conversation" in result["assistant_message"]["content"]
+            assert result["model"] == "gpt-4o"
+            assert result["provider"] == "openai"
     
     @pytest.mark.asyncio
     async def test_process_chat_request_api_failure(self):
@@ -165,6 +175,37 @@ class TestEnhancedChatServiceToolHandling:
         assert results[0]["tool_call_id"] == "call-unknown"
         assert "not supported" in results[0]["content"].lower()
 
+    @pytest.mark.asyncio
+    async def test_call_claude_api_with_web_search_tool(self):
+        """Claude requests should forward web search tooling to the Anthropic client."""
+        chat_service = EnhancedChatService()
+        tools = [{"type": "web_search_preview", "name": "web_search"}]
+        messages = [{"role": "user", "content": "What's the latest sports news?"}]
+        mock_response = {
+            "content": [
+                {"type": "text", "text": "Here are the latest headlines."}
+            ]
+        }
+
+        with patch.object(anthropic_client, "api_key", "test-key"), \
+             patch.object(anthropic_client, "call_messages_api", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = mock_response
+
+            result = await chat_service.call_claude_api(
+                messages=messages,
+                model="claude-3-5-sonnet",
+                tools=tools,
+            )
+
+        mock_call.assert_awaited_once()
+        await_kwargs = mock_call.await_args.kwargs
+        assert await_kwargs["tools"] == tools
+        assert result["provider"] == "anthropic"
+        assert "latest headlines" in result["output_text"]
+        assert result["sources"] == []
+        assert result["blocks"] == []
+        assert result["sources"] == []
+
 
 class TestEnhancedChatServiceConversationManagement:
     """Test conversation management functionality."""
@@ -181,7 +222,8 @@ class TestEnhancedChatServiceConversationManagement:
             
             assert conversation_id == "new-conv-123"
             mock_fallback.assert_called_once()
-    
+
+
     @pytest.mark.asyncio 
     async def test_get_conversation_history(self):
         """Test retrieving conversation history."""
@@ -233,12 +275,13 @@ class TestEnhancedChatServiceConversationManagement:
 class TestEnhancedChatServiceUtilities:
     """Test utility functions."""
     
-    def test_get_user_preferences_default(self):
+    @pytest.mark.asyncio
+    async def test_get_user_preferences_default(self):
         """Test getting default user preferences."""
         chat_service = EnhancedChatService()
-        
-        preferences = chat_service.get_user_preferences("user-123")
-        
+
+        preferences = await chat_service.get_user_preferences("user-123")
+
         assert "model" in preferences
         assert "include_reasoning" in preferences
         assert "reasoning_effort" in preferences
@@ -356,7 +399,7 @@ class TestEnhancedChatServiceModelHandling:
         """Test calling responses API with different models."""
         chat_service = EnhancedChatService()
         
-        test_models = ["gpt-4o", "gpt-5-mini", "claude-3-sonnet"]
+        test_models = ["gpt-4o", "gpt-5-mini", "claude-sonnet-4-20250514"]
         
         for model in test_models:
             with patch('httpx.AsyncClient') as mock_client_class:
@@ -446,3 +489,139 @@ class TestEnhancedChatServiceListOperations:
             
             assert result is True
             mock_fallback.assert_called_once()
+
+
+class TestAnthropicClientToolConversion:
+    """Test Anthropic tool conversion helper."""
+
+    def test_convert_web_search_tool(self):
+        """Ensure web search preview tools convert to Anthropic format."""
+        client = AnthropicClient()
+        converted = client._convert_tools_to_anthropic_format(
+            [{"type": "web_search_preview", "name": "web_search"}]
+        )
+        assert converted == [{
+            "type": "web_search_20250305",
+            "name": "web_search"
+        }]
+
+    def test_convert_function_tool(self):
+        """Ensure function tools convert to Anthropic function schema."""
+        client = AnthropicClient()
+        converted = client._convert_tools_to_anthropic_format(
+            [{
+                "type": "function",
+                "function": {
+                    "name": "gmail_recent",
+                    "description": "Fetch latest emails.",
+                    "parameters": {"type": "object"}
+                }
+            }]
+        )
+        assert converted == [{
+            "type": "custom",
+            "name": "gmail_recent",
+            "description": "Fetch latest emails.",
+            "input_schema": {"type": "object"}
+        }]
+
+    def test_convert_web_search_with_location(self):
+        """Ensure location metadata is preserved when provided."""
+        client = AnthropicClient()
+        converted = client._convert_tools_to_anthropic_format(
+            [{
+                "type": "web_search_preview",
+                "name": "web_search",
+                "user_location": {
+                    "type": "fixed",
+                    "city": "Bangkok",
+                    "country": "Thailand"
+                }
+            }]
+        )
+        assert converted == [{
+            "type": "web_search_20250305",
+            "name": "web_search",
+            "user_location": {
+                "type": "fixed",
+                "city": "Bangkok",
+                "country": "Thailand"
+            }
+        }]
+
+    def test_convert_web_search_ignores_context_size(self):
+        """Ensure search context size is not forwarded to Anthropic."""
+        client = AnthropicClient()
+        converted = client._convert_tools_to_anthropic_format(
+            [{
+                "type": "web_search_preview",
+                "name": "web_search",
+                "search_context_size": "large"
+            }]
+        )
+        assert converted == [{
+            "type": "web_search_20250305",
+            "name": "web_search"
+        }]
+
+
+class TestSourceExtractionHelpers:
+    """Test helper utilities for extracting search sources."""
+
+    def test_extract_sources_from_tool_result_json(self):
+        """Extract sources from tool result containing JSON payload."""
+        tool_result = {
+            "type": "tool_result",
+            "name": "web_search_preview",
+            "content": [
+                {
+                    "type": "output_text",
+                    "text": json.dumps({
+                        "search_results": [
+                            {"title": "Result One", "url": "https://example.com/1"},
+                            {"title": "Result Two", "url": "https://example.com/2"}
+                        ]
+                    })
+                }
+            ]
+        }
+
+        sources = extract_sources_from_tool_result(tool_result)
+        assert len(sources) == 2
+        assert sources[0]["url"] == "https://example.com/1"
+        assert sources[1]["title"] == "Result Two"
+
+    def test_extract_sources_from_claude_response_citations(self):
+        """Extract sources from Claude response citations."""
+        response = {
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Answer with citation",
+                    "citations": [
+                        {"url": "https://news.example.com/story", "title": "Story"}
+                    ]
+                }
+            ]
+        }
+
+        sources = extract_sources_from_claude_response(response)
+        assert sources == [{
+            "url": "https://news.example.com/story",
+            "title": "Story",
+            "site": "news.example.com",
+            "favicon": "https://www.google.com/s2/favicons?domain=news.example.com&sz=64"
+        }]
+
+    def test_dedupe_sources(self):
+        """Ensure duplicate sources are removed while preserving order."""
+        entries = [
+            {"url": "https://example.com/a", "title": "A", "site": "example.com", "favicon": ""},
+            {"url": "https://example.com/a", "title": "Duplicate", "site": "example.com", "favicon": ""},
+            {"url": "https://example.com/b", "title": "B", "site": "example.com", "favicon": ""},
+        ]
+
+        deduped = dedupe_sources(entries)
+        assert len(deduped) == 2
+        assert deduped[0]["url"] == "https://example.com/a"
+        assert deduped[1]["url"] == "https://example.com/b"

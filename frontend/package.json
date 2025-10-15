@@ -4,12 +4,23 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "python3 -m http.server 3000 --directory public",
-    "build": "echo 'Static files - no build needed'",
-    "preview": "python3 -m http.server 3001 --directory public",
-    "lint": "echo 'Static HTML - no linting configured'",
-    "test": "echo 'Static HTML - no tests configured'"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "echo 'No linting configured yet'",
+    "test": "echo 'No tests configured yet'"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@assistant-ui/react": "^0.11.28",
+    "@assistant-ui/react-markdown": "^0.11.1",
+    "react-markdown": "^9.0.3",
+    "react-syntax-highlighter": "^15.5.0",
+    "remark-gfm": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.10"
+  }
 }

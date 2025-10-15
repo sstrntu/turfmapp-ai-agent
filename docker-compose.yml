@@ -3,6 +3,8 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     # environment:
     #   - OPENAI_API_KEY=${OPENAI_API_KEY}
     #   - FAL_KEY=${FAL_KEY}
@@ -38,5 +40,4 @@ services:
 
 # volumes:
 #   backend_data:
-
 
