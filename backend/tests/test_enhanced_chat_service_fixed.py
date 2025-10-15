@@ -10,11 +10,11 @@ from unittest.mock import AsyncMock, Mock, patch
 from typing import Dict, Any, List
 import json
 
-from app.services.chat_service import (
-    EnhancedChatService,
-    _extract_sources_from_tool_result,
-    _extract_sources_from_claude_response,
-    _dedupe_sources,
+from app.services.chat_service import EnhancedChatService
+from app.services.chat_source_extractor import (
+    extract_sources_from_tool_result,
+    extract_sources_from_claude_response,
+    dedupe_sources,
 )
 from app.services.anthropic_client import AnthropicClient, anthropic_client
 
@@ -586,7 +586,7 @@ class TestSourceExtractionHelpers:
             ]
         }
 
-        sources = _extract_sources_from_tool_result(tool_result)
+        sources = extract_sources_from_tool_result(tool_result)
         assert len(sources) == 2
         assert sources[0]["url"] == "https://example.com/1"
         assert sources[1]["title"] == "Result Two"
@@ -605,7 +605,7 @@ class TestSourceExtractionHelpers:
             ]
         }
 
-        sources = _extract_sources_from_claude_response(response)
+        sources = extract_sources_from_claude_response(response)
         assert sources == [{
             "url": "https://news.example.com/story",
             "title": "Story",
@@ -621,7 +621,7 @@ class TestSourceExtractionHelpers:
             {"url": "https://example.com/b", "title": "B", "site": "example.com", "favicon": ""},
         ]
 
-        deduped = _dedupe_sources(entries)
+        deduped = dedupe_sources(entries)
         assert len(deduped) == 2
         assert deduped[0]["url"] == "https://example.com/a"
         assert deduped[1]["url"] == "https://example.com/b"

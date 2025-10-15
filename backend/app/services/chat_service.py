@@ -2,7 +2,7 @@
 Enhanced Chat Service - Core Business Logic for AI Chat Operations
 
 This service provides the primary business logic for chat functionality, including:
-- Multi-model AI integration (GPT-4O, O1, GPT-5-mini via OpenAI Responses API)  
+- Multi-model AI integration (GPT-4O, O1, GPT-5-mini via OpenAI Responses API)
 - Conversation management with persistent storage
 - Sources extraction and metadata enrichment
 - Database fallback patterns for resilience
@@ -19,18 +19,17 @@ Recent improvements (August 2025):
 - Enhanced GPT-5-mini support with 4000 token limit
 - Improved incomplete response handling
 - Auto-generated conversation titles from first message
+- Refactored into focused modules (Phase 3 - January 2025)
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional, Iterable
+from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import uuid
 import json
-import re
-from collections import deque
 
 from fastapi import HTTPException
 from ..database import ConversationService
@@ -40,590 +39,30 @@ from .chat_api_client import chat_api_client
 from .chat_tool_handler import ChatToolHandler
 from .anthropic_client import anthropic_client
 from .chat_instructions import build_system_instructions
-from urllib.parse import urlparse
+
+# Import from new modular files
+from .chat_source_extractor import (
+    extract_sources_from_text,
+    extract_sources_from_tool_result,
+    extract_sources_from_claude_response,
+    dedupe_sources,
+    build_source_entry,
+)
+from .chat_block_builder import (
+    build_blocks_from_tool_results,
+    dedupe_blocks,
+    serialise_args,
+)
+from .chat_response_parser import (
+    parse_openai_output_items,
+    execute_openai_function_calls,
+    parse_claude_tool_uses,
+    summarize_tool_results_with_ai,
+    extract_sources_from_annotations,
+)
 
 # Configure logger
 logger = logging.getLogger(__name__)
-
-_URL_PATTERN = re.compile(r"https?://[^\s\]\)\"'>]+")
-
-
-def _build_source_entry(url: Optional[str], title: Optional[str] = None) -> Optional[Dict[str, str]]:
-    """
-    Build a normalized source entry from URL and title.
-
-    Args:
-        url: The URL to normalize and validate
-        title: Optional display title for the source
-
-    Returns:
-        Dictionary with url, title, site, and favicon keys, or None if invalid
-    """
-    if not isinstance(url, str):
-        return None
-
-    url = url.strip()
-    if not url:
-        return None
-
-    if url.startswith("//"):
-        url = f"https:{url}"
-    elif not url.lower().startswith(("http://", "https://")):
-        url = f"https://{url}"
-
-    try:
-        parsed = urlparse(url)
-    except ValueError:
-        return None
-
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return None
-
-    site = parsed.netloc
-    display_title = title.strip() if isinstance(title, str) and title.strip() else site
-
-    return {
-        "url": url,
-        "title": display_title,
-        "site": site,
-        "favicon": f"https://www.google.com/s2/favicons?domain={site}&sz=64",
-    }
-
-
-def _dedupe_sources(sources: Iterable[Dict[str, str]]) -> List[Dict[str, str]]:
-    """
-    Deduplicate sources, preserving order and limiting count.
-
-    Args:
-        sources: Iterable of source dictionaries with 'url' keys
-
-    Returns:
-        List of unique sources, limited to 8 items maximum
-    """
-    unique: List[Dict[str, str]] = []
-    seen = set()
-
-    for source in sources:
-        url = source.get("url")
-        if not url or url in seen:
-            continue
-        seen.add(url)
-        unique.append(source)
-        if len(unique) >= 8:
-            break
-
-    return unique
-
-
-def _extract_sources_from_text(text: str) -> List[Dict[str, str]]:
-    """Extract HTTP(S) URLs from plain text and convert to sources.
-
-    Scans the provided text for HTTP(S) URLs using regex pattern matching,
-    cleans each URL by removing trailing punctuation, validates and normalizes
-    them into source entries with metadata.
-
-    Args:
-        text: Plain text string to search for URLs.
-
-    Returns:
-        List of source dictionaries, each containing 'url', 'title', 'site',
-        and 'favicon' keys. Returns empty list if input is not a string or
-        contains no valid URLs.
-
-    Example:
-        >>> text = "Check out https://example.com and https://test.org!"
-        >>> sources = _extract_sources_from_text(text)
-        >>> len(sources)
-        2
-    """
-    if not isinstance(text, str):
-        return []
-
-    matches = _URL_PATTERN.findall(text)
-    sources = []
-    for match in matches:
-        cleaned = match.rstrip(".,);]")
-        source = _build_source_entry(cleaned)
-        if source:
-            sources.append(source)
-    return sources
-
-
-def _extract_sources_from_object(obj: Any) -> List[Dict[str, str]]:
-    """Recursively extract source entries from nested data structures.
-
-    Performs breadth-first traversal of nested dictionaries, lists, and JSON strings
-    to find and extract URL-based source entries. Handles multiple URL field names
-    (url, link, href) and title field names (title, name, headline, text).
-
-    Args:
-        obj: Any data structure to search - can be dict, list, str (JSON), or
-            any nested combination thereof.
-
-    Returns:
-        List of source dictionaries extracted from the object tree, each containing
-        'url', 'title', 'site', and 'favicon' keys. Returns empty list if no valid
-        sources found.
-
-    Example:
-        >>> data = {"results": [{"url": "https://example.com", "title": "Example"}]}
-        >>> sources = _extract_sources_from_object(data)
-        >>> sources[0]['site']
-        'example.com'
-    """
-    sources: List[Dict[str, str]] = []
-    queue: deque[Any] = deque([obj])
-
-    while queue:
-        current = queue.popleft()
-
-        if isinstance(current, dict):
-            url = current.get("url") or current.get("link") or current.get("href")
-            title = current.get("title") or current.get("name") or current.get("headline") or current.get("text")
-
-            source = _build_source_entry(url, title)
-            if source:
-                sources.append(source)
-
-            for value in current.values():
-                if isinstance(value, (list, dict, str)):
-                    queue.append(value)
-
-        elif isinstance(current, list):
-            for item in current:
-                if isinstance(item, (list, dict, str)):
-                    queue.append(item)
-
-        elif isinstance(current, str):
-            try:
-                parsed = json.loads(current)
-            except (TypeError, ValueError):
-                sources.extend(_extract_sources_from_text(current))
-            else:
-                queue.append(parsed)
-
-    return sources
-
-
-def _extract_sources_from_tool_result(tool_result: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Extract sources from a tool result payload.
-
-    Searches tool result dictionaries for common output fields (output, content,
-    outputs, results, data, value) and extracts URL sources from each. Also checks
-    nested 'tool' object for additional output fields.
-
-    Args:
-        tool_result: Dictionary containing tool execution results, typically with
-            fields like 'output', 'content', or 'results' containing response data.
-
-    Returns:
-        Deduplicated list of source dictionaries (max 8 items), each containing
-        'url', 'title', 'site', and 'favicon' keys. Returns empty list if input
-        is not a dict or contains no valid sources.
-
-    Example:
-        >>> result = {"output": {"url": "https://example.com", "title": "Test"}}
-        >>> sources = _extract_sources_from_tool_result(result)
-        >>> len(sources)
-        1
-    """
-    if not isinstance(tool_result, dict):
-        return []
-
-    candidate_values: List[Any] = []
-    for key in ("output", "content", "outputs", "results", "data", "value"):
-        value = tool_result.get(key)
-        if value:
-            candidate_values.append(value)
-
-    tool_info = tool_result.get("tool")
-    if isinstance(tool_info, dict):
-        for key in ("output", "outputs", "results"):
-            if tool_info.get(key):
-                candidate_values.append(tool_info[key])
-
-    sources: List[Dict[str, str]] = []
-    for candidate in candidate_values:
-        sources.extend(_extract_sources_from_object(candidate))
-
-    return _dedupe_sources(sources)
-
-
-def _extract_tool_payloads(tool_result: Dict[str, Any]) -> List[Any]:
-    """Extract raw payloads from tool result for block rendering.
-
-    Extracts structured and text payloads from tool results for frontend display.
-    Handles both content arrays (with type-specific extraction) and direct output
-    fields. JSON text is parsed, while plain text is preserved as-is.
-
-    Args:
-        tool_result: Dictionary containing tool execution results with 'content'
-            array or direct output fields ('result', 'output', 'data', 'value').
-
-    Returns:
-        List of payload values extracted from the tool result. Can contain mixed
-        types (dicts, strings, etc.). Returns empty list if input is not a dict
-        or contains no extractable payloads.
-
-    Example:
-        >>> result = {"content": [{"type": "json", "json": {"key": "value"}}]}
-        >>> payloads = _extract_tool_payloads(result)
-        >>> payloads[0]
-        {'key': 'value'}
-    """
-    if not isinstance(tool_result, dict):
-        return []
-
-    payloads: List[Any] = []
-
-    def _add_payload(value: Any) -> None:
-        if value is None:
-            return
-        payloads.append(value)
-
-    content_items = tool_result.get("content")
-    if isinstance(content_items, list):
-        for entry in content_items:
-            if not isinstance(entry, dict):
-                continue
-            entry_type = entry.get("type")
-            if entry_type in {"json", "json_object"} and entry.get("json") is not None:
-                _add_payload(entry.get("json"))
-            elif entry_type in {"text", "output_text"}:
-                text = entry.get("text")
-                if not text:
-                    continue
-                try:
-                    _add_payload(json.loads(text))
-                except (TypeError, ValueError):
-                    _add_payload(text)
-
-    for key in ("result", "output", "data", "value"):
-        if key in tool_result and tool_result[key]:
-            _add_payload(tool_result[key])
-
-    return payloads
-
-
-def _serialise_args(args: Any) -> Optional[str]:
-    """Serialise tool arguments for display.
-
-    Converts tool call arguments to a human-readable string format for UI display.
-    Handles strings (pass-through), JSON-serializable objects (pretty-print), and
-    non-serializable objects (fallback to str()).
-
-    Args:
-        args: Tool arguments to serialize - can be None, str, dict, list, or any
-            other type.
-
-    Returns:
-        String representation of the arguments formatted for display, or None if
-        args is None. JSON objects are indented for readability.
-
-    Example:
-        >>> _serialise_args({"query": "test", "limit": 10})
-        '{\\n  "query": "test",\\n  "limit": 10\\n}'
-        >>> _serialise_args("already a string")
-        'already a string'
-        >>> _serialise_args(None)
-        None
-    """
-    if args is None:
-        return None
-    if isinstance(args, str):
-        return args
-    try:
-        return json.dumps(args, ensure_ascii=False, indent=2)
-    except TypeError:
-        return str(args)
-
-
-def _build_blocks_from_tool_results(
-    tool_results: Iterable[Dict[str, Any]],
-    tool_call_inputs: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> List[Dict[str, Any]]:
-    """Convert tool results into structured blocks for frontend rendering.
-
-    Transforms raw tool execution results into UI-friendly block structures with
-    appropriate types (search-results, key-value, markdown, tool-call) based on
-    the payload content. Enriches blocks with metadata from tool call inputs.
-
-    Args:
-        tool_results: Iterable of tool result dictionaries, each typically containing
-            'tool_call_id', 'name', and result data in various formats.
-        tool_call_inputs: Optional mapping of tool call IDs to their input metadata
-            (name, args, args_text). Used to enrich blocks with call context.
-            Defaults to empty dict if not provided.
-
-    Returns:
-        Deduplicated list of block dictionaries (max 8 items), each containing:
-        - id: Unique block identifier
-        - type: Block type (search-results, key-value, markdown, tool-call)
-        - toolName: Name of the tool that generated this block
-        - args: Original tool arguments
-        - argsText: Serialized display version of arguments
-        - callId: Tool call identifier
-        - Additional type-specific fields (results, pairs, text, result, title)
-
-    Example:
-        >>> results = [{"tool_call_id": "1", "name": "search", "result": {...}}]
-        >>> blocks = _build_blocks_from_tool_results(results)
-        >>> blocks[0]['type']
-        'search-results'
-    """
-    blocks: List[Dict[str, Any]] = []
-
-    if tool_call_inputs is None:
-        tool_call_inputs = {}
-
-    for index, tool_result in enumerate(tool_results):
-        if not isinstance(tool_result, dict):
-            continue
-
-        call_id = (
-            tool_result.get("tool_call_id")
-            or tool_result.get("id")
-            or tool_result.get("tool_use_id")
-        )
-        tool_name = (
-            tool_result.get("name")
-            or tool_result.get("tool_name")
-            or tool_call_inputs.get(call_id, {}).get("name")
-        )
-
-        args_info = tool_call_inputs.get(call_id, {})
-        args_payload = args_info.get("args")
-        args_text = args_info.get("args_text") or _serialise_args(args_payload)
-
-        payloads = _extract_tool_payloads(tool_result)
-
-        block_id_prefix = (tool_name or "tool").replace(" ", "-").lower()
-        base_common = {
-            "toolName": tool_name,
-            "args": args_payload,
-            "argsText": args_text,
-            "callId": call_id,
-        }
-
-        created_block = False
-        for payload in payloads:
-            if isinstance(payload, dict):
-                results = None
-                for key in ("results", "search_results", "items"):
-                    candidate = payload.get(key)
-                    if isinstance(candidate, list) and candidate:
-                        results = candidate
-                        break
-
-                if results:
-                    normalised_results = []
-                    for item in results:
-                        if isinstance(item, dict):
-                            source = _build_source_entry(
-                                item.get("url")
-                                or item.get("link")
-                                or item.get("source_url"),
-                                item.get("title") or item.get("name"),
-                            )
-                            snippet = (
-                                item.get("snippet")
-                                or item.get("description")
-                                or item.get("text")
-                            )
-                            entry = {
-                                "title": source["title"] if source else (item.get("title") or item.get("name") or "Result"),
-                                "url": source["url"] if source else item.get("url") or item.get("link"),
-                                "snippet": snippet,
-                                "site": source["site"] if source else item.get("site"),
-                                "favicon": source["favicon"] if source else item.get("favicon"),
-                            }
-                            normalised_results.append(entry)
-                        elif isinstance(item, str):
-                            normalised_results.append(
-                                {
-                                    "title": item,
-                                    "url": None,
-                                    "snippet": None,
-                                }
-                            )
-
-                    if normalised_results:
-                        blocks.append(
-                            {
-                                "id": f"{block_id_prefix}-search-{index}",
-                                "type": "search-results",
-                                "title": payload.get("title")
-                                or payload.get("query")
-                                or payload.get("topic")
-                                or (tool_name or "Search results"),
-                                "results": normalised_results,
-                                **base_common,
-                            }
-                        )
-                        created_block = True
-                        continue
-
-                # Fallback to key-value representation for structured dicts
-                pairs = []
-                for key, value in payload.items():
-                    if isinstance(value, (dict, list)):
-                        value_repr = json.dumps(value, ensure_ascii=False, indent=2)
-                    else:
-                        value_repr = str(value)
-                    pairs.append({"label": key, "value": value_repr})
-
-                if pairs:
-                    blocks.append(
-                        {
-                            "id": f"{block_id_prefix}-object-{index}",
-                            "type": "key-value",
-                            "title": payload.get("title") or (tool_name or "Tool output"),
-                            "pairs": pairs,
-                            **base_common,
-                        }
-                    )
-                    created_block = True
-                    continue
-
-            elif isinstance(payload, str):
-                text = payload.strip()
-                if text:
-                    blocks.append(
-                        {
-                            "id": f"{block_id_prefix}-markdown-{index}",
-                            "type": "markdown",
-                            "text": text,
-                            **base_common,
-                        }
-                    )
-                    created_block = True
-                    continue
-
-        if not created_block:
-            fallback_payload = payloads[0] if payloads else tool_result
-            blocks.append(
-                {
-                    "id": f"{block_id_prefix}-raw-{index}",
-                    "type": "tool-call",
-                    "title": tool_name or "Tool response",
-                    "result": fallback_payload,
-                    **base_common,
-                }
-            )
-
-    return _dedupe_blocks(blocks)
-
-
-def _dedupe_blocks(blocks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Remove duplicate blocks while preserving order.
-
-    Deduplicates block dictionaries using either explicit 'id' field or a composite
-    hash of (type, toolName, title) for blocks without IDs. Limits output to
-    maximum of 8 blocks.
-
-    Args:
-        blocks: Iterable of block dictionaries to deduplicate. Non-dict items are
-            silently skipped.
-
-    Returns:
-        List of unique blocks in original order, limited to 8 items maximum.
-        Uniqueness determined by 'id' field if present, otherwise by composite
-        key of block metadata.
-
-    Example:
-        >>> blocks = [
-        ...     {"id": "1", "type": "search"},
-        ...     {"id": "1", "type": "search"},  # duplicate
-        ...     {"id": "2", "type": "tool"}
-        ... ]
-        >>> deduped = _dedupe_blocks(blocks)
-        >>> len(deduped)
-        2
-    """
-    cleaned: List[Dict[str, Any]] = []
-    seen: set = set()
-
-    for block in blocks:
-        if not isinstance(block, dict):
-            continue
-        block_id = block.get("id")
-        if block_id:
-            key = ("id", block_id)
-        else:
-            key = ("hash", block.get("type"), block.get("toolName"), block.get("title"))
-        if key in seen:
-            continue
-        seen.add(key)
-        cleaned.append(block)
-        if len(cleaned) >= 8:
-            break
-
-    return cleaned
-
-
-def _extract_sources_from_claude_response(response: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Extract sources from Claude response payload.
-
-    Searches Claude API response for sources in multiple locations:
-    - Content block citations (both direct and in metadata)
-    - Tool result blocks
-    - Search results within blocks
-    - Top-level citations array
-
-    Args:
-        response: Claude API response dictionary, typically containing 'content'
-            array with text blocks, tool results, and optional 'citations' field.
-
-    Returns:
-        Deduplicated list of source dictionaries (max 8 items), each containing
-        'url', 'title', 'site', and 'favicon' keys. Returns empty list if no
-        valid sources found in response.
-
-    Example:
-        >>> response = {
-        ...     "content": [{"citations": [{"url": "https://example.com", "title": "Test"}]}],
-        ...     "citations": [{"url": "https://test.org"}]
-        ... }
-        >>> sources = _extract_sources_from_claude_response(response)
-        >>> len(sources)
-        2
-    """
-    sources: List[Dict[str, str]] = []
-
-    content_blocks = response.get("content", [])
-    if isinstance(content_blocks, list):
-        for block in content_blocks:
-            if not isinstance(block, dict):
-                continue
-
-            citations = block.get("citations") or block.get("metadata", {}).get("citations")
-            if isinstance(citations, list):
-                for citation in citations:
-                    if isinstance(citation, dict):
-                        source = _build_source_entry(
-                            citation.get("url") or citation.get("source_url") or citation.get("source"),
-                            citation.get("title") or citation.get("text"),
-                        )
-                        if source:
-                            sources.append(source)
-
-            if block.get("type") == "tool_result":
-                sources.extend(_extract_sources_from_tool_result(block))
-
-            sources.extend(_extract_sources_from_object(block.get("search_results")))
-
-    top_level_citations = response.get("citations")
-    if isinstance(top_level_citations, list):
-        for citation in top_level_citations:
-            if isinstance(citation, dict):
-                source = _build_source_entry(
-                    citation.get("url") or citation.get("source_url") or citation.get("source"),
-                    citation.get("title") or citation.get("text"),
-                )
-                if source:
-                    sources.append(source)
-
-    return _dedupe_sources(sources)
 
 
 class EnhancedChatService:
@@ -856,13 +295,13 @@ class EnhancedChatService:
                     claude_tool_inputs[tool_id] = {
                         "name": block.get("name"),
                         "args": block.get("input"),
-                        "args_text": _serialise_args(block.get("input")),
+                        "args_text": serialise_args(block.get("input")),
                     }
             elif block_type == "tool_result":
                 claude_tool_results.append(block)
 
-        sources = _extract_sources_from_claude_response(response)
-        claude_blocks = _build_blocks_from_tool_results(claude_tool_results, claude_tool_inputs)
+        sources = extract_sources_from_claude_response(response)
+        claude_blocks = build_blocks_from_tool_results(claude_tool_results, claude_tool_inputs)
 
         output_text = "\n\n".join(block for block in text_blocks if block)
 
@@ -1058,7 +497,7 @@ class EnhancedChatService:
                                 tool_call_inputs[call_id] = {
                                     "name": tool_name,
                                     "args": parsed_args,
-                                    "args_text": _serialise_args(parsed_args),
+                                    "args_text": serialise_args(parsed_args),
                                 }
 
                             except Exception as tool_error:
@@ -1082,7 +521,7 @@ class EnhancedChatService:
                             tool_call_inputs[call_id] = {
                                 "name": item.get("name"),
                                 "args": parsed_args if parsed_args is not None else arguments,
-                                "args_text": _serialise_args(parsed_args if parsed_args is not None else arguments),
+                                "args_text": serialise_args(parsed_args if parsed_args is not None else arguments),
                             }
                     elif item_type == "tool_result":
                         logger.debug(f"🔧 Tool result found: {item}")
@@ -1106,7 +545,7 @@ class EnhancedChatService:
                                             logger.debug(f"🔧 Found {len(annotations)} annotations")
                                             for annotation in annotations:
                                                 if annotation.get("type") == "url_citation":
-                                                    source = _build_source_entry(
+                                                    source = build_source_entry(
                                                         annotation.get("url", ""),
                                                         annotation.get("title"),
                                                     )
@@ -1173,7 +612,7 @@ class EnhancedChatService:
                             tool_call_inputs[tool_id] = {
                                 "name": tool_name,
                                 "args": tool_input,
-                                "args_text": _serialise_args(tool_input),
+                                "args_text": serialise_args(tool_input),
                             }
                             tool_results.append(result)
 
@@ -1340,7 +779,7 @@ Respond as if you're having a natural conversation with the user."""
             tools_already_summarized = bool((claude_tool_uses or openai_function_calls) and assistant_content)
 
             if tool_results:
-                tool_blocks = _build_blocks_from_tool_results(tool_results, tool_call_inputs)
+                tool_blocks = build_blocks_from_tool_results(tool_results, tool_call_inputs)
                 if tool_blocks:
                     message_blocks.extend(tool_blocks)
 
@@ -1375,7 +814,7 @@ Respond as if you're having a natural conversation with the user."""
 
                 # Always extract sources from tool results
                 for tool_item in tool_results:
-                    extracted_sources = _extract_sources_from_tool_result(tool_item)
+                    extracted_sources = extract_sources_from_tool_result(tool_item)
                     if extracted_sources:
                         logger.debug(f"🔧 Extracted {len(extracted_sources)} sources from tool result")
                         sources.extend(extracted_sources)
@@ -1387,7 +826,7 @@ Respond as if you're having a natural conversation with the user."""
 
             # Extract sources from URLs in text content (like original repo)
             if isinstance(assistant_content, str) and assistant_content and not sources:
-                text_sources = _extract_sources_from_text(assistant_content)
+                text_sources = extract_sources_from_text(assistant_content)
                 if text_sources:
                     logger.warning(f"🔍 Extracted {len(text_sources)} sources from assistant text")
                     sources.extend(text_sources)
@@ -1402,9 +841,9 @@ Respond as if you're having a natural conversation with the user."""
                 reasoning = api_response["reasoning"]
 
             if sources:
-                sources = _dedupe_sources(sources)
+                sources = dedupe_sources(sources)
             if message_blocks:
-                message_blocks = _dedupe_blocks(message_blocks)
+                message_blocks = dedupe_blocks(message_blocks)
 
             logger.warning(f"🔍 Final assistant content length: {len(assistant_content) if assistant_content else 0}")
             
