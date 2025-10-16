@@ -1,30 +1,34 @@
-# Multi-stage build to reduce context
-FROM alpine:latest AS file-copier
+# Build stage
+FROM node:20-alpine AS build
 
-# Create directory structure
-RUN mkdir -p /app/public
+WORKDIR /app
 
-# Copy HTML and assets (include background images)
-COPY public/*.html /app/public/
-COPY public/*Background.jpg /app/public/
-COPY public/scripts/ /app/public/scripts/
-COPY public/styles/ /app/public/styles/
-COPY public/favicon.ico /app/public/
-COPY public/fonts/ /app/public/fonts/
-COPY public/icons/ /app/public/icons/
+# Copy package files
+COPY package.json package-lock.json ./
 
-# Final stage with nginx
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY vite.config.js ./
+COPY public ./public
+COPY src ./src
+
+# Build the app
+RUN npm run build
+
+# Production stage with nginx
 FROM nginx:alpine
 
 # Remove default nginx files
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy files from previous stage
-COPY --from=file-copier /app/public/ /usr/share/nginx/html/
+# Copy built files from build stage
+COPY --from=build /app/dist/ /usr/share/nginx/html/
 
-# Fix permissions for all files
-RUN chmod -R 644 /usr/share/nginx/html/
-RUN find /usr/share/nginx/html/ -type d -exec chmod 755 {} \;
+# Fix file permissions for nginx
+RUN chmod -R 755 /usr/share/nginx/html && \
+    find /usr/share/nginx/html -type f -exec chmod 644 {} \;
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf

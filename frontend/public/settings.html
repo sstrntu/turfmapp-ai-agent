@@ -413,7 +413,12 @@
                                 <div class="label">Preferred Model</div>
                                 <select id="user-model" class="select-input">
                                     <option value="gpt-4o">gpt-4o (Default, Fast & Reliable)</option>
-                                    <option value="gpt-5-mini">gpt-5-mini (Latest, Experimental)</option>
+                                    <option value="gpt-4o-mini">gpt-4o-mini (Lightweight, cost efficient)</option>
+                                    <option value="gpt-5-mini">gpt-5-mini (Latest OpenAI experimental)</option>
+                                    <option value="claude-3-haiku-20240307">claude-3-haiku (Fast Claude)</option>
+                                    <option value="claude-sonnet-4-20250514">claude-sonnet-4 (Balanced Claude)</option>
+                                    <option value="claude-sonnet-4-5-20250929">claude-sonnet-4.5 (Enhanced Claude)</option>
+                                    <option value="claude-opus-4-1-20250805">claude-opus-4.1 (Premium Claude)</option>
                                 </select>
                             </div>
 
@@ -1051,6 +1056,12 @@
                     system_prompt: document.getElementById('system-prompt').value.trim() || null
                 };
 
+                try {
+                    localStorage.setItem('tm_model', preferencesData.default_model);
+                } catch (storageError) {
+                    console.warn('Unable to persist preferred model locally:', storageError);
+                }
+
                 const response = await fetch('/api/v1/settings/preferences', {
                     method: 'PUT',
                     headers: {
@@ -1234,30 +1245,7 @@
     </aside>
 
     <script>
-        // Initialize left panel toggle functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const toggleBtn = document.getElementById('left-panel-toggle');
-            const closeBtn = document.getElementById('left-panel-close');
-            const panel = document.getElementById('left-panel');
-
-            if (toggleBtn && panel) {
-                toggleBtn.addEventListener('click', function() {
-                    panel.classList.toggle('open');
-                    toggleBtn.setAttribute('aria-expanded', panel.classList.contains('open'));
-                    panel.setAttribute('aria-hidden', !panel.classList.contains('open'));
-                    document.body.classList.toggle('panel-open', panel.classList.contains('open'));
-                });
-            }
-
-            if (closeBtn && panel) {
-                closeBtn.addEventListener('click', function() {
-                    panel.classList.remove('open');
-                    toggleBtn.setAttribute('aria-expanded', 'false');
-                    panel.setAttribute('aria-hidden', 'true');
-                    document.body.classList.remove('panel-open');
-                });
-            }
-        });
+        // Sidebar initialization is handled by scripts/ui.js
 
         // Google Account Management Functions
         let googleAccountsData = [];

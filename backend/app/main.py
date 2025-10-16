@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import os
 import logging
 from typing import List
@@ -15,7 +17,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # New modular API structure
 from .api.v1.chat import router as chat_router_v1
-from .api.v1.preferences import router as preferences_router_v1
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
@@ -30,14 +31,23 @@ from .core.logging_config import setup_logging, get_logger
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"), enable_colors=True)
 logger = get_logger(__name__)
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
 
 def _get_cors_origins() -> List[str]:
     origins_env = os.getenv("BACKEND_CORS_ORIGINS", "")
     if origins_env:
-        return [origin.strip() for origin in origins_env.split(",") if origin.strip()]
+        origins = [
+            origin.strip() for origin in origins_env.split(",") if origin.strip()
+        ]
+        logger.info(f"🌐 CORS origins from env: {origins}")
+        return origins
 
     # Default CORS origins
-    return ["http://localhost:3005", "http://localhost:3000"]
+    default_origins = ["http://localhost:3005", "http://localhost:3000"]
+    logger.info(f"🌐 CORS origins (default): {default_origins}")
+    return default_origins
 
 
 @asynccontextmanager
@@ -47,7 +57,6 @@ async def lifespan(app: FastAPI):
     logger.info("Application starting up")
     config = get_supabase_config()
     logger.info(f"Supabase configured: {bool(config['url'])}")
-    logger.info(f"CORS origins: {_get_cors_origins()}")
 
     yield
 
@@ -59,7 +68,7 @@ app = FastAPI(
     title="TURFMAPP AI Agent Backend",
     description="Modular AI chatbot backend with Supabase integration",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -74,11 +83,7 @@ app.add_middleware(
 @app.get("/")
 def root():
     """Root endpoint"""
-    return {
-        "message": "TURFMAPP AI Agent Backend",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    return {"message": "TURFMAPP AI Agent Backend", "version": "1.0.0", "docs": "/docs"}
 
 
 @app.get("/healthz")
@@ -93,17 +98,14 @@ def get_frontend_config():
     return {
         "supabase": {
             "url": os.getenv("SUPABASE_URL"),
-            "anonKey": os.getenv("SUPABASE_ANON_KEY")
+            "anonKey": os.getenv("SUPABASE_ANON_KEY"),
         },
-        "frontend": {
-            "url": os.getenv("FRONTEND_URL", "http://localhost:3005")
-        }
+        "frontend": {"url": os.getenv("FRONTEND_URL", "http://localhost:3005")},
     }
 
 
 # API v1 routes
 app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
-app.include_router(preferences_router_v1, prefix="/api/v1/preferences", tags=["preferences"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
 
 # Additional v1 routes
@@ -118,5 +120,3 @@ app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oa
 
 
 # Startup logic moved to lifespan context manager above
-
-

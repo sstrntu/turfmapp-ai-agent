@@ -62,12 +62,13 @@ class TestCriticalUserFlows:
             assert result["assistant_message"]["content"] == "Hello! I can help you with that."
             assert result["conversation_id"] == "conv-123"
     
-    def test_user_preferences_default_behavior(self):
+    @pytest.mark.asyncio
+    async def test_user_preferences_default_behavior(self):
         """CRITICAL: User preferences must have sensible defaults."""
         chat_service = EnhancedChatService()
-        
-        prefs = chat_service.get_user_preferences("new-user")
-        
+
+        prefs = await chat_service.get_user_preferences("new-user")
+
         # These defaults must never change without migration
         assert prefs["model"] == "gpt-4o"
         assert prefs["include_reasoning"] is False

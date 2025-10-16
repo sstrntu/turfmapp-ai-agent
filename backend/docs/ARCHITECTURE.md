@@ -85,10 +85,38 @@ async def send_chat_message(
 #### 2. Service Layer (`app/services/`)
 **Purpose**: Business logic and external service integration
 
-**Components**:
-- `enhanced_chat_service.py`: Core chat functionality
+**Components** (refactored in Phase 3 - January 2025):
+
+**Core Services**:
+- `chat_service.py`: Core chat functionality (facade)
+- `chat_tool_handler.py`: Tool routing and execution (facade)
+- `mcp_client.py`: Google MCP client (facade)
+- `google_oauth.py`: Google OAuth service (facade)
 - `conversation_service.py`: Conversation management
 - `user_service.py`: User data management
+
+**Chat Processing Modules**:
+- `chat_source_extractor.py`: URL and source extraction utilities
+- `chat_block_builder.py`: Block building for UI rendering
+- `chat_response_parser.py`: Response parsing for multiple AI providers
+
+**Tool Management Modules**:
+- `chat_tool_definitions.py`: Google service tool schemas
+- `chat_mcp_handler.py`: AI-driven tool selection and execution
+- `chat_tool_executor.py`: Generic tool routing
+
+**MCP Handler Modules** (`app/services/mcp/`):
+- `mcp_gmail_handler.py`: Gmail operations
+- `mcp_drive_handler.py`: Drive operations
+- `mcp_calendar_handler.py`: Calendar operations
+
+**Google Operations Modules**:
+- `google_oauth_core.py`: OAuth and authentication
+- `google_gmail_ops.py`: Gmail API operations
+- `google_drive_ops.py`: Drive API operations
+- `google_calendar_ops.py`: Calendar API operations
+
+> **📖 See [REFACTORING.md](./REFACTORING.md)** for detailed documentation on the modular architecture, design patterns, and migration guides.
 
 **Responsibilities**:
 - AI model integration and response processing
@@ -129,7 +157,7 @@ class EnhancedChatService:
 
 **Components**:
 - `config.py`: Application configuration
-- `simple_auth.py`: Authentication middleware
+- `jwt_auth.py`: Development JWT authentication middleware
 - `security.py`: Security utilities
 
 **Responsibilities**:
@@ -532,6 +560,16 @@ class TestChatService:
 
 ---
 
-**Architecture Version**: 1.0  
-**Last Updated**: August 30, 2025  
-**Next Review**: December 2025
+## Related Documentation
+
+- **[REFACTORING.md](./REFACTORING.md)**: Comprehensive Phase 3 refactoring documentation including:
+  - Modular service architecture breakdown
+  - Design patterns (Facade, Handler, Functional Decomposition, Dependency Injection)
+  - Migration guides for developers
+  - Before/after metrics and benefits
+
+---
+
+**Architecture Version**: 1.1
+**Last Updated**: January 15, 2025 (Phase 3 Refactoring)
+**Next Review**: March 2025

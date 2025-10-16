@@ -165,7 +165,7 @@ def generate_encryption_key() -> str:
 if __name__ == "__main__":
     # Utility to generate encryption key for production
     key = generate_encryption_key()
-    print(f"Generated encryption key for production:")
-    print(f"ENCRYPTION_KEY={key}")
-    print("\n⚠️  Store this key securely and set it in your production environment!")
-    print("⚠️  Keep this key secret and backed up - losing it makes data unrecoverable!")
+    logger.info(f"Generated encryption key for production:")
+    logger.info(f"ENCRYPTION_KEY={key}")
+    logger.info("\n⚠️  Store this key securely and set it in your production environment!")
+    logger.info("⚠️  Keep this key secret and backed up - losing it makes data unrecoverable!")

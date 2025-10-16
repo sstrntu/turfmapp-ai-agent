@@ -37,7 +37,7 @@ class TestChatIntegration:
         }
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     @patch('app.services.chat_service.EnhancedChatService.call_responses_api')
     @patch('app.services.chat_service.EnhancedChatService.save_message_to_conversation')
     async def test_chat_send_preserves_sources_metadata(
@@ -97,7 +97,7 @@ class TestChatIntegration:
         assert len(metadata["sources"]) > 0
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     @patch('app.services.chat_service.EnhancedChatService.get_conversation_history')
     async def test_conversation_history_includes_metadata(
         self,
@@ -168,7 +168,7 @@ class TestChatIntegration:
         assert "favicon" in source
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     async def test_conversation_not_found_returns_404(
         self,
         mock_auth,
@@ -189,7 +189,7 @@ class TestChatIntegration:
             assert "not found" in response.json()["detail"].lower()
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     @patch('app.services.chat_service.EnhancedChatService.call_responses_api')
     async def test_api_error_handling_preserves_conversation(
         self,
@@ -226,7 +226,7 @@ class TestChatIntegration:
             assert "error" in data["assistant_message"]["content"].lower()
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     async def test_send_message_validates_required_fields(
         self,
         mock_auth,
@@ -288,7 +288,7 @@ class TestChatDataFlow:
         return {"id": "user-456", "email": "dataflow@test.com"}
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     @patch('httpx.AsyncClient')
     async def test_sources_extraction_pipeline(
         self,
@@ -354,7 +354,7 @@ class TestChatDataFlow:
                 assert "favicon" in source["favicon"]
     
     @pytest.mark.asyncio
-    @patch('app.core.simple_auth.get_current_user_from_token')
+    @patch('app.core.jwt_auth.get_current_user_from_token')
     async def test_conversation_persistence_flow(
         self,
         mock_auth,

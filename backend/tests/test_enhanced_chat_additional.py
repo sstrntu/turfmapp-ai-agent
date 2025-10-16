@@ -15,12 +15,13 @@ from app.services.chat_service import EnhancedChatService
 class TestEnhancedChatServiceUserPreferences:
     """Test user preferences functionality."""
     
-    def test_get_user_preferences_default(self):
+    @pytest.mark.asyncio
+    async def test_get_user_preferences_default(self):
         """Test getting default user preferences."""
         chat_service = EnhancedChatService()
-        
-        preferences = chat_service.get_user_preferences("user-123")
-        
+
+        preferences = await chat_service.get_user_preferences("user-123")
+
         assert "model" in preferences
         assert "include_reasoning" in preferences
         assert "reasoning_effort" in preferences

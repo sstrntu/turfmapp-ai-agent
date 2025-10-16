@@ -8,9 +8,15 @@ Now enhanced with MCP (Model Context Protocol) integration for Google services.
 
 from __future__ import annotations
 
+import logging
+
 from typing import Dict, Any, List, Optional
 import json
 import asyncio
+
+# Configure logger
+logger = logging.getLogger(__name__)
+
 
 class ToolManager:
     """Manages all available tools for the agentic chatbot (non-Google services)."""
@@ -96,7 +102,7 @@ class ToolManager:
             return traditional_tools + mcp_openai_tools
             
         except Exception as e:
-            print(f"❌ Failed to get MCP tools in tool manager: {e}")
+            logger.error(f"❌ Failed to get MCP tools in tool manager: {e}")
             # Fallback to traditional tools only
             return self.get_available_tools()
     
@@ -121,7 +127,7 @@ class ToolManager:
             return {**traditional_descriptions, **mcp_descriptions}
             
         except Exception as e:
-            print(f"❌ Failed to get MCP tool descriptions: {e}")
+            logger.error(f"❌ Failed to get MCP tool descriptions: {e}")
             # Fallback to traditional descriptions only
             return self.get_tool_descriptions()
     

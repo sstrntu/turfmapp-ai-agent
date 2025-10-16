@@ -7,15 +7,20 @@ agent routing system that was previously unused.
 
 from __future__ import annotations
 
+import logging
+
 import os
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from ...core.simple_auth import get_current_user_from_token
+from ...core.jwt_auth import get_current_user_from_token
 from ...agents.routing.agent import RoutingAgent
 from ...agents.routing.config import RoutingConfig
 from ...agents.routing.monitor import PerformanceMonitor
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -103,7 +108,7 @@ async def analyze_routing_needs(
         )
         
     except Exception as e:
-        print(f"❌ Routing analysis error: {e}")
+        logger.error(f"❌ Routing analysis error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to analyze routing needs: {str(e)}"
@@ -126,7 +131,7 @@ async def get_agent_statistics(
         )
         
     except Exception as e:
-        print(f"❌ Agent stats error: {e}")
+        logger.error(f"❌ Agent stats error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve agent statistics: {str(e)}"
@@ -152,7 +157,7 @@ async def get_routing_config(
         }
         
     except Exception as e:
-        print(f"❌ Get config error: {e}")
+        logger.error(f"❌ Get config error: {e}")
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to retrieve routing configuration: {str(e)}"

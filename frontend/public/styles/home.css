@@ -897,6 +897,15 @@ p {
     color: var(--color-secondary);
 }
 
+.chat-react-root {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    z-index: 2;
+}
+
 .chat-list {
     margin-top: var(--spacing-md);
     display: flex;
