@@ -30,68 +30,42 @@
             const code = urlParams.get('code');
             const state = urlParams.get('state');
             const error = urlParams.get('error');
-
+            
             if (error) {
                 let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
                 const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
                 localStorage.removeItem('google-oauth-return-url');
                 localStorage.removeItem('google-oauth-return-context');
-
-                document.getElementById('status').innerHTML =
+                
+                document.getElementById('status').innerHTML = 
                     '<div class="error">❌ Google authentication failed</div>';
-                document.getElementById('result').innerHTML =
+                document.getElementById('result').innerHTML = 
                     `<p>Error: ${error}</p><p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>`;
                 return;
             }
-
+            
             if (!code) {
                 let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
                 const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
                 localStorage.removeItem('google-oauth-return-url');
                 localStorage.removeItem('google-oauth-return-context');
-
-                document.getElementById('status').innerHTML =
+                
+                document.getElementById('status').innerHTML = 
                     '<div class="error">❌ No authorization code received</div>';
-                document.getElementById('result').innerHTML =
+                document.getElementById('result').innerHTML = 
                     `<p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>`;
                 return;
             }
-
-            // Wait for Supabase to initialize
-            console.log('🔄 Waiting for Supabase initialization...');
-            let attempts = 0;
-            while (!window.supabase && attempts < 100) {
-                await new Promise(resolve => setTimeout(resolve, 50));
-                attempts++;
-            }
-
-            if (!window.supabase) {
-                console.error('❌ Supabase failed to initialize');
-                document.getElementById('status').innerHTML =
-                    '<div class="error">❌ TURFMAPP initialization failed</div>';
-                let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
-                const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
-                localStorage.removeItem('google-oauth-return-url');
-                localStorage.removeItem('google-oauth-return-context');
-
-                document.getElementById('result').innerHTML = `
-                    <p>Unable to initialize TURFMAPP authentication.</p>
-                    <p><a href="${returnUrl}">← Back to ${returnContext === 'settings' ? 'Settings' : 'test page'}</a></p>
-                `;
-                return;
-            }
-
-            console.log('✅ Supabase initialized, checking session...');
-
+            
             // Check if user is authenticated with TURFMAPP first
             if (!window.supabase.isSessionValid()) {
-                document.getElementById('status').innerHTML =
+                document.getElementById('status').innerHTML = 
                     '<div class="error">❌ TURFMAPP authentication required</div>';
                 let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
                 const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
                 localStorage.removeItem('google-oauth-return-url');
                 localStorage.removeItem('google-oauth-return-context');
-
+                
                 document.getElementById('result').innerHTML = `
                     <p>You need to be logged into TURFMAPP before connecting Google services.</p>
                     <p><a href="portal.html">← Login to TURFMAPP first</a></p>
