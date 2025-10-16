@@ -349,6 +349,7 @@ export const ChatThread = () => {
               title="Attach file"
               aria-label="Attach file"
               onClick={handleAttachClick}
+              disabled
             >
               +
             </button>
@@ -359,6 +360,7 @@ export const ChatThread = () => {
               aria-label="Generate images"
               aria-pressed={activeTool === 'image'}
               onClick={() => handleToolToggle('image', 'Describe an image to generate...')}
+              disabled
             >
               <img
                 src="/icons/Picture.png"
