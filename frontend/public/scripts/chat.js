@@ -1718,13 +1718,17 @@
             }
 
             //console.log('Sending chat request with tools:', tools?.map?.(t => t.type), 'tool_choice:', requestBody.tool_choice);
-            fetch('/api/v1/chat/send', {
+            // Using Chat V2 (LlamaIndex) for advanced memory management
+            fetch('/api/v1/chat/v2/send', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${authToken}`
                 },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify({
+                    ...requestBody,
+                    include_memory: true  // Enable LlamaIndex memory
+                })
             })
                 .then(function (r) {
                     if (!r.ok) {
@@ -1755,7 +1759,9 @@
                         //console.log('🔍 Sources type:', typeof sources);
                         //console.log('🔍 Sources length:', Array.isArray(sources) ? sources.length : 'Not array');
 
-                        const modelInfo = buildModelInfo(res.model || settings.model, res.provider);
+                        // Chat V2 returns model_used instead of model
+                        const modelUsed = res.model_used || res.model || settings.model;
+                        const modelInfo = buildModelInfo(modelUsed, res.provider);
                         placeholder.finish(messageContent, reasoning, sources, modelInfo);
                         updateModelIndicator(modelInfo);
 

@@ -1,42 +1,60 @@
-__pycache__
-*.pyc
-*.pyo
-*.pyd
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 .Python
-env
-pip-log.txt
-pip-delete-this-directory.txt
-.tox
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git
-.mypy_cache
-.pytest_cache
-.hypothesis
-.DS_Store
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
 venv/
-.venv/
+env/
+ENV/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.vscode
-.idea
+.env.*
+
+# Logs
+*.log
+logs/
+
+# Docker
+docker-compose.override.yml
+
+# Git
+.git/
+.gitignore
+
+# Documentation (already copied in Dockerfile)
+*.md
+!TESTING_WORKFLOW.md
+
+# Scripts (not needed in container)
+scripts/
+!run_tests.sh
+
+# Database files
 *.db
 *.sqlite
-*.sqlite3
-uploads/
-fal_media/
-data/
-SCHEMA_INFO.md
-supabase_schema.sql
-Dockerfile
-docker-compose.yml
-README.md
-venv/
-**/*.wav

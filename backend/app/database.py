@@ -14,13 +14,30 @@ logger = logging.getLogger(__name__)
 
 # Database configuration
 def _ensure_sslmode(url: str) -> str:
-    """Append sslmode=require to the connection string if missing."""
+    """Append sslmode based on whether it's a local or cloud database."""
     if not url:
         return url
     lower = url.lower()
+
+    # If sslmode already specified, keep it
     if "sslmode=" in lower:
         return url
+
+    # Check if this is a localhost/local connection
+    is_local = any(host in lower for host in [
+        "localhost",
+        "127.0.0.1",
+        "host.docker.internal",
+        "::1"
+    ])
+
     separator = "&" if "?" in url else "?"
+
+    # Local databases don't need SSL
+    if is_local:
+        return f"{url}{separator}sslmode=disable"
+
+    # Cloud databases (Supabase, etc.) require SSL
     return f"{url}{separator}sslmode=require"
 
 
@@ -62,19 +79,41 @@ async def get_db_pool() -> Optional[asyncpg.Pool]:
         try:
             db_url = _ensure_sslmode(SUPABASE_DB_URL)
             logger.info(f"Attempting to connect to: {db_url}")
-            # Ensure SSL is used for Supabase connections
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            _connection_pool = await asyncpg.create_pool(
-                db_url,
-                min_size=1,
-                max_size=10,
-                ssl=ssl_context,
-                server_settings={
-                    "search_path": "public"  # Start with public schema for now
-                },
-            )
+
+            # Check if this is a local connection
+            is_local = any(host in db_url.lower() for host in [
+                "localhost",
+                "127.0.0.1",
+                "host.docker.internal",
+                "::1"
+            ])
+
+            # Only use SSL for cloud databases
+            if is_local:
+                logger.info("Local database detected - SSL disabled")
+                _connection_pool = await asyncpg.create_pool(
+                    db_url,
+                    min_size=1,
+                    max_size=10,
+                    ssl=None,  # No SSL for local
+                    server_settings={
+                        "search_path": "public"
+                    },
+                )
+            else:
+                logger.info("Cloud database detected - SSL enabled")
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                _connection_pool = await asyncpg.create_pool(
+                    db_url,
+                    min_size=1,
+                    max_size=10,
+                    ssl=ssl_context,
+                    server_settings={
+                        "search_path": "public"
+                    },
+                )
             logger.info("✅ PostgreSQL connection pool created successfully!")
 
             # Test the connection

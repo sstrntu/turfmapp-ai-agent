@@ -61,6 +61,7 @@ from .chat_response_parser import (
     summarize_tool_results_with_ai,
     extract_sources_from_annotations,
 )
+from .conversation_manager import ConversationManager
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -70,7 +71,10 @@ class EnhancedChatService:
     """Enhanced chat service with comprehensive API integration."""
 
     def __init__(self):
-        # Fallback storage for when database fails
+        # Initialize conversation manager
+        self.conversation_manager = ConversationManager()
+
+        # Fallback storage for when database fails (kept for backward compatibility)
         self.fallback_conversations: Dict[str, List[Dict[str, Any]]] = {}
         self.fallback_conversation_metadata: Dict[str, Dict[str, Any]] = {}
 

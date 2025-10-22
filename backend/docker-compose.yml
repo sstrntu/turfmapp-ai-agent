@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Backend API (connects to host's local PostgreSQL)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: turfmapp-backend
+    ports:
+      - "3005:8000"  # Map host port 3005 to container port 8000
+    environment:
+      # Database connection - connects to host machine's PostgreSQL
+      DATABASE_URL: postgresql://turfmapp_agent:Z3c2et-2025@host.docker.internal:5432/turfmapp_dev
+      SUPABASE_DB_URL: postgresql://turfmapp_agent:Z3c2et-2025@host.docker.internal:5432/turfmapp_dev
+
+      # CORS
+      BACKEND_CORS_ORIGINS: http://localhost:3005,http://localhost:3000
+      FRONTEND_URL: http://localhost:3005
+
+      # API Keys (load from .env file)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+
+      # Supabase (if using cloud)
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3005/auth/google/callback}
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-change-this-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-jwt-secret}
+
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      # Mount code for development (hot reload)
+      - ./app:/app/app
+      - ./tests:/app/tests
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped

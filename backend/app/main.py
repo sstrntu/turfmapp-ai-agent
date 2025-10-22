@@ -17,12 +17,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # New modular API structure
 from .api.v1.chat import router as chat_router_v1
+from .api.v1.chat_v2 import router as chat_router_v2
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
 from .api.v1.admin import router as admin_router_v1
 from .api.v1.settings import router as settings_router_v1
 from .api.v1.google_api import router as google_api_router_v1
+from .api.v1.agent import router as agent_router_v1
+from .api.v1.rag import router as rag_router_v1
 
 from .database import get_supabase_config
 from .core.logging_config import setup_logging, get_logger
@@ -106,7 +109,9 @@ def get_frontend_config():
 
 # API v1 routes
 app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(chat_router_v2, prefix="/api/v1/chat", tags=["chat-v2"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(agent_router_v1, prefix="/api/v1", tags=["agent"])
 
 # Additional v1 routes
 app.include_router(upload_router, prefix="/api/v1/uploads", tags=["uploads"])
@@ -114,6 +119,7 @@ app.include_router(fal_tools_router, prefix="/api/v1/fal-tools", tags=["fal-tool
 app.include_router(admin_router_v1, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(settings_router_v1, prefix="/api/v1/settings", tags=["settings"])
 app.include_router(google_api_router_v1, prefix="/api/v1/google", tags=["google-api"])
+app.include_router(rag_router_v1, prefix="/api/v1", tags=["rag"])
 
 # Direct Google OAuth callback route for frontend redirect
 app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oauth"])

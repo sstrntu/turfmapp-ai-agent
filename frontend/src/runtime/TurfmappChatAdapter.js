@@ -5,7 +5,7 @@
  * that are stored in localStorage by the rest of the dashboard.
  */
 
-const CHAT_ENDPOINT = "/api/v1/chat/send";
+const CHAT_ENDPOINT = "/api/v1/chat/v2/send";
 
 const DEFAULT_STATUS = {
   type: "complete",
@@ -303,6 +303,7 @@ export class TurfmappChatAdapter {
       tool_choice: forceFlags.search ? "required" : "auto",
       assistant_context: systemInstructions || settings.assistantContext || null,
       attachments: attachments,
+      include_memory: true,  // Enable LlamaIndex conversation memory
     };
 
     console.log('🔍 Adapter: Full payload:', JSON.stringify(payload, null, 2));
