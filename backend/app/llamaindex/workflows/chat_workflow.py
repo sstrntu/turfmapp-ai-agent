@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Optional, Dict, Any
 
-from llama_index.core.workflow import StartEvent, StopEvent, step, Context
+from llama_index.core.workflow import StartEvent, StopEvent, step, Context, Event
 from llama_index.core.llms import ChatMessage, MessageRole
 
 from .base_workflow import (
@@ -27,17 +27,17 @@ logger = logging.getLogger(__name__)
 
 
 # Custom events for workflow steps (defined early for forward references)
-class PrepareContextEvent:
+class PrepareContextEvent(Event):
     """Event triggered after context preparation."""
     pass
 
 
-class BuildMessagesEvent:
+class BuildMessagesEvent(Event):
     """Event triggered after building messages."""
     pass
 
 
-class GenerateResponseEvent:
+class GenerateResponseEvent(Event):
     """Event triggered after generating response."""
     pass
 
@@ -137,8 +137,8 @@ class ChatWorkflow(BaseAgentWorkflow):
         )
 
         # Store input in context
-        await ctx.set("workflow_input", workflow_input)
-        await ctx.set("workflow_context", workflow_context)
+        await ctx.store.set("workflow_input", workflow_input)
+        await ctx.store.set("workflow_context", workflow_context)
 
         await self.log_step(
             workflow_context,
@@ -159,7 +159,7 @@ class ChatWorkflow(BaseAgentWorkflow):
             )
             await memory.load_from_database()
 
-        await ctx.set("memory", memory)
+        await ctx.store.set("memory", memory)
 
         return PrepareContextEvent()
 
@@ -172,9 +172,9 @@ class ChatWorkflow(BaseAgentWorkflow):
         """
         Step 2: Build message list for LLM including system prompt and history.
         """
-        workflow_input: ChatWorkflowInput = await ctx.get("workflow_input")
-        workflow_context: WorkflowContext = await ctx.get("workflow_context")
-        memory: Optional[ConversationMemory] = await ctx.get("memory")
+        workflow_input: ChatWorkflowInput = await ctx.store.get("workflow_input")
+        workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
+        memory: Optional[ConversationMemory] = await ctx.store.get("memory")
 
         messages: list[ChatMessage] = []
 
@@ -214,7 +214,7 @@ class ChatWorkflow(BaseAgentWorkflow):
             },
         )
 
-        await ctx.set("messages", messages)
+        await ctx.store.set("messages", messages)
 
         return BuildMessagesEvent()
 
@@ -227,9 +227,9 @@ class ChatWorkflow(BaseAgentWorkflow):
         """
         Step 3: Generate LLM response.
         """
-        workflow_input: ChatWorkflowInput = await ctx.get("workflow_input")
-        workflow_context: WorkflowContext = await ctx.get("workflow_context")
-        messages: list[ChatMessage] = await ctx.get("messages")
+        workflow_input: ChatWorkflowInput = await ctx.store.get("workflow_input")
+        workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
+        messages: list[ChatMessage] = await ctx.store.get("messages")
 
         try:
             # Get model
@@ -259,8 +259,8 @@ class ChatWorkflow(BaseAgentWorkflow):
             response_text = chat_response.message.content
 
             # Store response
-            await ctx.set("response_text", response_text)
-            await ctx.set("model_used", model_id)
+            await ctx.store.set("response_text", response_text)
+            await ctx.store.set("model_used", model_id)
 
             # Add assistant response to context
             workflow_context.add_message(
@@ -283,11 +283,11 @@ class ChatWorkflow(BaseAgentWorkflow):
         """
         Step 4: Save conversation to memory and return result.
         """
-        workflow_input: ChatWorkflowInput = await ctx.get("workflow_input")
-        workflow_context: WorkflowContext = await ctx.get("workflow_context")
-        memory: Optional[ConversationMemory] = await ctx.get("memory")
-        response_text: str = await ctx.get("response_text")
-        model_used: str = await ctx.get("model_used")
+        workflow_input: ChatWorkflowInput = await ctx.store.get("workflow_input")
+        workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
+        memory: Optional[ConversationMemory] = await ctx.store.get("memory")
+        response_text: str = await ctx.store.get("response_text")
+        model_used: str = await ctx.store.get("model_used")
 
         try:
             # Save to memory if enabled

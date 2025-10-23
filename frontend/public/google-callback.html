@@ -21,16 +21,46 @@
     <div id="result"></div>
 
     <!-- Include required scripts -->
-    <script src="scripts/supabase-client.js"></script>
-    <script src="scripts/google-services.js"></script>
+    <script src="scripts/supabase-client.js?v=2" defer></script>
+    <script src="scripts/google-services.js?v=2" defer></script>
 
-    <script>
+    <script defer>
         async function handleGoogleCallback() {
+            console.log('🔍 Starting Google callback handler...');
+
+            // Wait for scripts to load
+            if (typeof window.supabase === 'undefined') {
+                console.log('⏳ Waiting for supabase-client.js to load...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                if (typeof window.supabase === 'undefined') {
+                    document.getElementById('status').innerHTML =
+                        '<div class="error">❌ Failed to load required scripts</div>';
+                    document.getElementById('result').innerHTML =
+                        '<p>Please refresh the page and try again.</p>';
+                    return;
+                }
+            }
+
+            if (typeof GoogleServices === 'undefined') {
+                console.log('⏳ Waiting for google-services.js to load...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                if (typeof GoogleServices === 'undefined') {
+                    document.getElementById('status').innerHTML =
+                        '<div class="error">❌ Failed to load Google services</div>';
+                    document.getElementById('result').innerHTML =
+                        '<p>Please refresh the page and try again.</p>';
+                    return;
+                }
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
             const error = urlParams.get('error');
-            
+            console.log('🔍 URL params:', { code: code ? code.substring(0, 20) + '...' : null, state, error });
+
             if (error) {
                 let returnUrl = localStorage.getItem('google-oauth-return-url') || 'test-google.html';
                 const returnContext = localStorage.getItem('google-oauth-return-context') || 'test';
@@ -75,10 +105,12 @@
             }
             
             try {
+                console.log('🔍 Calling GoogleServices.handleGoogleCallback...');
                 // Handle the OAuth callback
                 const result = await GoogleServices.handleGoogleCallback(code, state);
-                
-                document.getElementById('status').innerHTML = 
+                console.log('✅ Callback successful:', result);
+
+                document.getElementById('status').innerHTML =
                     '<div class="success">✅ Google authentication successful!</div>';
                 
                 // Determine where to redirect based on stored return URL or referrer

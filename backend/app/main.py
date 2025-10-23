@@ -109,9 +109,11 @@ def get_frontend_config():
 
 # API v1 routes
 app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
-app.include_router(chat_router_v2, prefix="/api/v1/chat", tags=["chat-v2"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(agent_router_v1, prefix="/api/v1", tags=["agent"])
+
+# API v2 routes (unified workflow with intelligent tool selection)
+app.include_router(chat_router_v2, prefix="/api/v2/chat", tags=["chat-v2"])
 
 # Additional v1 routes
 app.include_router(upload_router, prefix="/api/v1/uploads", tags=["uploads"])

@@ -5,7 +5,7 @@
  * that are stored in localStorage by the rest of the dashboard.
  */
 
-const CHAT_ENDPOINT = "/api/v1/chat/v2/send";
+const CHAT_ENDPOINT = "/api/v2/chat/stream";
 
 const DEFAULT_STATUS = {
   type: "complete",
@@ -276,15 +276,29 @@ export class TurfmappChatAdapter {
     }
 
     const settings = loadSettings();
-    const forceFlags = {
-      image: localStorage.getItem("tm_force_image_tool") === "true",
-      search: localStorage.getItem("tm_force_search_tool") === "true",
-      gmail: localStorage.getItem("tm_force_gmail_tool") === "true",
-      calendar: localStorage.getItem("tm_force_calendar_tool") === "true",
-      drive: localStorage.getItem("tm_force_drive_tool") === "true",
+
+    // Check if user has Google credentials
+    let hasGoogleAuth = false;
+    try {
+      const authCheck = await fetch('/api/v1/google/auth/status', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const authData = await authCheck.json();
+      hasGoogleAuth = authData?.data?.has_tokens || false;
+    } catch (e) {
+      console.warn('Failed to check Google auth status:', e);
+    }
+
+    // Auto-enable Google tools if user has OAuth credentials
+    const autoFlags = {
+      image: false,  // Disabled by default
+      search: false,  // Disabled - rely on settings.toolWebSearch instead
+      gmail: hasGoogleAuth,
+      calendar: hasGoogleAuth,
+      drive: hasGoogleAuth,
     };
-    const tools = buildToolsArray(settings, forceFlags);
-    const systemInstructions = buildSystemInstructions(settings, forceFlags.search);
+    const tools = buildToolsArray(settings, autoFlags);
+    const systemInstructions = buildSystemInstructions(settings, settings.toolWebSearch);
 
     // Get attachments from global window object if available
     const attachments = window.pendingAttachments || null;
@@ -300,7 +314,7 @@ export class TurfmappChatAdapter {
       conversation_id: this.conversationId,
       model: selectedModel,
       tools: tools.length > 0 ? tools : null,
-      tool_choice: forceFlags.search ? "required" : "auto",
+      tool_choice: "auto",  // Always let AI decide when to use tools
       assistant_context: systemInstructions || settings.assistantContext || null,
       attachments: attachments,
       include_memory: true,  // Enable LlamaIndex conversation memory
@@ -323,7 +337,38 @@ export class TurfmappChatAdapter {
       throw new Error(`Chat request failed (${response.status}): ${errorBody}`);
     }
 
-    const data = await response.json();
+    // Handle streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let data = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === 'done') {
+              data = event;
+            }
+          } catch (e) {
+            console.error('Failed to parse streaming event:', e, line);
+          }
+        }
+      }
+    }
+
+    if (!data) {
+      throw new Error('No completion event received from stream');
+    }
+
     console.log("🔍 Backend response:", data);
 
     if (data?.conversation_id) {

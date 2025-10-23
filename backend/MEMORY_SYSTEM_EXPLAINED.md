@@ -105,7 +105,7 @@ updated_at        TIMESTAMPTZ
 ### **When You Send a Message:**
 
 ```
-1. Frontend sends message to /api/v1/chat/v2/send
+1. Frontend sends message to /api/v2/chat/send
 
 2. Backend creates/loads ConversationMemory
    ├─ Checks database for existing memory
@@ -211,10 +211,10 @@ EOF
 
 ```bash
 # Get conversation summary
-curl http://localhost:8000/api/v1/chat/v2/conversations/CONV-ID/summary
+curl http://localhost:8000/api/v2/chat/conversations/CONV-ID/summary
 
 # Get extracted entities
-curl http://localhost:8000/api/v1/chat/v2/conversations/CONV-ID/entities
+curl http://localhost:8000/api/v2/chat/conversations/CONV-ID/entities
 ```
 
 ---

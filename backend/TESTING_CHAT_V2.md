@@ -15,7 +15,7 @@ The Chat V2 endpoint has been successfully integrated into your TurfMapp AI Agen
 
 ## Endpoints
 
-### 1. POST `/api/v1/chat/v2/send` - Send Chat Message
+### 1. POST `/api/v2/chat/send` - Send Chat Message
 
 **Features:**
 - Drop-in replacement for the V1 chat endpoint
@@ -61,7 +61,7 @@ The Chat V2 endpoint has been successfully integrated into your TurfMapp AI Agen
 }
 ```
 
-### 2. GET `/api/v1/chat/v2/models` - List Available Models
+### 2. GET `/api/v2/chat/models` - List Available Models
 
 **Response:**
 ```json
@@ -83,7 +83,7 @@ The Chat V2 endpoint has been successfully integrated into your TurfMapp AI Agen
 }
 ```
 
-### 3. GET `/api/v1/chat/v2/conversations/{id}/summary` - Get Conversation Summary
+### 3. GET `/api/v2/chat/conversations/{id}/summary` - Get Conversation Summary
 
 **Response:**
 ```json
@@ -95,7 +95,7 @@ The Chat V2 endpoint has been successfully integrated into your TurfMapp AI Agen
 }
 ```
 
-### 4. GET `/api/v1/chat/v2/conversations/{id}/entities` - Get Extracted Entities
+### 4. GET `/api/v2/chat/conversations/{id}/entities` - Get Extracted Entities
 
 **Response:**
 ```json
@@ -110,7 +110,7 @@ The Chat V2 endpoint has been successfully integrated into your TurfMapp AI Agen
 }
 ```
 
-### 5. GET `/api/v1/chat/v2/health` - Health Check
+### 5. GET `/api/v2/chat/health` - Health Check
 
 **Response:**
 ```json
@@ -157,12 +157,12 @@ uvicorn app.main:app --port 8000
 
 **1. Health Check:**
 ```bash
-curl http://localhost:8000/api/v1/chat/v2/health
+curl http://localhost:8000/api/v2/chat/health
 ```
 
 **2. List Models:**
 ```bash
-curl http://localhost:8000/api/v1/chat/v2/models
+curl http://localhost:8000/api/v2/chat/models
 ```
 
 **3. Send Chat Message:**
@@ -170,7 +170,7 @@ curl http://localhost:8000/api/v1/chat/v2/models
 # You'll need a valid JWT token from authentication
 export TOKEN="your-jwt-token-here"
 
-curl -X POST http://localhost:8000/api/v1/chat/v2/send \
+curl -X POST http://localhost:8000/api/v2/chat/send \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -204,12 +204,12 @@ headers = {
 }
 
 # Test 1: List models
-response = requests.get(f"{BASE_URL}/api/v1/chat/v2/models")
+response = requests.get(f"{BASE_URL}/api/v2/chat/models")
 print("Models:", response.json())
 
 # Test 2: Send chat message
 response = requests.post(
-    f"{BASE_URL}/api/v1/chat/v2/send",
+    f"{BASE_URL}/api/v2/chat/send",
     headers=headers,
     json={
         "message": "What is 2+2?",
@@ -221,7 +221,7 @@ print("Response:", response.json())
 
 # Test 3: Get conversation summary (after 5+ messages)
 response = requests.get(
-    f"{BASE_URL}/api/v1/chat/v2/conversations/test-123/summary",
+    f"{BASE_URL}/api/v2/chat/conversations/test-123/summary",
     headers=headers
 )
 print("Summary:", response.json())
@@ -341,7 +341,7 @@ Use the `/models` endpoint to see per-model costs:
 ## Next Steps
 
 1. ✅ **Test the endpoint** using one of the methods above
-2. **Compare with V1** - Send same requests to `/api/v1/chat/send` and `/api/v1/chat/v2/send`
+2. **Compare with V1** - Send same requests to `/api/v1/chat/send` and `/api/v2/chat/send`
 3. **Test memory** - Have a multi-turn conversation and verify context is maintained
 4. **Test summarization** - Send 30+ messages and verify summary is generated
 5. **Test model selection** - Try different models and verify correct one is used
@@ -363,7 +363,7 @@ If you encounter any problems:
 
 1. Check the FastAPI server logs
 2. Verify all environment variables are set
-3. Test the health endpoint first: `/api/v1/chat/v2/health`
+3. Test the health endpoint first: `/api/v2/chat/health`
 4. Check database connectivity: `psql -U turfmapp_agent -d turfmapp_dev`
 
 ---

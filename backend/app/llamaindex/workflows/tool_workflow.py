@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from typing import Optional, Dict, Any, List
 
-from llama_index.core.workflow import StartEvent, StopEvent, step, Context
+from llama_index.core.workflow import StartEvent, StopEvent, step, Context, Event
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import BaseTool
@@ -29,17 +29,17 @@ logger = logging.getLogger(__name__)
 
 
 # Custom events for workflow steps (defined early for forward references)
-class PrepareAgentEvent:
+class PrepareAgentEvent(Event):
     """Event triggered after agent preparation."""
     pass
 
 
-class BuildContextEvent:
+class BuildContextEvent(Event):
     """Event triggered after building context."""
     pass
 
 
-class ExecuteAgentEvent:
+class ExecuteAgentEvent(Event):
     """Event triggered after agent execution."""
     pass
 
@@ -117,6 +117,7 @@ class ToolWorkflow(BaseAgentWorkflow):
             verbose=verbose,
         )
         self.memory_manager = memory_manager
+        self.verbose = verbose
         self.default_system_prompt = default_system_prompt or (
             "You are a helpful AI assistant with access to various tools. "
             "Use the available tools to help answer questions and complete tasks. "
@@ -141,8 +142,8 @@ class ToolWorkflow(BaseAgentWorkflow):
         )
 
         # Store input in context
-        await ctx.set("workflow_input", workflow_input)
-        await ctx.set("workflow_context", workflow_context)
+        await ctx.store.set("workflow_input", workflow_input)
+        await ctx.store.set("workflow_context", workflow_context)
 
         await self.log_step(
             workflow_context,
@@ -164,7 +165,7 @@ class ToolWorkflow(BaseAgentWorkflow):
             )
             await memory.load_from_database()
 
-        await ctx.set("memory", memory)
+        await ctx.store.set("memory", memory)
 
         # Get model for tool use
         model_id = workflow_input.model_id or llm_factory.recommend_model_for_task(
@@ -177,17 +178,27 @@ class ToolWorkflow(BaseAgentWorkflow):
             temperature=0.1,  # Lower temperature for more deterministic tool use
         )
 
-        await ctx.set("model_used", model_id)
+        await ctx.store.set("model_used", model_id)
 
-        # Create ReAct agent
-        agent = ReActAgent.from_tools(
-            tools=workflow_input.tools,
-            llm=llm,
-            verbose=verbose,
-            max_iterations=workflow_input.max_iterations,
+        # Get system prompt from input or use default
+        system_prompt = (
+            workflow_input.system_prompt
+            if hasattr(workflow_input, "system_prompt") and workflow_input.system_prompt
+            else self.default_system_prompt
         )
 
-        await ctx.set("agent", agent)
+        # Create ReAct agent
+        agent = ReActAgent(
+            name="Tool Agent",
+            description="An AI assistant that can use various tools to help answer questions",
+            system_prompt=system_prompt,
+            tools=workflow_input.tools,
+            llm=llm,
+            verbose=self.verbose,
+        )
+
+        await ctx.store.set("agent", agent)
+        await ctx.store.set("max_iterations", workflow_input.max_iterations)
 
         return PrepareAgentEvent()
 
@@ -200,9 +211,9 @@ class ToolWorkflow(BaseAgentWorkflow):
         """
         Step 2: Build context from conversation history.
         """
-        workflow_input: ToolWorkflowInput = await ctx.get("workflow_input")
-        workflow_context: WorkflowContext = await ctx.get("workflow_context")
-        memory: Optional[ConversationMemory] = await ctx.get("memory")
+        workflow_input: ToolWorkflowInput = await ctx.store.get("workflow_input")
+        workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
+        memory: Optional[ConversationMemory] = await ctx.store.get("memory")
 
         # Build context string from memory
         context_parts = []
@@ -230,7 +241,7 @@ class ToolWorkflow(BaseAgentWorkflow):
             },
         )
 
-        await ctx.set("context_str", context_str)
+        await ctx.store.set("context_str", context_str)
 
         return BuildContextEvent()
 
@@ -243,10 +254,11 @@ class ToolWorkflow(BaseAgentWorkflow):
         """
         Step 3: Execute agent with tools to answer query.
         """
-        workflow_input: ToolWorkflowInput = await ctx.get("workflow_input")
-        workflow_context: WorkflowContext = await ctx.get("workflow_context")
-        agent: ReActAgent = await ctx.get("agent")
-        context_str: Optional[str] = await ctx.get("context_str")
+        workflow_input: ToolWorkflowInput = await ctx.store.get("workflow_input")
+        workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
+        agent: ReActAgent = await ctx.store.get("agent")
+        context_str: Optional[str] = await ctx.store.get("context_str")
+        max_iterations: int = await ctx.store.get("max_iterations")
 
         try:
             # Build query with context
@@ -261,24 +273,36 @@ class ToolWorkflow(BaseAgentWorkflow):
             )
 
             # Execute agent
-            response = await agent.achat(query)
+            handler = agent.run(
+                user_msg=query,
+                max_iterations=max_iterations,
+            )
+            result = await handler
 
             # Extract tool usage information
             tools_used = []
-            iterations = 0
-
-            # Get sources from response (if available)
-            if hasattr(response, "sources") and response.sources:
-                for source in response.sources:
-                    if hasattr(source, "tool_name"):
-                        tools_used.append(source.tool_name)
+            if hasattr(result, "tool_calls") and result.tool_calls:
+                for tool_call in result.tool_calls:
+                    if hasattr(tool_call, "tool_name"):
+                        tools_used.append(tool_call.tool_name)
+                    elif hasattr(tool_call, "name"):
+                        tools_used.append(tool_call.name)
 
             # Get response text
-            response_text = str(response)
+            if hasattr(result, "response"):
+                # result.response is a ChatMessage, extract content
+                response_text = result.response.content if hasattr(result.response, "content") else str(result.response)
+            else:
+                response_text = str(result)
 
-            await ctx.set("response_text", response_text)
-            await ctx.set("tools_used", tools_used)
-            await ctx.set("iterations", iterations)
+            # Count iterations (approximate from messages if available)
+            iterations = 0
+            if hasattr(result, "raw") and result.raw and hasattr(result.raw, "messages"):
+                iterations = len(result.raw.messages) // 2  # Approximate
+
+            await ctx.store.set("response_text", response_text)
+            await ctx.store.set("tools_used", tools_used)
+            await ctx.store.set("iterations", iterations)
 
             # Add messages to context
             workflow_context.add_message(
@@ -306,13 +330,13 @@ class ToolWorkflow(BaseAgentWorkflow):
         """
         Step 4: Save conversation to memory and return result.
         """
-        workflow_input: ToolWorkflowInput = await ctx.get("workflow_input")
-        workflow_context: WorkflowContext = await ctx.get("workflow_context")
-        memory: Optional[ConversationMemory] = await ctx.get("memory")
-        response_text: str = await ctx.get("response_text")
-        model_used: str = await ctx.get("model_used")
-        tools_used: List[str] = await ctx.get("tools_used")
-        iterations: int = await ctx.get("iterations")
+        workflow_input: ToolWorkflowInput = await ctx.store.get("workflow_input")
+        workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
+        memory: Optional[ConversationMemory] = await ctx.store.get("memory")
+        response_text: str = await ctx.store.get("response_text")
+        model_used: str = await ctx.store.get("model_used")
+        tools_used: List[str] = await ctx.store.get("tools_used")
+        iterations: int = await ctx.store.get("iterations")
 
         try:
             # Save to memory if enabled

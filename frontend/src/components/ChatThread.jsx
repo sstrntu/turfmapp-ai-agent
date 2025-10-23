@@ -34,8 +34,6 @@ export const ChatThread = () => {
   const listRef = React.useRef(null);
   const textareaRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
-  const [activeTool, setActiveTool] = React.useState(null);
-  const [placeholder, setPlaceholder] = React.useState('Type your message…');
   const [attachments, setAttachments] = React.useState([]);
   const [selectedModel, setSelectedModel] = React.useState(() => {
     return localStorage.getItem('tm_model') || 'gpt-4o';
@@ -153,26 +151,6 @@ export const ChatThread = () => {
 
     runtime.composer.setText(suggestion.text);
     runtime.composer.send();
-  };
-
-  const handleToolToggle = (toolId, placeholderText) => {
-    if (activeTool === toolId) {
-      // Deactivate current tool
-      setActiveTool(null);
-      setPlaceholder('Type your message…');
-      localStorage.removeItem(`tm_force_${toolId}_tool`);
-    } else {
-      // Activate new tool
-      setActiveTool(toolId);
-      setPlaceholder(placeholderText);
-      localStorage.setItem(`tm_force_${toolId}_tool`, 'true');
-      // Deactivate other tools
-      ['image', 'search', 'gmail', 'calendar', 'drive'].forEach(tool => {
-        if (tool !== toolId) {
-          localStorage.removeItem(`tm_force_${tool}_tool`);
-        }
-      });
-    }
   };
 
   const getFileType = (filename) => {
@@ -311,7 +289,7 @@ export const ChatThread = () => {
             <textarea
               ref={textareaRef}
               className="chat-input"
-              placeholder={placeholder}
+              placeholder="Type your message…"
               aria-label="Message"
               rows={1}
               value={composerText}
@@ -352,87 +330,6 @@ export const ChatThread = () => {
               disabled
             >
               +
-            </button>
-            <button
-              id="image-gen-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'image' ? ' active' : ''}`}
-              aria-label="Generate images"
-              aria-pressed={activeTool === 'image'}
-              onClick={() => handleToolToggle('image', 'Describe an image to generate...')}
-              disabled
-            >
-              <img
-                src="/icons/Picture.png"
-                alt="Image generation"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="web-search-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'search' ? ' active' : ''}`}
-              aria-label="Web search"
-              aria-pressed={activeTool === 'search'}
-              onClick={() => handleToolToggle('search', 'Search the web for...')}
-            >
-              <img
-                src="/icons/websearchicon.png"
-                alt="Web search"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="gmail-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'gmail' ? ' active' : ''}`}
-              aria-label="Gmail"
-              aria-pressed={activeTool === 'gmail'}
-              onClick={() => handleToolToggle('gmail', 'Ask about your emails...')}
-            >
-              <img
-                src="/icons/Gmail.png"
-                alt="Gmail"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="calendar-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'calendar' ? ' active' : ''}`}
-              aria-label="Google Calendar"
-              aria-pressed={activeTool === 'calendar'}
-              onClick={() => handleToolToggle('calendar', 'Ask about your calendar...')}
-            >
-              <img
-                src="/icons/Calendar.png"
-                alt="Google Calendar"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="drive-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'drive' ? ' active' : ''}`}
-              aria-label="Google Drive"
-              aria-pressed={activeTool === 'drive'}
-              onClick={() => handleToolToggle('drive', 'Ask about your files...')}
-            >
-              <img
-                src="/icons/Google Drive.png"
-                alt="Google Drive"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
             </button>
           </div>
         </div>

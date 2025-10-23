@@ -167,6 +167,38 @@ def build_google_function_tools(enabled_tools: Dict[str, bool]) -> List[Dict[str
             }
         )
 
+    # Always include RAG tools for document search
+    available_tools.extend([
+        {
+            "type": "function",
+            "function": {
+                "name": "search_documents",
+                "description": "Search through the user's uploaded documents to find relevant information. Use this when the user asks about content from their files, resumes, reports, or uploaded documents.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search query to find relevant information in uploaded documents",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_documents",
+                "description": "List all documents the user has uploaded. Use this when the user wants to know what documents are available in their library.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+        },
+    ])
+
     if enabled_tools.get("drive"):
         available_tools.extend([
             {

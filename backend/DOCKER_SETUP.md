@@ -51,10 +51,10 @@ This will start:
 curl http://localhost:3005/healthz
 
 # Check Chat V2 health
-curl http://localhost:3005/api/v1/chat/v2/health
+curl http://localhost:3005/api/v2/chat/health
 
 # List available models
-curl http://localhost:3005/api/v1/chat/v2/models
+curl http://localhost:3005/api/v2/chat/models
 ```
 
 ## Services
@@ -69,8 +69,8 @@ curl http://localhost:3005/api/v1/chat/v2/models
 **Endpoints:**
 - `/healthz` - Basic health check
 - `/api/v1/chat/send` - V1 chat endpoint
-- `/api/v1/chat/v2/send` - V2 chat endpoint (LlamaIndex)
-- `/api/v1/chat/v2/models` - List available models
+- `/api/v2/chat/send` - V2 chat endpoint (LlamaIndex)
+- `/api/v2/chat/models` - List available models
 - `/docs` - Interactive API documentation
 
 ### PostgreSQL Database (Port 5432)
@@ -406,7 +406,7 @@ After starting with Docker:
 
 1. Test the API: `curl http://localhost:3005/healthz`
 2. Visit docs: http://localhost:3005/docs
-3. Test Chat V2: `curl http://localhost:3005/api/v1/chat/v2/models`
+3. Test Chat V2: `curl http://localhost:3005/api/v2/chat/models`
 4. Read `TESTING_CHAT_V2.md` for testing the LlamaIndex integration
 
 ---

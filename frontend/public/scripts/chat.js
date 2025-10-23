@@ -740,6 +740,71 @@
             scrollToBottom();
 
             return {
+                updateThought(thought) {
+                    // Update the typing indicator to show current thought
+                    const thinkingText = msg.querySelector('.thinking-text');
+                    if (thinkingText) {
+                        thinkingText.textContent = thought;
+                    } else {
+                        const textEl = document.createElement('div');
+                        textEl.className = 'thinking-text';
+                        textEl.textContent = thought;
+                        textEl.style.marginLeft = '10px';
+                        textEl.style.fontSize = '13px';
+                        textEl.style.color = '#666';
+                        textEl.style.fontStyle = 'italic';
+                        msg.appendChild(textEl);
+                    }
+                    scrollToBottom();
+                },
+
+                startStreaming(modelInfo) {
+                    // Convert from typing bubble to streaming message
+                    msg.classList.remove('typing-bubble');
+                    msg.classList.add('assistant-message', 'streaming');
+                    msg.innerHTML = '';
+
+                    if (modelInfo) {
+                        renderModelBadge(msg, modelInfo);
+                    }
+
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.className = 'assistant-content-wrapper streaming-content';
+                    contentWrapper.style.minHeight = '20px';
+                    msg.appendChild(contentWrapper);
+
+                    this.contentWrapper = contentWrapper;
+                    this.streamedContent = '';
+                },
+
+                appendContent(delta) {
+                    // Append streaming content
+                    if (!this.contentWrapper) {
+                        this.startStreaming();
+                    }
+                    this.streamedContent = (this.streamedContent || '') + delta;
+                    this.contentWrapper.textContent = this.streamedContent;
+                    scrollToBottom();
+                },
+
+                finishStreaming(fullContent, reasoning, sources, modelInfo) {
+                    // Finalize streaming with complete content
+                    msg.classList.remove('streaming');
+                    if (fullContent && this.contentWrapper) {
+                        // Re-render with markdown formatting
+                        const normalized = this.normalizeMarkdown(fullContent);
+                        this.contentWrapper.innerHTML = '';
+                        this.renderMarkdown(this.contentWrapper, normalized);
+                    }
+                    if (reasoning) {
+                        this.renderReasoning(msg, reasoning);
+                    }
+                    if (sources) {
+                        renderSources(msg, sources);
+                    }
+                    scrollToBottom();
+                },
+
                 finish(answer, reasoning, sources, modelInfo) {
                     // Promote to full-width assistant panel and render content
                     msg.classList.remove('typing-bubble');
@@ -1718,8 +1783,9 @@
             }
 
             //console.log('Sending chat request with tools:', tools?.map?.(t => t.type), 'tool_choice:', requestBody.tool_choice);
-            // Using Chat V2 (LlamaIndex) for advanced memory management
-            fetch('/api/v1/chat/v2/send', {
+
+            // Using unified V2 Streaming API - handles everything (web search, tools, memory, streaming)
+            fetch('/api/v2/chat/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1730,66 +1796,111 @@
                     include_memory: true  // Enable LlamaIndex memory
                 })
             })
-                .then(function (r) {
-                    if (!r.ok) {
-                        throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+                .then(async function (response) {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
-                    return r.json();
-                })
-                .then(function (res) {
-                    if (res && res.assistant_message) {
-                        // Update conversation ID from response
-                        if (res.conversation_id) {
-                            currentConversationId = res.conversation_id;
 
-                            // Refresh conversation history in sidebar
-                            if (window.refreshConversationHistory) {
-                                window.refreshConversationHistory();
+                    // Read streaming response
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    let hasStartedStreaming = false;
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop(); // Keep incomplete line in buffer
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const event = JSON.parse(line.slice(6));
+
+                                    switch (event.type) {
+                                        case 'start':
+                                            currentConversationId = event.conversation_id;
+                                            break;
+
+                                        case 'thought':
+                                            // Display agent's thinking process
+                                            placeholder.updateThought(event.content);
+                                            break;
+
+                                        case 'tool_call':
+                                            // Show which tool is being called
+                                            placeholder.updateThought(`🔧 Using tool: ${event.tool}`);
+                                            break;
+
+                                        case 'content':
+                                            // Stream response content
+                                            if (!hasStartedStreaming) {
+                                                placeholder.startStreaming();
+                                                hasStartedStreaming = true;
+                                            }
+                                            placeholder.appendContent(event.delta);
+                                            break;
+
+                                        case 'done':
+                                            // Finalize with complete response
+                                            if (event.conversation_id) {
+                                                currentConversationId = event.conversation_id;
+
+                                                // Refresh conversation history in sidebar
+                                                if (window.refreshConversationHistory) {
+                                                    window.refreshConversationHistory();
+                                                }
+                                            }
+
+                                            const messageContent = event.assistant_message?.content || '';
+                                            const sources = event.sources || [];
+                                            const reasoning = event.reasoning || '';
+                                            const modelInfo = buildModelInfo(event.model_used, event.provider);
+
+                                            if (hasStartedStreaming) {
+                                                placeholder.finishStreaming(messageContent, reasoning, sources, modelInfo);
+                                            } else {
+                                                placeholder.finish(messageContent, reasoning, sources, modelInfo);
+                                            }
+
+                                            updateModelIndicator(modelInfo);
+
+                                            // Clear attachments and reset tool buttons
+                                            attachments = [];
+                                            renderAttachments();
+
+                                            imageGenBtn?.classList.remove('active');
+                                            webSearchBtn?.classList.remove('active');
+                                            gmailBtn?.classList.remove('active');
+                                            calendarBtn?.classList.remove('active');
+                                            driveBtn?.classList.remove('active');
+
+                                            imageGenBtn?.setAttribute('aria-pressed', 'false');
+                                            webSearchBtn?.setAttribute('aria-pressed', 'false');
+                                            gmailBtn?.setAttribute('aria-pressed', 'false');
+                                            calendarBtn?.setAttribute('aria-pressed', 'false');
+                                            driveBtn?.setAttribute('aria-pressed', 'false');
+
+                                            input.placeholder = 'Type your message...';
+                                            break;
+
+                                        case 'error':
+                                            console.error('Streaming error:', event.error);
+                                            placeholder.error();
+                                            break;
+                                    }
+                                } catch (e) {
+                                    console.error('Failed to parse streaming event:', e, line);
+                                }
                             }
                         }
-
-                        // Extract message content from the assistant_message
-                        const messageContent = res.assistant_message.content || '';
-                        // Sources and reasoning are at the top level of the response
-                        const sources = res.sources || [];
-                        const reasoning = res.reasoning || '';
-
-                        // Debug logging for sources
-                        //console.log('🔍 Frontend received sources:', sources);
-                        //console.log('🔍 Sources type:', typeof sources);
-                        //console.log('🔍 Sources length:', Array.isArray(sources) ? sources.length : 'Not array');
-
-                        // Chat V2 returns model_used instead of model
-                        const modelUsed = res.model_used || res.model || settings.model;
-                        const modelInfo = buildModelInfo(modelUsed, res.provider);
-                        placeholder.finish(messageContent, reasoning, sources, modelInfo);
-                        updateModelIndicator(modelInfo);
-
-                        // Clear attachments and reset tool buttons after successful response
-                        attachments = [];
-                        renderAttachments();
-
-                        // Reset tool button states
-                        imageGenBtn?.classList.remove('active');
-                        webSearchBtn?.classList.remove('active');
-                        gmailBtn?.classList.remove('active');
-                        calendarBtn?.classList.remove('active');
-                        driveBtn?.classList.remove('active');
-
-                        // Reset aria-pressed attributes
-                        imageGenBtn?.setAttribute('aria-pressed', 'false');
-                        webSearchBtn?.setAttribute('aria-pressed', 'false');
-                        gmailBtn?.setAttribute('aria-pressed', 'false');
-                        calendarBtn?.setAttribute('aria-pressed', 'false');
-                        driveBtn?.setAttribute('aria-pressed', 'false');
-
-                        input.placeholder = 'Type your message...';
-                    } else {
-                        console.error('Invalid response format:', res);
-                        placeholder.error();
                     }
                 })
-                .catch(function () {
+                .catch(function (error) {
+                    console.error('Streaming error:', error);
                     placeholder.error();
                 });
         });

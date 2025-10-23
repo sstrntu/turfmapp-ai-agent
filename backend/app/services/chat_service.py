@@ -330,13 +330,15 @@ class EnhancedChatService:
         for tool in raw_tools:
             if isinstance(tool, dict) and tool.get("type") == "google_mcp":
                 enabled = tool.get("enabled_tools") or {}
-                expanded_tools.extend(
-                    self.tool_handler.build_google_function_tools(enabled)
-                )
+                logger.warning(f"🔍 Google MCP enabled_tools: {enabled}")
+                google_tools = self.tool_handler.build_google_function_tools(enabled)
+                logger.warning(f"🔍 Built {len(google_tools)} Google tools: {[t['function']['name'] if 'function' in t else t.get('type') for t in google_tools]}")
+                expanded_tools.extend(google_tools)
             else:
                 expanded_tools.append(tool)
 
         tools_to_include = expanded_tools
+        logger.warning(f"🔍 Total tools to include: {len(tools_to_include)}")
 
         logger.info(
             "🚀 🚀 🚀 ROUTING CHAT REQUEST via %s model: %s 🚀 🚀 🚀",

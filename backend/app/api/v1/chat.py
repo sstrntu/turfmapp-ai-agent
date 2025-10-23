@@ -35,7 +35,10 @@ from datetime import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+import json
+import asyncio
 
 from ...core.jwt_auth import get_current_user_from_token
 from ...services.chat_service import EnhancedChatService
@@ -151,6 +154,100 @@ async def send_chat_message(
         raise HTTPException(
             status_code=500, detail=f"Failed to process chat message: {str(e)}"
         )
+
+
+@router.post("/stream")
+async def stream_chat_message(
+    request: ChatRequest, current_user: dict = Depends(get_current_user_from_token)
+):
+    """
+    Stream a chat message with real-time updates and web search support.
+
+    Returns Server-Sent Events (SSE) with streaming response and tool usage.
+    """
+
+    async def event_generator():
+        try:
+            user_id = current_user["id"]
+            conversation_id = request.conversation_id or str(uuid.uuid4())
+
+            # Send start event
+            yield f"data: {json.dumps({'type': 'start', 'conversation_id': conversation_id})}\n\n"
+
+            # Get user preferences
+            user_prefs = await chat_service.get_user_preferences(user_id)
+            model_to_use = request.model if request.model else user_prefs.get("model", "gpt-4o")
+
+            # Emit thinking status
+            yield f"data: {json.dumps({'type': 'thought', 'content': '🔍 Analyzing your question...'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            # Process the chat request (this is not streaming from OpenAI yet, but we can chunk the response)
+            result = await chat_service.process_chat_request(
+                user_id=user_id,
+                message=request.message,
+                conversation_id=conversation_id,
+                model=model_to_use,
+                include_reasoning=request.include_reasoning,
+                attachments=request.attachments,
+                developer_instructions=request.developer_instructions,
+                assistant_context=request.assistant_context,
+                text_format=request.text_format,
+                text_verbosity=request.text_verbosity,
+                reasoning_effort=request.reasoning_effort,
+                tools=request.tools,
+                tool_choice=request.tool_choice,
+            )
+
+            # Check if web search was used
+            sources = result.get("sources", [])
+            if sources:
+                yield f"data: {json.dumps({'type': 'thought', 'content': '🌐 Searching the web...'})}\n\n"
+                await asyncio.sleep(0.2)
+
+            # Stream the response content in chunks
+            response_text = result["assistant_message"]["content"]
+            words = response_text.split(' ')
+            chunk_size = 5
+
+            for i in range(0, len(words), chunk_size):
+                chunk = ' '.join(words[i:i+chunk_size])
+                if i + chunk_size < len(words):
+                    chunk += ' '
+                yield f"data: {json.dumps({'type': 'content', 'delta': chunk})}\n\n"
+                await asyncio.sleep(0.03)
+
+            # Send completion with all metadata
+            completion_data = {
+                "type": "done",
+                "conversation_id": result["conversation_id"],
+                "user_message": result["user_message"],
+                "assistant_message": result["assistant_message"],
+                "reasoning": result.get("reasoning"),
+                "sources": sources,
+                "model": result.get("model"),
+                "provider": result.get("provider"),
+            }
+
+            yield f"data: {json.dumps(completion_data)}\n\n"
+
+        except Exception as e:
+            logger.error(f"❌ Streaming error: {e}", exc_info=True)
+            error_data = {
+                "type": "error",
+                "error": str(e)
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.get("/conversations", response_model=ConversationListResponse)

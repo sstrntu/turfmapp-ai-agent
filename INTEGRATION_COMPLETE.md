@@ -10,7 +10,7 @@
 
 ### ✅ Step 1: Reviewed Existing Implementation (Options A & B)
 **Discovered:**
-- ✅ Chat V2 endpoint **already implemented** at `/api/v1/chat/v2/send`
+- ✅ Chat V2 endpoint **already implemented** at `/api/v2/chat/send`
 - ✅ Google OAuth **fully implemented** with database storage
 - ✅ LlamaIndex tools (Gmail, Drive, Calendar) **already created**
 - ✅ LLM Factory with 6 models **working**
@@ -126,10 +126,10 @@ Verifies agent service is operational.
 
 ### API Endpoints ✅
 1. **Chat V1** - `/api/v1/chat/send` (legacy, still working)
-2. **Chat V2** - `/api/v1/chat/v2/send` ⭐ LlamaIndex
+2. **Chat V2** - `/api/v2/chat/send` ⭐ LlamaIndex
 3. **Agent** - `/api/v1/agent/execute` ⭐ NEW
 4. **Google OAuth** - Full suite of auth + tool endpoints
-5. **Models** - `/api/v1/chat/v2/models` (6 models)
+5. **Models** - `/api/v2/chat/models` (6 models)
 6. **Health Checks** - Multiple service health endpoints
 
 ---
