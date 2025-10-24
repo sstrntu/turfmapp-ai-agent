@@ -275,6 +275,9 @@ export class TurfmappChatAdapter {
       throw new Error("Unable to locate user message to send");
     }
 
+    // Get runtime for live updates
+    const runtime = window.chatRuntime;
+
     const settings = loadSettings();
 
     // Check if user has Google credentials
@@ -342,6 +345,9 @@ export class TurfmappChatAdapter {
     const decoder = new TextDecoder();
     let buffer = '';
     let data = null;
+    let accumulatedContent = '';
+    let thoughts = [];
+    let toolCalls = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -355,7 +361,28 @@ export class TurfmappChatAdapter {
         if (line.startsWith('data: ')) {
           try {
             const event = JSON.parse(line.slice(6));
-            if (event.type === 'done') {
+
+            // Handle different event types
+            if (event.type === 'thought') {
+              console.log('💭 Thought received:', event.content);
+              thoughts.push(event.content);
+
+              // Update custom progress overlay
+              this._updateProgressOverlay(event.content);
+
+            } else if (event.type === 'tool_call') {
+              console.log('🔧 Tool call received:', event.tool);
+              const toolName = event.tool || 'unknown';
+              toolCalls.push(toolName);
+
+              // Update progress overlay
+              this._updateProgressOverlay(`🔧 Using tool: ${toolName}`)
+
+            } else if (event.type === 'content') {
+              if (event.delta) {
+                accumulatedContent += event.delta;
+              }
+            } else if (event.type === 'done') {
               data = event;
             }
           } catch (e) {
@@ -370,6 +397,10 @@ export class TurfmappChatAdapter {
     }
 
     console.log("🔍 Backend response:", data);
+    console.log("🔍 Sources from backend:", data?.sources);
+    console.log("🔍 Tools used from backend:", data?.tools_used);
+    console.log("🔍 Thoughts collected:", thoughts);
+    console.log("🔍 Tool calls collected:", toolCalls);
 
     if (data?.conversation_id) {
       this.conversationId = data.conversation_id;
@@ -414,7 +445,8 @@ export class TurfmappChatAdapter {
         .filter(Boolean) ||
       ensureArray(metadataFromBackend?.reasoning)
         .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
-        .filter(Boolean);
+        .filter(Boolean) ||
+      thoughts.filter(Boolean);
 
     const blocksFromBackend =
       normaliseBlocks(metadataFromBackend?.blocks) ||
@@ -426,8 +458,15 @@ export class TurfmappChatAdapter {
       sources,
       reasoning,
       blocks: blocksFromBackend,
+      tools_used: toolCalls.length > 0 ? toolCalls : (data?.assistant_message?.metadata?.tools_used || []),
       raw_response: data,
     };
+
+    console.log("📦 Custom metadata being sent to UI:", {
+      sources_count: sources.length,
+      reasoning_count: reasoning.length,
+      tools_used: customMetadata.tools_used,
+    });
 
     const result = {
       content: textParts,

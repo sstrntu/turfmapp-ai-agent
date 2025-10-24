@@ -10,7 +10,8 @@ Uses LlamaIndex's ReActAgent for autonomous tool selection.
 from __future__ import annotations
 
 import logging
-from typing import Optional, Dict, Any, List
+import asyncio
+from typing import Optional, Dict, Any, List, Callable, Awaitable
 
 from llama_index.core.workflow import StartEvent, StopEvent, step, Context, Event
 from llama_index.core.llms import ChatMessage, MessageRole
@@ -30,6 +31,9 @@ from ..memory.conversation_memory import ConversationMemory
 from ..memory.user_memory import UserMemory
 
 logger = logging.getLogger(__name__)
+
+# Type for event emitter callback
+EventEmitter = Callable[[Dict[str, Any]], Awaitable[None]]
 
 
 # Custom events
@@ -62,6 +66,7 @@ class UnifiedWorkflowInput(BaseWorkflowInput):
         include_memory: bool = True,
         google_credentials: Optional[Any] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        event_emitter: Optional[EventEmitter] = None,
     ):
         super().__init__(user_id, conversation_id, message, metadata)
         self.model_id = model_id
@@ -69,6 +74,7 @@ class UnifiedWorkflowInput(BaseWorkflowInput):
         self.max_iterations = max_iterations
         self.include_memory = include_memory
         self.google_credentials = google_credentials
+        self.event_emitter = event_emitter
 
 
 class UnifiedWorkflowOutput(BaseWorkflowOutput):
@@ -81,12 +87,14 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
         model_used: str,
         tools_used: List[str],
         reasoning_steps: List[Dict[str, Any]],
+        sources: Optional[List[Dict[str, Any]]] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(response, context, metadata)
         self.model_used = model_used
         self.tools_used = tools_used
         self.reasoning_steps = reasoning_steps
+        self.sources = sources or []
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert output to dictionary."""
@@ -95,6 +103,7 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
             "model_used": self.model_used,
             "tools_used": self.tools_used,
             "reasoning_steps": self.reasoning_steps,
+            "sources": self.sources,
         })
         return result
 
@@ -129,6 +138,15 @@ class UnifiedWorkflow(BaseAgentWorkflow):
         self.memory_manager = memory_manager
         self.verbose = verbose
 
+    async def _emit_event(self, ctx: Context, event: Dict[str, Any]):
+        """Emit a streaming event if emitter is available."""
+        try:
+            workflow_input: UnifiedWorkflowInput = await ctx.store.get("workflow_input")
+            if workflow_input.event_emitter:
+                await workflow_input.event_emitter(event)
+        except Exception as e:
+            logger.warning(f"Failed to emit event: {e}")
+
     @step
     async def load_memory(
         self,
@@ -149,6 +167,12 @@ class UnifiedWorkflow(BaseAgentWorkflow):
         # Store input in context
         await ctx.store.set("workflow_input", workflow_input)
         await ctx.store.set("workflow_context", workflow_context)
+
+        # Emit event: Starting to load memory
+        await self._emit_event(ctx, {
+            'type': 'thought',
+            'content': '🧠 Loading memory and context...'
+        })
 
         await self.log_step(
             workflow_context,
@@ -189,6 +213,12 @@ class UnifiedWorkflow(BaseAgentWorkflow):
         workflow_input: UnifiedWorkflowInput = await ctx.store.get("workflow_input")
         workflow_context: WorkflowContext = await ctx.store.get("workflow_context")
 
+        # Emit event: Preparing tools
+        await self._emit_event(ctx, {
+            'type': 'thought',
+            'content': '🔧 Preparing tools...'
+        })
+
         tools: List[BaseTool] = []
 
         # 1. Add RAG tools (always available if user has documents)
@@ -214,7 +244,190 @@ class UnifiedWorkflow(BaseAgentWorkflow):
         except Exception as e:
             logger.warning(f"Failed to add RAG tools: {e}")
 
-        # 2. Add Google tools (if credentials available)
+        # 2. Add Web Search tool (OpenAI or Claude)
+        try:
+            from llama_index.core.tools import FunctionTool
+            from openai import AsyncOpenAI
+            from anthropic import AsyncAnthropic
+            import os
+
+            # Get model to determine which search API to use
+            model_id = workflow_input.model_id or "gpt-4o"
+            is_claude = model_id.startswith("claude")
+
+            # Storage for sources (accessed by workflow)
+            web_search_sources = []
+
+            async def web_search(query: str) -> str:
+                """
+                Search the web for current information, news, weather, sports scores, and real-time data.
+
+                Use this tool when:
+                - User asks about current events, news, or recent information
+                - Questions about weather, sports scores, or time-sensitive data
+                - Looking up facts that may have changed since your training data
+                - User explicitly asks to "search the web" or "look up"
+
+                Args:
+                    query: Search query to find information on the web
+
+                Returns:
+                    Web search results with relevant information and sources
+                """
+                nonlocal web_search_sources
+
+                # Emit event: Starting web search
+                await self._emit_event(ctx, {
+                    'type': 'tool_call',
+                    'tool': 'web_search',
+                    'input': query
+                })
+
+                try:
+                    if is_claude:
+                        # Use Claude's native web search
+                        client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+                        response = await client.messages.create(
+                            model=model_id,
+                            max_tokens=2000,
+                            tools=[{
+                                "type": "web_search_20250305",
+                                "name": "web_search",
+                                "max_uses": 5
+                            }],
+                            messages=[{
+                                "role": "user",
+                                "content": f"Use web search to find the most current factual information for: {query}"
+                            }]
+                        )
+
+                        # Extract text and sources from response
+                        text_parts = []
+                        for block in response.content:
+                            if hasattr(block, 'text'):
+                                text_parts.append(block.text)
+
+                        result_text = "\n".join(text_parts) if text_parts else f"No results found for: {query}"
+
+                        # Extract citations from Claude's response
+                        # Claude embeds citations as markdown links in the text
+                        import re
+
+                        # Pattern to match markdown links: [text](url)
+                        citation_pattern = r'\[([^\]]+)\]\(([^)]+)\)'
+                        matches = re.findall(citation_pattern, result_text)
+
+                        seen_urls = set()
+                        for title, url in matches:
+                            # Only add if it's a web URL and not a duplicate
+                            if url.startswith('http') and url not in seen_urls:
+                                web_search_sources.append({
+                                    'title': title,
+                                    'url': url,
+                                    'snippet': '',
+                                })
+                                seen_urls.add(url)
+                                logger.info(f"🔍 Extracted Claude citation: {title} - {url}")
+
+                        logger.info(f"🔍 Extracted {len(web_search_sources)} sources from Claude web search")
+
+                        # Store sources in context
+                        await ctx.store.set("web_search_sources", web_search_sources)
+
+                        # Emit event: Web search completed
+                        await self._emit_event(ctx, {
+                            'type': 'tool_result',
+                            'tool': 'web_search',
+                            'sources_count': len(web_search_sources)
+                        })
+
+                        return result_text
+
+                    else:
+                        # Use OpenAI's native web search (Responses API)
+                        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+                        response = await client.responses.create(
+                            model="gpt-4o-mini",
+                            input=f"Use the web tool to find the most current factual information for: {query}",
+                            tools=[{"type": "web_search"}],
+                            tool_choice={"type": "web_search"},
+                        )
+
+                        # Extract text and sources from response
+                        # The output contains: [ResponseFunctionWebSearch, ResponseOutputMessage]
+                        text = ""
+                        if response.output:
+                            try:
+                                # Find the ResponseOutputMessage (it has type='message')
+                                message = None
+                                for item in response.output:
+                                    if hasattr(item, 'type') and item.type == 'message':
+                                        message = item
+                                        break
+
+                                if message and message.content:
+                                    # Extract text from content
+                                    content_block = message.content[0]
+                                    text = content_block.text
+
+                                    # Extract citations from annotations
+                                    if hasattr(content_block, 'annotations') and content_block.annotations:
+                                        logger.info(f"🔍 Found {len(content_block.annotations)} URL citations")
+                                        for annotation in content_block.annotations:
+                                            # Each annotation is an AnnotationURLCitation
+                                            if annotation.type == 'url_citation':
+                                                web_search_sources.append({
+                                                    'title': annotation.title,
+                                                    'url': annotation.url,
+                                                    'snippet': '',  # OpenAI doesn't provide snippets in annotations
+                                                })
+                                                logger.info(f"🔍 Added source: {annotation.title} - {annotation.url}")
+
+                            except Exception as e:
+                                logger.error(f"Failed to extract sources: {e}", exc_info=True)
+                                text = str(response.output) if response.output else ""
+
+                        if not text:
+                            text = f"No web search results found for: {query}"
+
+                        # Store sources in context for later retrieval
+                        logger.info(f"🔍 Extracted {len(web_search_sources)} sources from OpenAI web search")
+                        await ctx.store.set("web_search_sources", web_search_sources)
+
+                        # Emit event: Web search completed
+                        await self._emit_event(ctx, {
+                            'type': 'tool_result',
+                            'tool': 'web_search',
+                            'sources_count': len(web_search_sources)
+                        })
+
+                        return text.strip()
+
+                except Exception as e:
+                    logger.error(f"Web search failed for {model_id}: {e}")
+
+                    # Emit error event
+                    await self._emit_event(ctx, {
+                        'type': 'tool_error',
+                        'tool': 'web_search',
+                        'error': str(e)
+                    })
+
+                    return f"Web search error: {str(e)}"
+
+            web_search_tool = FunctionTool.from_defaults(
+                async_fn=web_search,
+                name="web_search",
+                description="Search the web for current information. Automatically uses OpenAI or Claude web search based on the model.",
+            )
+            tools.append(web_search_tool)
+            logger.info(f"Added web search tool (using {'Claude' if is_claude else 'OpenAI'} search)")
+        except Exception as e:
+            logger.warning(f"Failed to add web search tool: {e}")
+
+        # 3. Add Google tools (if credentials available)
         if workflow_input.google_credentials:
             try:
                 from ..tools import (
@@ -322,10 +535,22 @@ class UnifiedWorkflow(BaseAgentWorkflow):
             system_prompt = "\n\n".join(system_prompt_parts)
             logger.info(f"🤖 Final system prompt:\n{system_prompt}\n{'='*80}")
 
+            # Emit event: Analyzing query
+            await self._emit_event(ctx, {
+                'type': 'thought',
+                'content': '🔍 Analyzing query...'
+            })
+
             # Smart routing: Check if we can answer from context first (without tools)
             # This prevents the agent from being "tool-happy" for simple questions
             if user_context or (conversation_memory and conversation_memory.message_count > 0):
                 logger.info("🧠 Checking if query can be answered from context alone...")
+
+                # Emit event: Checking context
+                await self._emit_event(ctx, {
+                    'type': 'thought',
+                    'content': '💭 Checking if I can answer from memory...'
+                })
 
                 # Use a lightweight LLM to check if context has the answer
                 router_llm = llm_factory.create_llm(
@@ -361,6 +586,25 @@ Your response:"""
 
                     logger.info("✅ Answered from context without using tools")
 
+                    # Emit event: Answered from context
+                    await self._emit_event(ctx, {
+                        'type': 'thought',
+                        'content': '✅ Found answer in context, no tools needed'
+                    })
+
+                    # Start streaming the response
+                    words = response_text.split(' ')
+                    chunk_size = 5
+                    for i in range(0, len(words), chunk_size):
+                        chunk = ' '.join(words[i:i+chunk_size])
+                        if i + chunk_size < len(words):
+                            chunk += ' '
+                        await self._emit_event(ctx, {
+                            'type': 'content',
+                            'delta': chunk
+                        })
+                        await asyncio.sleep(0.03)  # Small delay for smooth streaming
+
                     await ctx.store.set("response_text", response_text)
                     await ctx.store.set("tools_used", tools_used)
                     await ctx.store.set("reasoning_steps", reasoning_steps)
@@ -369,6 +613,12 @@ Your response:"""
 
             # If we get here, we need tools - create the agent
             if tools:
+                # Emit event: Starting agent with tools
+                await self._emit_event(ctx, {
+                    'type': 'thought',
+                    'content': f'🤖 Starting agent with {len(tools)} tools available...'
+                })
+
                 # Use ReActAgent with tools
                 agent = ReActAgent(
                     name="Unified Agent",
@@ -385,12 +635,24 @@ Your response:"""
                     {"mode": "tool_agent", "tool_count": len(tools)},
                 )
 
+                # Emit event: Running agent
+                await self._emit_event(ctx, {
+                    'type': 'thought',
+                    'content': '🧠 Agent is thinking...'
+                })
+
                 # Execute agent
                 handler = agent.run(
                     user_msg=workflow_input.message,
                     max_iterations=workflow_input.max_iterations,
                 )
                 result = await handler
+
+                # Emit event: Agent completed
+                await self._emit_event(ctx, {
+                    'type': 'thought',
+                    'content': '✅ Agent completed reasoning'
+                })
 
                 # Extract response text
                 if hasattr(result, "response"):
@@ -403,10 +665,20 @@ Your response:"""
                 tools_used = []
                 if hasattr(result, "tool_calls") and result.tool_calls:
                     for tool_call in result.tool_calls:
+                        tool_name = None
                         if hasattr(tool_call, "tool_name"):
-                            tools_used.append(tool_call.tool_name)
+                            tool_name = tool_call.tool_name
                         elif hasattr(tool_call, "name"):
-                            tools_used.append(tool_call.name)
+                            tool_name = tool_call.name
+
+                        if tool_name:
+                            tools_used.append(tool_name)
+                            # Emit event for each tool used (if not already emitted by tool itself)
+                            if tool_name != 'web_search':  # web_search emits its own events
+                                await self._emit_event(ctx, {
+                                    'type': 'tool_call',
+                                    'tool': tool_name
+                                })
 
                 # Extract reasoning steps from raw messages
                 reasoning_steps = []
@@ -418,8 +690,26 @@ Your response:"""
                                 "content": str(msg.content)[:200] if hasattr(msg, "content") else "",  # Truncate
                             })
 
+                # Stream the response content
+                words = response_text.split(' ')
+                chunk_size = 5
+                for i in range(0, len(words), chunk_size):
+                    chunk = ' '.join(words[i:i+chunk_size])
+                    if i + chunk_size < len(words):
+                        chunk += ' '
+                    await self._emit_event(ctx, {
+                        'type': 'content',
+                        'delta': chunk
+                    })
+                    await asyncio.sleep(0.03)  # Small delay for smooth streaming
+
             else:
                 # No tools available, use direct LLM
+                await self._emit_event(ctx, {
+                    'type': 'thought',
+                    'content': '💬 Generating response (no tools needed)...'
+                })
+
                 await self.log_step(
                     workflow_context,
                     "execute_agent",
@@ -435,6 +725,19 @@ Your response:"""
                 response_text = response.message.content
                 tools_used = []
                 reasoning_steps = []
+
+                # Stream the response content
+                words = response_text.split(' ')
+                chunk_size = 5
+                for i in range(0, len(words), chunk_size):
+                    chunk = ' '.join(words[i:i+chunk_size])
+                    if i + chunk_size < len(words):
+                        chunk += ' '
+                    await self._emit_event(ctx, {
+                        'type': 'content',
+                        'delta': chunk
+                    })
+                    await asyncio.sleep(0.03)  # Small delay for smooth streaming
 
             await ctx.store.set("response_text", response_text)
             await ctx.store.set("tools_used", tools_used)
@@ -463,6 +766,13 @@ Your response:"""
         model_used: str = await ctx.store.get("model_used")
         tools_used: List[str] = await ctx.store.get("tools_used")
         reasoning_steps: List[Dict[str, Any]] = await ctx.store.get("reasoning_steps")
+
+        # Get web search sources if available
+        try:
+            web_search_sources = await ctx.store.get("web_search_sources")
+        except (ValueError, AttributeError):
+            # Key doesn't exist if web search wasn't used
+            web_search_sources = []
 
         try:
             # Save to conversation memory
@@ -518,6 +828,7 @@ Your response:"""
                 model_used=model_used,
                 tools_used=tools_used,
                 reasoning_steps=reasoning_steps,
+                sources=web_search_sources,
                 metadata=workflow_input.metadata,
             )
 

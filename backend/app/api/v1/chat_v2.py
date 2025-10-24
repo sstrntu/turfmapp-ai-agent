@@ -329,147 +329,20 @@ async def stream_chat_message_v2(
             db_pool = await get_db_pool()
             mem_mgr = await get_memory_manager()
 
-            # Check if using OpenAI tools (web search, image gen)
-            has_openai_tools = request.tools and len(request.tools) > 0
-
-            if has_openai_tools:
-                # Use old chat service for OpenAI tools (web search, image gen)
-                yield f"data: {json.dumps({'type': 'thought', 'content': '🔍 Analyzing your question...'})}\n\n"
-                await asyncio.sleep(0.1)
-
-                from ...services.chat_service import EnhancedChatService
-                from ...llamaindex.memory.conversation_memory import ConversationMemory
-                from ...llamaindex.memory.user_memory import UserMemory
-
-                chat_service = EnhancedChatService()
-
-                # Load conversation memory
-                if request.include_memory and mem_mgr:
-                    conversation_memory = mem_mgr.get_memory(
-                        user_id=user_id,
-                        conversation_id=conversation_id,
-                    )
-                    await conversation_memory.load_from_database()
-
-                    # Add conversation context to assistant_context
-                    recent_messages = await conversation_memory.get_messages(limit=5)
-                    if recent_messages and len(recent_messages) > 0:
-                        context_parts = []
-                        if request.assistant_context:
-                            context_parts.append(request.assistant_context)
-
-                        context_parts.append("\n\n**Recent Conversation:**")
-                        for msg in recent_messages[-3:]:  # Last 3 messages
-                            context_parts.append(f"{msg['role']}: {msg['content']}")
-
-                        request.assistant_context = "\n".join(context_parts)
-                        yield f"data: {json.dumps({'type': 'thought', 'content': '🧠 Loaded conversation memory'})}\n\n"
-
-                # Load user memory
-                user_memory = UserMemory(user_id=user_id, db_pool=db_pool)
-                await user_memory.load_from_database()
-                user_context = user_memory.get_context_string()
-                if user_context:
-                    if request.assistant_context:
-                        request.assistant_context = user_context + "\n\n" + request.assistant_context
-                    else:
-                        request.assistant_context = user_context
-                    yield f"data: {json.dumps({'type': 'thought', 'content': '🧠 Loaded user memory'})}\n\n"
-
-                # Get user preferences
-                user_prefs = await chat_service.get_user_preferences(user_id)
-                model_to_use = request.model if request.model else user_prefs.get("model", "gpt-4o")
-
-                # Process with old service
-                result = await chat_service.process_chat_request(
-                    user_id=user_id,
-                    message=request.message,
-                    conversation_id=conversation_id,
-                    model=model_to_use,
-                    include_reasoning=False,
-                    attachments=request.attachments,
-                    assistant_context=request.assistant_context,
-                    tools=request.tools,
-                    tool_choice=request.tool_choice,
-                )
-
-                # Check if web search was used
-                sources = result.get("sources", [])
-                if sources:
-                    yield f"data: {json.dumps({'type': 'thought', 'content': '🌐 Found sources from web search'})}\n\n"
-                    await asyncio.sleep(0.2)
-
-                # Stream the response
-                response_text = result["assistant_message"]["content"]
-                words = response_text.split(' ')
-                chunk_size = 5
-
-                for i in range(0, len(words), chunk_size):
-                    chunk = ' '.join(words[i:i+chunk_size])
-                    if i + chunk_size < len(words):
-                        chunk += ' '
-                    yield f"data: {json.dumps({'type': 'content', 'delta': chunk})}\n\n"
-                    await asyncio.sleep(0.03)
-
-                # Get model info
-                model_config = llm_factory.get_model_config(result.get("model", model_to_use))
-
-                # Extract user facts for user memory (background task)
-                try:
-                    fact_llm = llm_factory.create_llm(
-                        model_id="gpt-4o-mini",
-                        temperature=0.3,
-                    )
-                    if request.include_memory and mem_mgr and 'conversation_memory' in locals():
-                        messages_for_facts = await conversation_memory.get_messages(limit=10)
-                        await user_memory.extract_facts_from_conversation(
-                            messages=messages_for_facts,
-                            conversation_id=conversation_id,
-                            llm=fact_llm,
-                        )
-                except Exception as e:
-                    logger.warning(f"Failed to extract user facts: {e}")
-
-                # Determine tools used
-                tools_used = []
-                if sources:
-                    tools_used.append("web_search")
-                # Check if google_mcp was in request
-                if request.tools:
-                    for tool in request.tools:
-                        if isinstance(tool, dict) and tool.get("type") == "google_mcp":
-                            enabled = tool.get("enabled_tools", {})
-                            if enabled.get("gmail"):
-                                tools_used.append("gmail")
-                            if enabled.get("calendar"):
-                                tools_used.append("calendar")
-                            if enabled.get("drive"):
-                                tools_used.append("drive")
-
-                # Send completion
-                completion_data = {
-                    "type": "done",
-                    "conversation_id": result["conversation_id"],
-                    "user_message": result["user_message"],
-                    "assistant_message": result["assistant_message"],
-                    "reasoning": result.get("reasoning"),
-                    "sources": sources,
-                    "model_used": result.get("model", model_to_use),
-                    "provider": model_config.provider,
-                    "tools_used": tools_used,
-                }
-
-                yield f"data: {json.dumps(completion_data)}\n\n"
-                return
-
-            # Use LlamaIndex workflow for everything else
-            yield f"data: {json.dumps({'type': 'thought', 'content': '🧠 Loading memory and context...'})}\n\n"
-
             workflow = UnifiedWorkflow(
                 db_pool=db_pool,
                 memory_manager=mem_mgr,
                 verbose=True,  # Enable for detailed logging
             )
+
+            # Create event queue for real-time streaming
+            event_queue = asyncio.Queue()
+            workflow_task = None
+            workflow_result = None
+
+            async def emit_event(event: Dict[str, Any]):
+                """Callback to emit events from workflow"""
+                await event_queue.put(event)
 
             workflow_input = UnifiedWorkflowInput(
                 user_id=user_id,
@@ -479,44 +352,47 @@ async def stream_chat_message_v2(
                 temperature=request.temperature,
                 include_memory=request.include_memory,
                 google_credentials=google_credentials,
+                event_emitter=emit_event,  # Pass event emitter
             )
 
-            # Stream workflow events
-            yield f"data: {json.dumps({'type': 'thought', 'content': '🔍 Analyzing query...'})}\n\n"
+            # Start workflow execution in background
+            async def run_workflow():
+                nonlocal workflow_result
+                result = await workflow.run(input=workflow_input)
+                workflow_result = result.result if hasattr(result, 'result') else result
+                # Signal completion by putting None in queue
+                await event_queue.put(None)
 
-            # Execute workflow and capture events
-            # Note: LlamaIndex workflows don't have built-in streaming yet,
-            # so we'll emit events at key checkpoints
+            workflow_task = asyncio.create_task(run_workflow())
 
-            result = await workflow.run(input=workflow_input)
-            output = result.result if hasattr(result, 'result') else result
+            # Stream events as they arrive from workflow
+            while True:
+                try:
+                    # Wait for next event with timeout
+                    event = await asyncio.wait_for(event_queue.get(), timeout=60.0)
 
-            # Emit tool usage if any
-            if output.tools_used:
-                for tool in output.tools_used:
-                    yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool})}\n\n"
-                    await asyncio.sleep(0.1)  # Small delay for visual effect
+                    # None signals workflow completion
+                    if event is None:
+                        break
 
-            # Emit reasoning steps
-            if output.reasoning_steps:
-                for step in output.reasoning_steps:
-                    content = step.get('content', '')[:200]  # Truncate long content
-                    if content:
-                        thought_text = f"💭 {content}"
-                        yield f"data: {json.dumps({'type': 'thought', 'content': thought_text})}\n\n"
-                        await asyncio.sleep(0.05)
+                    # Yield event to client
+                    yield f"data: {json.dumps(event)}\n\n"
 
-            # Stream the response content (simulate streaming by chunking)
-            response_text = output.response
-            words = response_text.split(' ')
-            chunk_size = 5
+                except asyncio.TimeoutError:
+                    # Check if workflow is still running
+                    if workflow_task.done():
+                        break
+                    # Send keepalive
+                    yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
 
-            for i in range(0, len(words), chunk_size):
-                chunk = ' '.join(words[i:i+chunk_size])
-                if i + chunk_size < len(words):
-                    chunk += ' '
-                yield f"data: {json.dumps({'type': 'content', 'delta': chunk})}\n\n"
-                await asyncio.sleep(0.05)  # Simulate streaming delay
+            # Wait for workflow to complete
+            await workflow_task
+
+            # Ensure we have the result
+            if workflow_result is None:
+                raise Exception("Workflow did not produce a result")
+
+            output = workflow_result
 
             # Create final response
             user_msg = {
@@ -549,6 +425,7 @@ async def stream_chat_message_v2(
                 "model_used": output.model_used,
                 "provider": model_config.provider,
                 "tools_used": output.tools_used,
+                "sources": output.sources,  # Web search sources for popup
             }
 
             yield f"data: {json.dumps(completion_data)}\n\n"

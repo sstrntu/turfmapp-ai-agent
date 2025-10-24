@@ -23,14 +23,14 @@
     const menuToggle = document.getElementById('menu-toggle');
     const menuPanel = document.getElementById('top-menu');
     const hasChat = !!(list && form && input);
+    // Must match backend MODEL_REGISTRY
     const MODEL_LABELS = {
         "gpt-4o": "GPT-4o",
         "gpt-4o-mini": "GPT-4o Mini",
-        "gpt-5-mini": "GPT-5 Mini",
-        "claude-3-haiku-20240307": "Claude 3 Haiku",
-        "claude-sonnet-4-20250514": "Claude Sonnet 4",
+        "gpt-3.5-turbo": "GPT-3.5 Turbo",
         "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
-        "claude-opus-4-1-20250805": "Claude Opus 4.1"
+        "claude-3-5-sonnet-20241022": "Claude 3.5 Sonnet",
+        "claude-3-haiku-20240307": "Claude 3 Haiku"
     };
 
     function normalizeMetadata(meta) {

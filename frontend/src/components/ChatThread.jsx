@@ -39,15 +39,14 @@ export const ChatThread = () => {
     return localStorage.getItem('tm_model') || 'gpt-4o';
   });
 
-  // Available models
+  // Available models (must match backend MODEL_REGISTRY)
   const models = [
     { id: 'gpt-4o', name: 'GPT-4O', provider: 'OpenAI' },
     { id: 'gpt-4o-mini', name: 'GPT-4O Mini', provider: 'OpenAI' },
-    { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', provider: 'Anthropic' },
-    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'Anthropic' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'OpenAI' },
     { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'Anthropic' },
-    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', provider: 'Anthropic' },
+    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', provider: 'Anthropic' },
   ];
 
   React.useEffect(() => {
