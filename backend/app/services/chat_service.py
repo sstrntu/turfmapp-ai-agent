@@ -640,7 +640,14 @@ class EnhancedChatService:
                         # Extract raw MCP data for AI summarization
                         for result in executed_results:
                             result_data = result.get("result", {})
-                            # Get the raw response from MCP (this is pre-formatted by MCP)
+                            if tool_name == "generate_image":
+                                tool_call_inputs[tool_id] = {
+                                    "name": tool_name,
+                                    "args": tool_input,
+                                    "args_text": serialise_args(tool_input),
+                                }
+                                tool_results.append(result)
+                                continue
                             raw_data = (
                                 result_data.get("response")
                                 or result_data.get("content")
@@ -796,6 +803,14 @@ Respond as if you're having a natural conversation with the user."""
                     tool_name = func_call["tool_name"]
                     for result in func_call["results"]:
                         result_data = result.get("result", {})
+                        if tool_name == "generate_image":
+                            tool_call_inputs[result.get("tool_call_id")] = {
+                                "name": tool_name,
+                                "args": result_data.get("arguments"),
+                                "args_text": serialise_args(result_data.get("arguments")),
+                            }
+                            tool_results.append(result)
+                            continue
                         raw_data = (
                             result_data.get("response")
                             or result_data.get("content")
@@ -939,6 +954,8 @@ Respond as if you're having a natural conversation with the user."""
                 # Extract text content from tool results (skip if already summarized by AI)
                 if not tools_already_summarized:
                     for tool_item in tool_results:
+                        if tool_item.get("tool_name") == "generate_image":
+                            continue
                         # Try to extract response text from tool result
                         if isinstance(tool_item, dict):
                             # Handle nested result structure from handle_tool_calls

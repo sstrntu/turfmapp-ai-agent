@@ -75,6 +75,14 @@ class MinimalChat {
 
     const model = this.modelSelect.value;
 
+    // Auto-dismiss any pending memory consent prompts
+    const memoryPrompts = document.querySelectorAll('.memory-consent[data-auto-dismiss="true"]');
+    memoryPrompts.forEach(prompt => {
+      prompt.style.opacity = '0';
+      prompt.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => prompt.remove(), 300);
+    });
+
     // Add user message
     this.addMessage('user', text);
     this.inputEl.value = '';
@@ -167,6 +175,38 @@ class MinimalChat {
               contentEl.textContent = content;
               this.scrollToBottom();
             }
+            else if (event.type === 'image_generated') {
+              // Render generated image
+              const imageContainer = document.createElement('div');
+              imageContainer.className = 'image-container';
+
+              const img = document.createElement('img');
+              img.className = 'generated-image';
+              img.alt = 'Generated image';
+
+              if (event.image_url) {
+                img.src = event.image_url;
+              } else if (event.image_base64) {
+                const format = event.format || 'png';
+                img.src = `data:image/${format};base64,${event.image_base64}`;
+              }
+
+              imageContainer.appendChild(img);
+
+              // Add download button
+              if (event.image_url) {
+                const downloadBtn = document.createElement('a');
+                downloadBtn.href = event.image_url;
+                downloadBtn.download = 'generated-image.png';
+                downloadBtn.className = 'download-image-btn';
+                downloadBtn.textContent = 'Download';
+                downloadBtn.target = '_blank';
+                imageContainer.appendChild(downloadBtn);
+              }
+
+              assistantMsgEl.insertBefore(imageContainer, contentEl);
+              this.scrollToBottom();
+            }
             else if (event.type === 'done') {
               // Final content with markdown rendering
               progressEl.style.display = 'none';
@@ -177,6 +217,13 @@ class MinimalChat {
               if (event.sources && event.sources.length > 0) {
                 const sourcesEl = this.createSourcesPopup(event.sources);
                 assistantMsgEl.appendChild(sourcesEl);
+              }
+
+              // Show memory consent prompt (HITL)
+              if (event.memory_request && event.memory_request.facts && event.memory_request.facts.length > 0) {
+                console.log('📋 Memory consent prompt:', event.memory_request);
+                const consentEl = this.createMemoryConsentPrompt(event.memory_request, event.conversation_id);
+                assistantMsgEl.appendChild(consentEl);
               }
 
               // Show metadata
@@ -422,6 +469,121 @@ class MinimalChat {
 
     wrapper.appendChild(button);
     wrapper.appendChild(popover);
+
+    return wrapper;
+  }
+
+  createMemoryConsentPrompt(memoryRequest, conversationId) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'memory-consent';
+    // Liquid glass theme: compact and subtle
+    wrapper.style.cssText = `
+      margin: 8px 0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    `;
+
+    // Simple message without listing facts
+    const message = document.createElement('div');
+    message.style.cssText = 'font-size: 13px; color: rgba(255, 255, 255, 0.8); flex: 1;';
+    const count = memoryRequest.facts.length;
+
+    // Check if any facts are instructions (contain keywords)
+    const instructionKeywords = ['approach', 'instruction', 'preference', 'style', 'guideline', 'rule', 'method'];
+    const hasInstructions = memoryRequest.facts.some(fact =>
+      instructionKeywords.some(keyword => fact.key.toLowerCase().includes(keyword))
+    );
+
+    if (hasInstructions && count === 1) {
+      message.textContent = 'Remember this instruction?';
+    } else if (hasInstructions) {
+      message.textContent = 'Remember these for future reference?';
+    } else {
+      message.textContent = `Remember ${count === 1 ? 'this' : `${count} things`} for next time?`;
+    }
+
+    wrapper.appendChild(message);
+
+    const approveBtn = document.createElement('button');
+    approveBtn.textContent = '💾 Remember';
+    approveBtn.style.cssText = `
+      padding: 6px 16px;
+      background: rgba(76, 175, 80, 0.25);
+      color: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(76, 175, 80, 0.4);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    `;
+
+    approveBtn.addEventListener('mouseenter', () => {
+      approveBtn.style.background = 'rgba(76, 175, 80, 0.35)';
+      approveBtn.style.borderColor = 'rgba(76, 175, 80, 0.6)';
+    });
+
+    approveBtn.addEventListener('mouseleave', () => {
+      if (!approveBtn.disabled) {
+        approveBtn.style.background = 'rgba(76, 175, 80, 0.25)';
+        approveBtn.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+      }
+    });
+
+    approveBtn.addEventListener('click', async () => {
+      approveBtn.disabled = true;
+      approveBtn.textContent = '⏳ Saving...';
+      approveBtn.style.background = 'rgba(76, 175, 80, 0.15)';
+
+      try {
+        const token = window?.supabase?.getAccessToken?.();
+        const response = await fetch('http://localhost:8000/api/v1/memory/approve', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            facts: memoryRequest.facts,
+            conversation_id: conversationId || memoryRequest.conversation_id
+          })
+        });
+
+        if (response.ok) {
+          approveBtn.textContent = '✓ Remembered';
+          approveBtn.style.background = 'rgba(33, 150, 243, 0.25)';
+          approveBtn.style.borderColor = 'rgba(33, 150, 243, 0.4)';
+          message.textContent = 'Saved to memory';
+          setTimeout(() => {
+            wrapper.style.opacity = '0';
+            wrapper.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => wrapper.remove(), 300);
+          }, 1500);
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (error) {
+        console.error('Failed to save memory:', error);
+        approveBtn.textContent = '✗ Retry';
+        approveBtn.style.background = 'rgba(244, 67, 54, 0.25)';
+        approveBtn.style.borderColor = 'rgba(244, 67, 54, 0.4)';
+        approveBtn.disabled = false;
+      }
+    });
+
+    wrapper.appendChild(approveBtn);
+
+    // Auto-dismiss when user starts typing a new message
+    wrapper.dataset.autoDismiss = 'true';
 
     return wrapper;
   }

@@ -233,8 +233,12 @@ async def send_chat_message_v2(
                 "model": output.model_used,
                 "tools_used": output.tools_used,
                 "reasoning_steps": output.reasoning_steps,
+                "conversation_id": conversation_id,
             },
         }
+
+        if output.metadata:
+            assistant_msg["metadata"].setdefault("custom", output.metadata)
 
         # Get provider from model config
         model_config = llm_factory.get_model_config(output.model_used)
@@ -422,6 +426,8 @@ async def stream_chat_message_v2(
                 "conversation_id": conversation_id,
                 "user_message": user_msg,
                 "assistant_message": assistant_msg,
+                "metadata": output.metadata,  # Include all metadata (includes memory_request)
+                "memory_request": output.memory_request,  # Explicit field for HITL consent prompt
                 "model_used": output.model_used,
                 "provider": model_config.provider,
                 "tools_used": output.tools_used,

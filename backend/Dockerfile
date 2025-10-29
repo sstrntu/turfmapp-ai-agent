@@ -30,15 +30,15 @@ RUN chmod +x /app/run_tests.sh
 # ESSENTIAL TEST SUITE - Build fails if critical tests fail
 # Focuses on regression prevention and core functionality
 RUN echo "🧪 Running essential test suite during Docker build..." && \
-    SUPABASE_URL=https://test.supabase.co \
-    SUPABASE_ANON_KEY=test-anon-key \
-    SUPABASE_SERVICE_ROLE_KEY=test-service-key \
-    SUPABASE_DB_URL=postgresql://test:test@localhost:5432/test \
-    OPENAI_API_KEY=test-openai-key \
-    SECRET_KEY=test-secret-key-for-docker-build \
-    GOOGLE_CLIENT_ID=test-google-client-id \
-    GOOGLE_CLIENT_SECRET=test-google-client-secret \
-    GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback \
+    export SUPABASE_URL=https://test.supabase.co && \
+    export SUPABASE_ANON_KEY=test-anon-key && \
+    export SUPABASE_SERVICE_ROLE_KEY=test-service-key && \
+    export SUPABASE_DB_URL=postgresql://test:test@localhost:5432/test && \
+    export OPENAI_API_KEY=test-openai-key && \
+    export SECRET_KEY=test-secret-key-for-docker-build && \
+    export GOOGLE_CLIENT_ID=test-google-client-id && \
+    export GOOGLE_CLIENT_SECRET=test-google-client-secret && \
+    export GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback && \
     echo "📋 Step 1: REGRESSION tests (Core workflows must never break)..." && \
     python -m pytest tests/test_regression_critical_flows.py -v --tb=short --maxfail=3 && \
     echo "✅ Regression tests PASSED" && \
@@ -69,6 +69,5 @@ LABEL maintainer="TurfMapp Team" \
       coverage="Minimum 35% code coverage enforced"
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-
 
 

@@ -13,6 +13,8 @@ import json
 import logging
 from typing import List, Dict, Any
 
+from .image_generation import generate_image as generate_image_tool
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,10 +76,20 @@ async def handle_tool_calls(user_id: str, tool_calls: List[Dict[str, Any]]) -> L
             if isinstance(tool_args, str):
                 tool_args = json.loads(tool_args)
 
-            # Check if this is a RAG tool
-            rag_tools = ["search_documents", "list_documents"]
+            # Check if this is the image generation tool
+            if tool_name == "generate_image":
+                logger.debug("🎨 Generating image via GPT-Image-1")
+                prompt = tool_args.get("prompt") or ""
+                result = await generate_image_tool(
+                    prompt=prompt,
+                    size=tool_args.get("size"),
+                    quality=tool_args.get("quality"),
+                    background=tool_args.get("background"),
+                    output_format=tool_args.get("output_format", "png"),
+                )
 
-            if tool_name in rag_tools:
+            # Check if this is a RAG tool
+            elif tool_name in ["search_documents", "list_documents"]:
                 # Use RAG service for document search
                 logger.debug(f"🔧 Using RAG service for tool: {tool_name}")
                 try:

@@ -2,6 +2,7 @@ import React from "react";
 import { BlockRenderer } from "./BlockRenderer.jsx";
 import { ReasoningPanel } from "./ReasoningPanel.jsx";
 import { SourcesPanel } from "./SourcesPanel.jsx";
+import { MemoryConsentPrompt } from "./MemoryConsentPrompt.jsx";
 
 const isNonEmptyString = (value) =>
   typeof value === "string" && value.trim().length > 0;
@@ -180,6 +181,14 @@ export const AssistantMessage = ({ message }) => {
   );
 
   const isRunning = message.status?.type === "running";
+  const memoryRequest = message.metadata?.custom?.memory_request;
+  const conversationId = message.metadata?.conversation_id || memoryRequest?.conversation_id;
+  const hasMemoryPrompt = Array.isArray(memoryRequest?.facts) && memoryRequest.facts.length > 0;
+  const [memoryDecision, setMemoryDecision] = React.useState("pending");
+
+  React.useEffect(() => {
+    setMemoryDecision("pending");
+  }, [message?.id]);
 
   return (
     <div className="assistant-message message-appear">
@@ -199,8 +208,23 @@ export const AssistantMessage = ({ message }) => {
         )}
       </div>
 
-      <ReasoningPanel reasoning={reasoning} />
-      <SourcesPanel sources={sources} />
+      {hasMemoryPrompt && memoryDecision === "pending" && (
+        <MemoryConsentPrompt
+          facts={memoryRequest.facts}
+          conversationId={conversationId}
+          onDecision={(decision) => setMemoryDecision(decision || "declined")}
+        />
+      )}
+
+      {memoryDecision === "approved" && (
+        <div className="memory-status acknowledgement">Great, I’ll remember that for you.</div>
+      )}
+      {memoryDecision === "declined" && hasMemoryPrompt && (
+        <div className="memory-status acknowledgement">No problem, I won’t store this.</div>
+      )}
+
+      {reasoning.length > 0 && <ReasoningPanel reasoning={reasoning} />}
+      {sources.length > 0 && <SourcesPanel sources={sources} />}
     </div>
   );
 };

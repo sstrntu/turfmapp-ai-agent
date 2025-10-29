@@ -89,12 +89,14 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
         reasoning_steps: List[Dict[str, Any]],
         sources: Optional[List[Dict[str, Any]]] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        memory_request: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(response, context, metadata)
         self.model_used = model_used
         self.tools_used = tools_used
         self.reasoning_steps = reasoning_steps
         self.sources = sources or []
+        self.memory_request = memory_request
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert output to dictionary."""
@@ -104,6 +106,7 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
             "tools_used": self.tools_used,
             "reasoning_steps": self.reasoning_steps,
             "sources": self.sources,
+            "memory_request": self.memory_request,
         })
         return result
 
@@ -427,6 +430,62 @@ class UnifiedWorkflow(BaseAgentWorkflow):
         except Exception as e:
             logger.warning(f"Failed to add web search tool: {e}")
 
+        # 3. Add Image Generation tool (GPT-Image-1)
+        try:
+            from app.services.image_generation import generate_image as openai_generate_image
+
+            async def image_generation_tool(prompt: str, size: str = "auto", quality: str = "auto", background: str = "auto", output_format: str = "png") -> str:
+                await self._emit_event(ctx, {
+                    'type': 'tool_call',
+                    'tool': 'generate_image',
+                    'input': {
+                        'prompt': prompt,
+                        'size': size,
+                        'quality': quality,
+                        'background': background,
+                        'output_format': output_format,
+                    },
+                })
+
+                result = await openai_generate_image(
+                    prompt=prompt,
+                    size=size,
+                    quality=quality,
+                    background=background,
+                    output_format=output_format,
+                )
+
+                if result.get("success"):
+                    # Emit image event with actual image data
+                    image_event = {
+                        'type': 'image_generated',
+                        'prompt': prompt,
+                    }
+
+                    if result.get("image_url"):
+                        image_event['image_url'] = result['image_url']
+                    elif result.get("image_base64"):
+                        image_event['image_base64'] = result['image_base64']
+                        image_event['format'] = output_format
+
+                    await self._emit_event(ctx, image_event)
+
+                    # Return text for the agent
+                    return result.get("response", "Image generated successfully.")
+
+                return f"Image generation failed: {result.get('error', 'Unknown error')}"
+
+            image_tool = FunctionTool.from_defaults(
+                name="generate_image",
+                fn=image_generation_tool,
+                description="Create a new image using OpenAI GPT-Image-1. Provide a detailed natural language prompt describing the desired picture. Optional parameters: size (1024x1024, 512x512, 256x256, auto), quality (standard, high, auto), background (transparent, white, auto), output_format (png, jpeg).",
+            )
+
+            tools.append(image_tool)
+            logger.info("Added image generation tool (GPT-Image-1)")
+        except Exception as e:
+            logger.warning(f"Failed to add image generation tool: {e}")
+
         # 3. Add Google tools (if credentials available)
         if workflow_input.google_credentials:
             try:
@@ -522,13 +581,28 @@ class UnifiedWorkflow(BaseAgentWorkflow):
             system_prompt_parts.append(
                 "\n**Your Role:**\n"
                 "You are a helpful AI assistant with access to various tools.\n\n"
+                "**CRITICAL: Follow User's Instructions & Preferences**\n"
+                "If the user has provided specific instructions or preferences above, YOU MUST follow them when applicable.\n"
+                "These are explicit guidelines the user wants you to apply in relevant situations.\n\n"
                 "**Decision Process:**\n"
-                "1. First, check if you can answer using the User Information or Recent Conversation above\n"
+                "1. First, check if you can answer using the User Profile or Recent Conversation above\n"
                 "2. If the answer is already available in that context, respond directly (no tools needed)\n"
                 "3. If you need additional information not in the context, select the most appropriate tool(s)\n"
-                "4. Use tools thoughtfully - only when they add value to your response\n\n"
+                "4. Use tools thoughtfully - only when they add value to your response\n"
+                "5. Apply any relevant user instructions/preferences to your response\n\n"
                 "**Available Tools:**\n"
                 "Each tool has a specific purpose. Read tool descriptions carefully to choose the right one.\n\n"
+                "**Web Search Guidelines (IMPORTANT):**\n"
+                "- Use web_search ONLY for current events, news, weather, real-time data, or facts that change over time\n"
+                "- Do NOT use web_search for:\n"
+                "  • Names or personal information the user just told you\n"
+                "  • Simple answers already in the conversation history\n"
+                "  • General knowledge questions you can answer directly\n"
+                "  • Single-word responses (these are usually answers to YOUR questions, not queries)\n\n"
+                "**Conversational Awareness:**\n"
+                "- If you asked the user a question, their next message is likely the answer\n"
+                "- Acknowledge and incorporate their answers into your understanding\n"
+                "- Update your knowledge of the user based on what they tell you\n\n"
                 "Remember: The most efficient answer uses available context when possible, and tools when necessary."
             )
 
@@ -558,13 +632,36 @@ class UnifiedWorkflow(BaseAgentWorkflow):
                     temperature=0.1,
                 )
 
-                router_prompt = f"""Given the following context about the user, can you answer this question: "{workflow_input.message}"?
+                # Build recent conversation context for better understanding
+                recent_convo = ""
+                if conversation_memory and conversation_memory.message_count > 0:
+                    recent_messages = await conversation_memory.get_messages(limit=5)
+                    recent_convo = "\n".join([
+                        f"{msg.get('role', 'unknown')}: {msg.get('content', '')}"
+                        for msg in recent_messages[-5:]  # Last 5 messages
+                    ])
 
-{system_prompt}
+                router_prompt = f"""You are analyzing whether you can respond to the user's message based on available context and conversation history.
 
-Instructions:
-- If the context above contains enough information to answer the question, respond with: YES: [your answer]
-- If you need to search documents or use tools for more information, respond with: NO
+**User Profile (from previous conversations):**
+{user_context if user_context else "No stored user information yet."}
+
+**Recent Conversation:**
+{recent_convo if recent_convo else "This is the start of the conversation."}
+
+**User's Latest Message:** {workflow_input.message}
+
+**Task:** Determine if you can provide a meaningful response based on the above information, OR if you need to use tools (search documents, web search, etc.).
+
+**Important Considerations:**
+1. The user might be answering a question YOU asked in the recent conversation
+2. Short responses like names or confirmations are often answers, not questions
+3. If the conversation context makes the user's intent clear, you can respond directly
+4. Only request tools if you genuinely need external information
+
+**Instructions:**
+- If you can respond based on context/conversation, reply with: YES: [your complete response]
+- If you need tools for external information, reply with: NO
 
 Your response:"""
 
@@ -792,7 +889,8 @@ Your response:"""
                     },
                 )
 
-            # Extract user facts for user memory (background task)
+            # Extract facts and prepare for HITL approval
+            memory_request = None
             try:
                 # Get LLM for fact extraction
                 fact_llm = llm_factory.create_llm(
@@ -800,16 +898,50 @@ Your response:"""
                     temperature=0.3,
                 )
 
-                # Extract facts from recent conversation
                 if conversation_memory:
-                    messages_for_facts = await conversation_memory.get_messages(limit=10)
-                    await user_memory.extract_facts_from_conversation(
+                    # Only look at last 3 messages to focus on current exchange
+                    messages_for_facts = await conversation_memory.get_messages(limit=3)
+
+                    # Extract facts without auto-saving (require approval)
+                    pending_facts = await user_memory.extract_facts_from_conversation(
                         messages=messages_for_facts,
                         conversation_id=workflow_input.conversation_id,
                         llm=fact_llm,
+                        auto_save=False,  # Require HITL approval
                     )
+
+                    if pending_facts:
+                        # Get existing facts from user memory
+                        existing_facts = user_memory.get_facts()
+
+                        # Filter to only NEW facts (not already in user_memory)
+                        new_facts_list = []
+                        for key, value in pending_facts.items():
+                            if not isinstance(value, str) or not value.strip():
+                                continue
+
+                            # Normalize key for comparison
+                            normalized_key = key.lower().replace(" ", "_")
+
+                            # Check if this fact is new or different from existing
+                            if normalized_key not in existing_facts or existing_facts[normalized_key] != value:
+                                new_facts_list.append({"key": key, "value": value})
+                                logger.info(f"🆕 New fact for approval: {key}={value}")
+                            else:
+                                logger.info(f"⏭️  Skipping existing fact: {key}={value}")
+
+                        # Only create memory_request if there are NEW facts
+                        if new_facts_list:
+                            memory_request = {
+                                "facts": new_facts_list,
+                                "conversation_id": workflow_input.conversation_id,
+                            }
+                            logger.info(f"📋 Created memory_request with {len(new_facts_list)} facts")
+                        else:
+                            logger.info("✅ No new facts to request approval for")
             except Exception as e:
                 logger.warning(f"Failed to extract user facts: {e}")
+                memory_request = None
 
             await self.log_step(
                 workflow_context,
@@ -822,6 +954,10 @@ Your response:"""
 
             # Create output
             workflow_context.set_state(WorkflowState.COMPLETED)
+            output_metadata = dict(workflow_input.metadata or {})
+            if memory_request:
+                output_metadata["memory_request"] = memory_request
+
             output = UnifiedWorkflowOutput(
                 response=response_text,
                 context=workflow_context,
@@ -829,7 +965,8 @@ Your response:"""
                 tools_used=tools_used,
                 reasoning_steps=reasoning_steps,
                 sources=web_search_sources,
-                metadata=workflow_input.metadata,
+                metadata=output_metadata,
+                memory_request=memory_request,
             )
 
             return StopEvent(result=output)

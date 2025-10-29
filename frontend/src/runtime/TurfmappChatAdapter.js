@@ -72,13 +72,42 @@ const buildToolsArray = (
 
   if (settings.toolImageGen || forceFlags.image) {
     tools.push({
-      type: "image_generation",
-      size: "auto",
-      quality: settings.imageQuality || "auto",
-      output_format: "png",
-      background: "auto",
-      moderation: "auto",
-      partial_images: 3,
+      type: "function",
+      function: {
+        name: "generate_image",
+        description:
+          "Create a new image using OpenAI GPT-Image-1. Provide a detailed natural language prompt describing the desired picture.",
+        parameters: {
+          type: "object",
+          properties: {
+            prompt: {
+              type: "string",
+              description: "Required text description of the image to generate",
+            },
+            size: {
+              type: "string",
+              enum: ["1024x1024", "512x512", "256x256", "auto"],
+              description: "Optional output size. Defaults to 1024x1024 when omitted.",
+            },
+            quality: {
+              type: "string",
+              enum: ["standard", "high", "auto"],
+              description: "Optional quality flag. Accepts standard or high.",
+            },
+            background: {
+              type: "string",
+              enum: ["transparent", "white", "auto"],
+              description: "Optional background configuration.",
+            },
+            output_format: {
+              type: "string",
+              enum: ["png", "jpeg"],
+              description: "Optional output format. Defaults to png.",
+            },
+          },
+          required: ["prompt"],
+        },
+      },
     });
   }
 
@@ -459,6 +488,7 @@ export class TurfmappChatAdapter {
       reasoning,
       blocks: blocksFromBackend,
       tools_used: toolCalls.length > 0 ? toolCalls : (data?.assistant_message?.metadata?.tools_used || []),
+      memory_request: data?.memory_request || metadataFromBackend?.memory_request,  // HITL consent prompt data
       raw_response: data,
     };
 
@@ -466,6 +496,7 @@ export class TurfmappChatAdapter {
       sources_count: sources.length,
       reasoning_count: reasoning.length,
       tools_used: customMetadata.tools_used,
+      memory_request: customMetadata.memory_request,
     });
 
     const result = {
@@ -474,6 +505,7 @@ export class TurfmappChatAdapter {
       metadata: {
         ...EMPTY_METADATA,
         ...metadataFromBackend,
+        conversation_id: data?.conversation_id || this.conversationId,  // For memory consent prompt
         custom: customMetadata,
       },
     };
@@ -482,3 +514,14 @@ export class TurfmappChatAdapter {
     return result;
   }
 }
+
+export {
+  getDefaultSettings,
+  loadSettings,
+  buildToolsArray,
+  buildSystemInstructions,
+  normaliseSources,
+  normaliseBlocks,
+  ensureArray,
+  extractUserInput,
+};

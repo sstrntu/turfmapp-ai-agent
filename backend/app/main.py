@@ -26,6 +26,7 @@ from .api.v1.settings import router as settings_router_v1
 from .api.v1.google_api import router as google_api_router_v1
 from .api.v1.agent import router as agent_router_v1
 from .api.v1.rag import router as rag_router_v1
+from .api.v1 import memory as memory_router
 
 from .database import get_supabase_config
 from .core.logging_config import setup_logging, get_logger
@@ -122,6 +123,7 @@ app.include_router(admin_router_v1, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(settings_router_v1, prefix="/api/v1/settings", tags=["settings"])
 app.include_router(google_api_router_v1, prefix="/api/v1/google", tags=["google-api"])
 app.include_router(rag_router_v1, prefix="/api/v1", tags=["rag"])
+app.include_router(memory_router.router, prefix="/api/v1/memory", tags=["memory"])
 
 # Direct Google OAuth callback route for frontend redirect
 app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oauth"])

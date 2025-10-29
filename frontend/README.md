@@ -22,12 +22,22 @@ Frontend/
 │       ├── settings.css           # Settings page styling
 │       └── common.css             # Shared components
 │
-├── tests/                         # Frontend Testing
-│   └── permission-system.test.js # Permission system tests
+├── src/                          # React components & runtime
+│   ├── components/               # Chat UI
+│   │   └── ChatThread.test.jsx   # Vitest + RTL coverage for chat workflow
+│   └── runtime/                  # Assistant runtime bridge
+│       └── TurfmappChatAdapter.test.js
+├── setupTests.js                 # Vitest environment bootstrap
 │
 ├── USER_GUIDE.md                  # User documentation
 └── Dockerfile                     # Container configuration
 ```
+
+## 🧪 Testing
+
+- Install dependencies: `npm install`
+- Run the unit suite with coverage: `npm run test`
+- Watch mode for local development: `npm run test:watch`
 
 ## 💬 Chat Interface (`home.html`)
 
