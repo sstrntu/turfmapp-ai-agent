@@ -3,9 +3,11 @@
 
 import asyncio
 import asyncpg
+import pytest
 from dotenv import load_dotenv
 import os
 
+@pytest.mark.asyncio
 async def test_connection():
     # Load environment variables from .env.local
     load_dotenv('.env.local')

@@ -9,10 +9,6 @@ import json
 import os
 from datetime import datetime
 
-# Add backend to path
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '.'))
-
 from app.llamaindex.workflows.unified_workflow import UnifiedWorkflow, UnifiedWorkflowInput
 from app.database import get_db_pool
 

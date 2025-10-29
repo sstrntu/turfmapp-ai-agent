@@ -221,7 +221,6 @@ class MinimalChat {
 
               // Show memory consent prompt (HITL)
               if (event.memory_request && event.memory_request.facts && event.memory_request.facts.length > 0) {
-                console.log('📋 Memory consent prompt:', event.memory_request);
                 const consentEl = this.createMemoryConsentPrompt(event.memory_request, event.conversation_id);
                 assistantMsgEl.appendChild(consentEl);
               }

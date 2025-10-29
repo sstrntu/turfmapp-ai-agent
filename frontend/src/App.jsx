@@ -28,11 +28,8 @@ const ChatRuntime = ({ adapter }) => {
   React.useEffect(() => {
     const loadConvId = localStorage.getItem('loadConversationId');
     if (loadConvId && adapter) {
-      console.log('Loading conversation from localStorage:', loadConvId);
-
       adapter.loadConversation(loadConvId)
         .then(messages => {
-          console.log('Loaded messages:', messages);
           // Clear the flag after loading
           localStorage.removeItem('loadConversationId');
           setState({ initialMessages: messages, isLoading: false });
@@ -54,7 +51,6 @@ const ChatRuntime = ({ adapter }) => {
       // Global function to load a conversation - uses page reload
       window.loadConversation = async (conversationId) => {
         try {
-          console.log('Requesting to load conversation:', conversationId);
           // Store conversation ID in localStorage
           localStorage.setItem('loadConversationId', conversationId);
           // Reload the page to properly reinitialize everything

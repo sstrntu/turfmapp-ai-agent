@@ -1,0 +1,34 @@
+[tool.ruff]
+# Minimal linting configuration
+line-length = 100
+target-version = "py311"
+
+# Select minimal rule sets
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort (import sorting)
+]
+
+# Ignore specific rules that would require extensive refactoring
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+]
+
+# Exclude directories
+exclude = [
+    ".git",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__.py files
+
+[tool.ruff.isort]
+known-first-party = ["app"]

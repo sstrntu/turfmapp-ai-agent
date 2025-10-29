@@ -5,11 +5,7 @@ Quick test script to verify the unified workflow with intelligent tool selection
 """
 
 import asyncio
-import sys
 import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.database import get_db_pool
 from app.llamaindex.workflows.unified_workflow import UnifiedWorkflow, UnifiedWorkflowInput

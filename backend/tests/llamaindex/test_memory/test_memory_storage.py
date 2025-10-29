@@ -10,10 +10,7 @@ This script demonstrates and tests:
 
 import asyncio
 import os
-import sys
 from datetime import datetime
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.api.v1.chat_v2 import send_chat_message_v2, ChatRequest
 from app.database import get_db_pool

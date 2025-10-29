@@ -249,7 +249,7 @@ async def send_chat_message_v2(
             assistant_message=assistant_msg,
             model_used=output.model_used,
             provider=model_config.provider,
-            tokens_used=None,  # TODO: Extract from workflow
+            tokens_used=None,  # Not yet implemented: requires token tracking in workflow
             memory_summary=None,  # Available in conversation memory
         )
 

@@ -337,9 +337,6 @@ export class TurfmappChatAdapter {
 
     // Use the selected model from the dropdown if available
     const selectedModel = window.selectedModel || settings.model || "gpt-4o";
-    console.log('🔍 Adapter: Using model:', selectedModel);
-    console.log('🔍 Adapter: window.selectedModel =', window.selectedModel);
-    console.log('🔍 Adapter: settings.model =', settings.model);
 
     const payload = {
       message: userText,
@@ -351,8 +348,6 @@ export class TurfmappChatAdapter {
       attachments: attachments,
       include_memory: true,  // Enable LlamaIndex conversation memory
     };
-
-    console.log('🔍 Adapter: Full payload:', JSON.stringify(payload, null, 2));
 
     const response = await fetch(CHAT_ENDPOINT, {
       method: "POST",
@@ -393,14 +388,12 @@ export class TurfmappChatAdapter {
 
             // Handle different event types
             if (event.type === 'thought') {
-              console.log('💭 Thought received:', event.content);
               thoughts.push(event.content);
 
               // Update custom progress overlay
               this._updateProgressOverlay(event.content);
 
             } else if (event.type === 'tool_call') {
-              console.log('🔧 Tool call received:', event.tool);
               const toolName = event.tool || 'unknown';
               toolCalls.push(toolName);
 
@@ -425,12 +418,6 @@ export class TurfmappChatAdapter {
       throw new Error('No completion event received from stream');
     }
 
-    console.log("🔍 Backend response:", data);
-    console.log("🔍 Sources from backend:", data?.sources);
-    console.log("🔍 Tools used from backend:", data?.tools_used);
-    console.log("🔍 Thoughts collected:", thoughts);
-    console.log("🔍 Tool calls collected:", toolCalls);
-
     if (data?.conversation_id) {
       this.conversationId = data.conversation_id;
     }
@@ -439,7 +426,6 @@ export class TurfmappChatAdapter {
     const metadataFromBackend = data?.metadata ?? {};
 
     const rawContent = assistantMessage?.content ?? "";
-    console.log("📝 Raw content from backend:", rawContent);
     const textParts = ensureArray(
       typeof rawContent === "string"
         ? [{ type: "text", text: rawContent }]
@@ -492,13 +478,6 @@ export class TurfmappChatAdapter {
       raw_response: data,
     };
 
-    console.log("📦 Custom metadata being sent to UI:", {
-      sources_count: sources.length,
-      reasoning_count: reasoning.length,
-      tools_used: customMetadata.tools_used,
-      memory_request: customMetadata.memory_request,
-    });
-
     const result = {
       content: textParts,
       status: assistantMessage?.status ?? DEFAULT_STATUS,
@@ -510,7 +489,6 @@ export class TurfmappChatAdapter {
       },
     };
 
-    console.log("✅ Returning to assistant-ui:", result);
     return result;
   }
 }

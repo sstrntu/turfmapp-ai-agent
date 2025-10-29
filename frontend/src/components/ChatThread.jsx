@@ -74,7 +74,6 @@ export const ChatThread = () => {
 
     // Store model selection globally so adapter can access it
     window.selectedModel = selectedModel;
-    console.log('🔍 Frontend: Selected model for this request:', selectedModel);
 
     // Store attachments globally so adapter can access them
     if (attachments.length > 0) {
@@ -96,7 +95,6 @@ export const ChatThread = () => {
     const newModel = event.target.value;
     setSelectedModel(newModel);
     localStorage.setItem('tm_model', newModel);
-    console.log('🔍 Frontend: Model changed to:', newModel);
 
     // Also save to database
     try {
@@ -110,7 +108,6 @@ export const ChatThread = () => {
           },
           body: JSON.stringify({ default_model: newModel })
         });
-        console.log('✅ Model preference saved to database');
       }
     } catch (error) {
       console.error('Failed to save model preference:', error);
@@ -123,7 +120,6 @@ export const ChatThread = () => {
       if (!composerIsEmpty) {
         // Store model selection globally so adapter can access it
         window.selectedModel = selectedModel;
-        console.log('🔍 Frontend (Enter key): Selected model for this request:', selectedModel);
 
         // Store attachments globally so adapter can access them
         if (attachments.length > 0) {
@@ -146,7 +142,6 @@ export const ChatThread = () => {
   const handleSuggestion = (suggestion) => {
     // Store model selection globally so adapter can access it
     window.selectedModel = selectedModel;
-    console.log('🔍 Frontend (Suggestion): Selected model for this request:', selectedModel);
 
     runtime.composer.setText(suggestion.text);
     runtime.composer.send();
