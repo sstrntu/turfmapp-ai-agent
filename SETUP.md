@@ -14,13 +14,44 @@ TURFMAPP now features:
 - **Admin User Management** with role-based access control
 - **RAG Document Management** (admin-only)
 
-## Prerequisites
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+ (for local frontend dev)
+- Python 3.11+ (for local backend dev)
 
-- Node.js 16+ and npm/yarn
-- Python 3.8+
-- Supabase account
-- Google Cloud Console project
-- OpenAI API key
+### Environment Variables
+Create a `.env` file in the root directory (or `backend/.env` for local backend):
+
+```env
+# AI Providers
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+
+# Database (Supabase / Postgres)
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
+SUPABASE_DB_URL=postgresql://user:pass@host:5432/db
+
+# Google Integration (Optional)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
+
+# Security
+SECRET_KEY=your_jwt_secret_key
+```
+
+### Quick Start (Docker)
+The easiest way to run the full stack:
+
+```bash
+docker-compose up --build
+```
+
+Access:
+- Frontend: `http://localhost:3005`
+- Backend API: `http://localhost:8000`
+- API Docs: `http://localhost:8000/docs`
 
 ## 1. Supabase Setup
 
