@@ -17,7 +17,7 @@ export GOOGLE_CLIENT_SECRET=test-google-client-secret
 export GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 
 echo "📋 Step 1: Running unit tests..."
-python -m pytest tests/test_enhanced_chat_service_fixed.py tests/test_tool_manager.py tests/test_mcp_client_simple.py -v
+python -m pytest tests/test_simple.py tests/test_tool_manager.py tests/test_mcp_client_simple.py -v
 
 echo "📋 Step 2: Running integration tests..."
 python -m pytest tests/test_google_mcp_integration.py tests/test_integration/ -v
