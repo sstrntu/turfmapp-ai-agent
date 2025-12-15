@@ -349,7 +349,7 @@ class MinimalChat {
           img.loading = 'lazy';
           img.onerror = () => { img.style.display = 'none'; };
           faviconStack.appendChild(img);
-        } catch (e) {}
+        } catch (e) { }
       }
     });
 
@@ -399,7 +399,7 @@ class MinimalChat {
           host.className = 'source-host';
           host.textContent = domain.replace(/^www\./, '');
           meta.appendChild(host);
-        } catch (e) {}
+        } catch (e) { }
 
         li.appendChild(meta);
 
@@ -604,6 +604,90 @@ class MinimalChat {
     this.messages = [];
     this.messagesEl.innerHTML = '';
   }
+
+  async loadConversation(conversationId) {
+    if (!conversationId) return;
+
+    const token = window?.supabase?.getAccessToken?.() ?? null;
+    if (!token) {
+      console.error('Not authenticated');
+      return;
+    }
+
+    // Show loading state
+    this.messagesEl.innerHTML = '<div class="message-status">Loading conversation...</div>';
+
+    try {
+      const response = await fetch(`/api/v2/chat/conversations/${conversationId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Reset state
+      this.conversationId = conversationId;
+      this.messages = [];
+      this.messagesEl.innerHTML = '';
+
+      // Render messages
+      const messages = data.messages || [];
+      messages.forEach(msg => {
+        // Map backend role to frontend role
+        let role = msg.role;
+        if (role === 'system') return; // Skip system messages
+
+        // Create message element
+        const msgEl = this.createMessageElement(role, msg.content);
+
+        // Handle metadata for assistant messages
+        if (role === 'assistant' && msg.metadata) {
+          // Parse metadata if it's a string
+          const metadata = typeof msg.metadata === 'string'
+            ? JSON.parse(msg.metadata)
+            : msg.metadata;
+
+          // 1. Render sources if available
+          // Check multiple possible locations for sources (standard vs custom)
+          const sources = metadata.sources || (metadata.custom && metadata.custom.sources) || [];
+
+          if (sources && Array.isArray(sources) && sources.length > 0) {
+            const normalizedSources = sources.map((s, idx) => {
+              if (typeof s === 'string') return { title: s, url: s };
+              return s;
+            });
+
+            const sourcesEl = this.createSourcesPopup(normalizedSources);
+            msgEl.appendChild(sourcesEl);
+          }
+
+          // 2. Render tool usage if available
+          const toolsUsed = metadata.tools_used || (metadata.custom && metadata.custom.tools_used);
+          if (toolsUsed && Array.isArray(toolsUsed) && toolsUsed.length > 0) {
+            const metaEl = document.createElement('div');
+            metaEl.className = 'message-meta';
+            metaEl.textContent = `🔧 Tools: ${toolsUsed.join(', ')}`;
+            msgEl.appendChild(metaEl);
+          }
+        }
+
+        this.messagesEl.appendChild(msgEl);
+      });
+
+      // Scroll to bottom
+      this.scrollToBottom();
+
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      this.messagesEl.innerHTML = '<div class="message-status error">Failed to load conversation</div>';
+    }
+  }
 }
 
 // Initialize when DOM is ready
@@ -612,11 +696,17 @@ if (document.readyState === 'loading') {
     const root = document.getElementById('react-chat-root');
     if (root) {
       window.minimalChat = new MinimalChat(root);
+
+      // Expose global loadConversation function for sidebar
+      window.loadConversation = (id) => window.minimalChat.loadConversation(id);
     }
   });
 } else {
   const root = document.getElementById('react-chat-root');
   if (root) {
     window.minimalChat = new MinimalChat(root);
+
+    // Expose global loadConversation function for sidebar
+    window.loadConversation = (id) => window.minimalChat.loadConversation(id);
   }
 }

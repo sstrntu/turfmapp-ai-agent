@@ -12,7 +12,7 @@ import asyncio
 import os
 from datetime import datetime
 
-from app.api.v1.chat_v2 import send_chat_message_v2, ChatRequest
+from app.api.v1.chat import send_chat_message, ChatRequest
 from app.database import get_db_pool
 
 
@@ -125,7 +125,7 @@ async def test_conversation_memory():
         temperature=0.7
     )
 
-    response3 = await send_chat_message_v2(request3, current_user=mock_user)
+    response3 = await send_chat_message(request3, current_user=mock_user)
     print(f"✅ User: {request3.message}")
     print(f"✅ Assistant: {response3.assistant_message['content']}")
     print()

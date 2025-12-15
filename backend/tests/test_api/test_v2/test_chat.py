@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.api.v1 import chat_v2
+from app.api.v1 import chat
 
 
 class DummyPool:
@@ -48,7 +48,7 @@ class DummyWorkflowInput:
 @pytest.fixture()
 def client(monkeypatch):
     """Provide a TestClient with external dependencies stubbed."""
-    app.dependency_overrides[chat_v2.get_current_user_from_token] = lambda: {"id": "user-1"}
+    app.dependency_overrides[chat.get_current_user_from_token] = lambda: {"id": "user-1"}
 
     async def fake_get_conversation(conversation_id):
         return None
@@ -59,29 +59,29 @@ def client(monkeypatch):
     async def fake_get_memory_manager():
         return SimpleNamespace()
 
-    monkeypatch.setattr(chat_v2.ConversationService, "get_conversation", staticmethod(fake_get_conversation))
-    monkeypatch.setattr(chat_v2, "get_db_pool", fake_get_db_pool)
-    monkeypatch.setattr(chat_v2, "get_memory_manager", fake_get_memory_manager)
+    monkeypatch.setattr(chat.ConversationService, "get_conversation", staticmethod(fake_get_conversation))
+    monkeypatch.setattr(chat, "get_db_pool", fake_get_db_pool)
+    monkeypatch.setattr(chat, "get_memory_manager", fake_get_memory_manager)
     monkeypatch.setitem(
         sys.modules,
         "app.llamaindex.workflows.unified_workflow",
         SimpleNamespace(UnifiedWorkflow=DummyWorkflow, UnifiedWorkflowInput=DummyWorkflowInput),
     )
     monkeypatch.setattr(
-        chat_v2.llm_factory,
+        chat.llm_factory,
         "get_model_config",
         lambda model_id: SimpleNamespace(provider="openai"),
     )
-    chat_v2.memory_manager = None
+    chat.memory_manager = None
 
     test_client = TestClient(app)
     try:
         yield test_client
     finally:
-        app.dependency_overrides.pop(chat_v2.get_current_user_from_token, None)
+        app.dependency_overrides.pop(chat.get_current_user_from_token, None)
 
 
-def test_chat_v2_send_success(client):
+def test_chat_send_success(client):
     """Unified workflow happy path should return structured response."""
     response = client.post("/api/v2/chat/send", json={"message": "Hello there"})
     assert response.status_code == 200
@@ -92,7 +92,7 @@ def test_chat_v2_send_success(client):
     assert payload["assistant_message"]["metadata"]["tools_used"] == ["search_documents"]
 
 
-def test_chat_v2_send_propagates_errors(monkeypatch, client):
+def test_chat_send_propagates_errors(monkeypatch, client):
     """Exceptions during workflow execution should surface as HTTP 500."""
 
     class FailingWorkflow(DummyWorkflow):

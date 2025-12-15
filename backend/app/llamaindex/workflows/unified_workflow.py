@@ -17,6 +17,8 @@ from llama_index.core.workflow import StartEvent, StopEvent, step, Context, Even
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.agent import ReActAgent
 from llama_index.core.tools import BaseTool
+from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
+from llama_index.core import Settings
 
 from .base_workflow import (
     BaseAgentWorkflow,
@@ -65,6 +67,7 @@ class UnifiedWorkflowInput(BaseWorkflowInput):
         max_iterations: int = 10,
         include_memory: bool = True,
         google_credentials: Optional[Any] = None,
+        custom_system_prompt: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         event_emitter: Optional[EventEmitter] = None,
     ):
@@ -74,6 +77,7 @@ class UnifiedWorkflowInput(BaseWorkflowInput):
         self.max_iterations = max_iterations
         self.include_memory = include_memory
         self.google_credentials = google_credentials
+        self.custom_system_prompt = custom_system_prompt
         self.event_emitter = event_emitter
 
 
@@ -90,6 +94,7 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
         sources: Optional[List[Dict[str, Any]]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         memory_request: Optional[Dict[str, Any]] = None,
+        tokens_used: Optional[Dict[str, int]] = None,
     ):
         super().__init__(response, context, metadata)
         self.model_used = model_used
@@ -97,6 +102,7 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
         self.reasoning_steps = reasoning_steps
         self.sources = sources or []
         self.memory_request = memory_request
+        self.tokens_used = tokens_used
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert output to dictionary."""
@@ -107,6 +113,7 @@ class UnifiedWorkflowOutput(BaseWorkflowOutput):
             "reasoning_steps": self.reasoning_steps,
             "sources": self.sources,
             "memory_request": self.memory_request,
+            "tokens_used": self.tokens_used,
         })
         return result
 
@@ -301,7 +308,7 @@ class UnifiedWorkflow(BaseAgentWorkflow):
                             }],
                             messages=[{
                                 "role": "user",
-                                "content": f"Use web search to find the most current factual information for: {query}"
+                                "content": f"Use web search to find the most current factual information for: {query}. vital: You MUST cite your sources as markdown links [Title](URL) inline or at the end."
                             }]
                         )
 
@@ -511,6 +518,7 @@ class UnifiedWorkflow(BaseAgentWorkflow):
                 logger.warning(f"Failed to add Google tools: {e}")
 
         await ctx.store.set("tools", tools)
+        await ctx.store.set("web_search_sources", [])  # Initialize empty sources list
 
         # Log available tools
         tool_names = [tool.metadata.name if hasattr(tool, 'metadata') else str(tool) for tool in tools]
@@ -544,18 +552,31 @@ class UnifiedWorkflow(BaseAgentWorkflow):
         user_memory: UserMemory = await ctx.store.get("user_memory")
         conversation_memory: Optional[ConversationMemory] = await ctx.store.get("conversation_memory")
         tools: List[BaseTool] = await ctx.store.get("tools")
+        web_search_sources = await ctx.store.get("web_search_sources")
+
+        # Initialize token counter
+        token_counter = TokenCountingHandler(
+            tokenizer=None,  # Use default tokenizer
+            verbose=False
+        )
+        callback_manager = CallbackManager([token_counter])
 
         try:
             # Get model for reasoning and tool use
             model_id = workflow_input.model_id or llm_factory.recommend_model_for_task(
                 TaskType.TOOL_USE
             )
+            # Override model_id if it's not set, or if we want a specific default for token counting
+            model_id = workflow_input.model_id or "gpt-4o"
 
             # Create LLM
             llm = llm_factory.create_llm(
                 model_id=model_id,
                 temperature=workflow_input.temperature,
+                streaming=True,  # Always enable streaming for agent
             )
+            # Attach callback manager to LLM
+            llm.callback_manager = callback_manager
 
             await ctx.store.set("model_used", model_id)
 
@@ -576,6 +597,12 @@ class UnifiedWorkflow(BaseAgentWorkflow):
                     system_prompt_parts.append("\n**Recent Conversation:**")
                     for msg in recent_messages[-3:]:  # Last 3 messages
                         system_prompt_parts.append(f"{msg['role']}: {msg['content']}")
+
+            # Add custom system prompt from user preferences (if provided)
+            workflow_input: UnifiedWorkflowInput = await ctx.store.get("workflow_input")
+            if workflow_input.custom_system_prompt:
+                logger.info(f"🎨 Using custom system prompt from user preferences")
+                system_prompt_parts.append(f"\n**User Instructions:**\n{workflow_input.custom_system_prompt}")
 
             # Add agent instructions
             system_prompt_parts.append(
@@ -631,6 +658,7 @@ class UnifiedWorkflow(BaseAgentWorkflow):
                     model_id="gpt-4o-mini",
                     temperature=0.1,
                 )
+                router_llm.callback_manager = callback_manager # Attach callback manager to router LLM
 
                 # Build recent conversation context for better understanding
                 recent_convo = ""
@@ -705,6 +733,15 @@ Your response:"""
                     await ctx.store.set("response_text", response_text)
                     await ctx.store.set("tools_used", tools_used)
                     await ctx.store.set("reasoning_steps", reasoning_steps)
+
+                    # Store token usage
+                    tokens_used = {
+                        "prompt": token_counter.prompt_llm_token_count,
+                        "completion": token_counter.completion_llm_token_count,
+                        "total": token_counter.total_llm_token_count
+                    }
+                    await ctx.store.set("tokens_used", tokens_used)
+                    logger.info(f"💰 Token usage: {tokens_used}")
 
                     return ExecuteAgentEvent()
 
@@ -836,9 +873,19 @@ Your response:"""
                     })
                     await asyncio.sleep(0.03)  # Small delay for smooth streaming
 
+            # Store response and metadata
             await ctx.store.set("response_text", response_text)
             await ctx.store.set("tools_used", tools_used)
             await ctx.store.set("reasoning_steps", reasoning_steps)
+            
+            # Store token usage
+            tokens_used = {
+                "prompt": token_counter.prompt_llm_token_count,
+                "completion": token_counter.completion_llm_token_count,
+                "total": token_counter.total_llm_token_count
+            }
+            await ctx.store.set("tokens_used", tokens_used)
+            logger.info(f"💰 Token usage: {tokens_used}")
 
             return ExecuteAgentEvent()
 
@@ -863,13 +910,19 @@ Your response:"""
         model_used: str = await ctx.store.get("model_used")
         tools_used: List[str] = await ctx.store.get("tools_used")
         reasoning_steps: List[Dict[str, Any]] = await ctx.store.get("reasoning_steps")
-
+        
         # Get web search sources if available
         try:
             web_search_sources = await ctx.store.get("web_search_sources")
         except (ValueError, AttributeError):
             # Key doesn't exist if web search wasn't used
             web_search_sources = []
+
+        try:
+            tokens_used: Dict[str, int] = await ctx.store.get("tokens_used")
+        except (ValueError, AttributeError):
+            tokens_used = {"prompt": 0, "completion": 0, "total": 0}
+
 
         try:
             # Save to conversation memory
@@ -886,6 +939,7 @@ Your response:"""
                     metadata={
                         "model": model_used,
                         "tools_used": tools_used,
+                        "sources": web_search_sources,
                     },
                 )
 
@@ -967,6 +1021,7 @@ Your response:"""
                 sources=web_search_sources,
                 metadata=output_metadata,
                 memory_request=memory_request,
+                tokens_used=tokens_used,
             )
 
             return StopEvent(result=output)
@@ -974,3 +1029,4 @@ Your response:"""
         except Exception as e:
             await self.handle_error(workflow_context, e, "save_and_respond")
             raise
+

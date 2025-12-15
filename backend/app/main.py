@@ -16,8 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # New modular API structure
-from .api.v1.chat import router as chat_router_v1
-from .api.v1.chat_v2 import router as chat_router_v2
+from .api.v1.chat import router as chat_router
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
@@ -30,6 +29,10 @@ from .api.v1 import memory as memory_router
 
 from .database import get_supabase_config
 from .core.logging_config import setup_logging, get_logger
+from .core.rate_limit import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
 
 # Initialize logging
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"), enable_colors=True)
@@ -75,6 +78,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Initialize Rate Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_cors_origins(),
@@ -109,12 +117,15 @@ def get_frontend_config():
 
 
 # API v1 routes
-app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(agent_router_v1, prefix="/api/v1", tags=["agent"])
 
 # API v2 routes (unified workflow with intelligent tool selection)
-app.include_router(chat_router_v2, prefix="/api/v2/chat", tags=["chat-v2"])
+
+# Include routers
+# Note: We keep the prefix as /api/v2/chat because the frontend expects V2 API structure
+# even though the file is now just chat.py (legacy chat.py was removed)
+app.include_router(chat_router, prefix="/api/v2/chat", tags=["chat-v2"])
 
 # Additional v1 routes
 app.include_router(upload_router, prefix="/api/v1/uploads", tags=["uploads"])

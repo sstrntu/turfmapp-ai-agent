@@ -14,17 +14,23 @@ Usage:
 
 import asyncio
 import os
+import sys
 from dotenv import load_dotenv
+from unittest.mock import MagicMock
 
 # Load environment variables
 load_dotenv()
 
-from app.api.v1.chat_v2 import send_chat_message_v2, ChatRequest
+from app.api.v1.chat import send_chat_message, ChatRequest
 from app.database import get_db_pool
 
 
-async def test_chat_v2():
-    """Test the chat V2 endpoint"""
+from fastapi import Request
+
+# ...
+
+async def test_chat():
+    """Test the chat endpoint"""
 
     print("=" * 80)
     print("Testing Chat V2 Endpoint (LlamaIndex Integration)")
@@ -33,6 +39,10 @@ async def test_chat_v2():
 
     # Mock user (replace with actual authentication in production)
     mock_user = {"id": "test_user_123"}
+    
+    # Create a real Request object for rate limiter (Mock failed isinstance check)
+    scope = {"type": "http", "client": ("127.0.0.1", 80), "path": "/"}
+    mock_request = Request(scope)
 
     # Test 1: Simple chat without memory
     print("Test 1: Simple chat (no memory)")
@@ -46,7 +56,7 @@ async def test_chat_v2():
     )
 
     try:
-        response1 = await send_chat_message_v2(request1, current_user=mock_user)
+        response1 = await send_chat_message(request1, request_obj=mock_request, current_user=mock_user)
         print(f"✅ Request successful!")
         print(f"   Model used: {response1.model_used}")
         print(f"   Provider: {response1.provider}")
@@ -71,7 +81,7 @@ async def test_chat_v2():
     )
 
     try:
-        response2 = await send_chat_message_v2(request2, current_user=mock_user)
+        response2 = await send_chat_message(request2, request_obj=mock_request, current_user=mock_user)
         print(f"✅ First message sent!")
         print(f"   Conversation ID: {response2.conversation_id}")
         print(f"   Response: {response2.assistant_message['content'][:100]}...")
@@ -85,7 +95,7 @@ async def test_chat_v2():
             temperature=0.7,
         )
 
-        response3 = await send_chat_message_v2(request3, current_user=mock_user)
+        response3 = await send_chat_message(request3, request_obj=mock_request, current_user=mock_user)
         print(f"✅ Follow-up message sent!")
         print(f"   Response: {response3.assistant_message['content'][:100]}...")
         print()
@@ -116,7 +126,7 @@ async def test_chat_v2():
     )
 
     try:
-        response4 = await send_chat_message_v2(request4, current_user=mock_user)
+        response4 = await send_chat_message(request4, request_obj=mock_request, current_user=mock_user)
         print(f"✅ Request successful!")
         print(f"   Model used: {response4.model_used}")
 
@@ -148,5 +158,5 @@ async def test_chat_v2():
 
 
 if __name__ == "__main__":
-    success = asyncio.run(test_chat_v2())
+    success = asyncio.run(test_chat())
     sys.exit(0 if success else 1)

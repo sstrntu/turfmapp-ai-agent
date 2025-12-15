@@ -47,3 +47,6 @@ google-api-python-client==2.122.0
 # Encryption
 cryptography==45.0.7
 
+
+# Rate Limiting
+slowapi>=0.1.9

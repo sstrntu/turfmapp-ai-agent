@@ -247,7 +247,7 @@ export class TurfmappChatAdapter {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`/api/v1/chat/conversations/${conversationId}`, {
+    const response = await fetch(`/api/v2/chat/conversations/${conversationId}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json'
@@ -449,10 +449,13 @@ export class TurfmappChatAdapter {
       textParts.push({ type: "text", text: rawContent });
     }
 
-    const sources =
-      normaliseSources(data?.sources) ||
-      normaliseSources(metadataFromBackend?.sources) ||
-      normaliseSources(assistantMessage?.sources);
+    const normalizedSourcesList = [
+      data?.sources,
+      metadataFromBackend?.sources,
+      assistantMessage?.sources
+    ].map(s => normaliseSources(s));
+
+    const sources = normalizedSourcesList.find(s => s.length > 0) || [];
 
     const reasoning =
       ensureArray(data?.reasoning)

@@ -64,7 +64,7 @@ window.UI.initSidebar = function initSidebar() {
         document.body.classList.toggle('panel-open', open);
     }
 
-    lpToggle.addEventListener('click', function(e) {
+    lpToggle.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
         const isCurrentlyOpen = lp.classList.contains('open');
@@ -72,12 +72,12 @@ window.UI.initSidebar = function initSidebar() {
     });
 
     if (lpClose) {
-        lpClose.addEventListener('click', function() {
+        lpClose.addEventListener('click', function () {
             setLeftPanel(false);
         });
     }
 
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             setLeftPanel(false);
         }
@@ -105,7 +105,7 @@ window.UI.loadConversationHistory = async function loadConversationHistory(retry
             return;
         }
 
-        const response = await fetch('/api/v1/chat/conversations', {
+        const response = await fetch('/api/v2/chat/conversations', {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -169,16 +169,18 @@ window.UI.loadConversationHistory = async function loadConversationHistory(retry
                 button.textContent = conv.title || 'Untitled conversation';
                 button.setAttribute('data-conversation-id', conv.id);
 
-                button.addEventListener('click', async function() {
+                button.addEventListener('click', async function () {
                     // Remove focus from button before closing sidebar to avoid aria-hidden accessibility warning
                     this.blur();
 
-                    // Close sidebar
-                    const lp = document.getElementById('left-panel');
-                    if (lp) {
-                        lp.classList.remove('open');
-                        lp.setAttribute('aria-hidden', 'true');
-                        document.body.classList.remove('panel-open');
+                    // Close sidebar only on mobile
+                    if (window.innerWidth < 768) {
+                        const lp = document.getElementById('left-panel');
+                        if (lp) {
+                            lp.classList.remove('open');
+                            lp.setAttribute('aria-hidden', 'true');
+                            document.body.classList.remove('panel-open');
+                        }
                     }
 
                     // Load conversation
@@ -202,7 +204,7 @@ window.UI.loadConversationHistory = async function loadConversationHistory(retry
                 deleteBtn.title = 'Delete conversation';
                 deleteBtn.setAttribute('aria-label', 'Delete conversation');
 
-                deleteBtn.addEventListener('click', async function(e) {
+                deleteBtn.addEventListener('click', async function (e) {
                     e.stopPropagation();
                     if (!confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
                         return;
@@ -215,7 +217,7 @@ window.UI.loadConversationHistory = async function loadConversationHistory(retry
                             return;
                         }
 
-                        const response = await fetch(`/api/v1/chat/conversations/${conv.id}`, {
+                        const response = await fetch(`/api/v2/chat/conversations/${conv.id}`, {
                             method: 'DELETE',
                             headers: {
                                 'Authorization': `Bearer ${token}`,
@@ -260,7 +262,7 @@ window.UI.initNewChat = function initNewChat() {
     const newChatBtn = document.getElementById('btn-new-chat');
     if (!newChatBtn) return;
 
-    newChatBtn.addEventListener('click', function() {
+    newChatBtn.addEventListener('click', function () {
         // Reload page to start fresh conversation
         window.location.reload();
     });
@@ -268,7 +270,7 @@ window.UI.initNewChat = function initNewChat() {
 
 // Initialize sidebar and load history on DOM ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         window.UI.initSidebar();
         window.UI.initNewChat();
         window.UI.loadConversationHistory();
