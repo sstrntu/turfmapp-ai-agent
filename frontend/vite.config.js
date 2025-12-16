@@ -31,6 +31,17 @@ export default defineConfig({
       '@': resolve(__dirname, './src')
     }
   },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./setupTests.js'],
+    globals: true,
+    include: ['src/**/*.test.{js,jsx,ts,tsx}', 'tests/**/*.test.{js,jsx,ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      reportsDirectory: './coverage'
+    }
+  },
   server: {
     host: '0.0.0.0',
     port: 3005,

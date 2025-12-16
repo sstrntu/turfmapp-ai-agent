@@ -34,19 +34,26 @@ python run_tests.py coverage
 
 ```
 backend/tests/
-├── conftest.py                 # Test configuration & fixtures
-├── test_simple.py             # Basic functionality tests
-├── test_core/                 # Core module tests
-│   ├── test_config.py         # Configuration tests
-│   └── test_auth.py           # Authentication tests
-├── test_api/                  # API endpoint tests  
-│   └── test_v1/               # Version 1 API tests
-│       ├── test_auth.py       # Auth endpoints
-│       ├── test_chat.py       # Chat endpoints
-│       ├── test_preferences.py # User preferences
-│       └── test_upload.py     # File upload
-└── test_utils/                # Utility function tests
-    └── test_sessions.py       # Session management
+├── conftest.py                   # Shared fixtures & configuration
+├── unit/                         # Fast unit coverage
+│   ├── services/                 # Service-layer tests
+│   │   ├── test_chat_api_client.py
+│   │   ├── test_chat_service_preferences.py
+│   │   └── test_conversation_manager.py
+│   └── test_database_config.py   # Database helper coverage
+├── test_core/                    # Core module tests
+│   ├── test_config.py            # Configuration tests
+│   └── test_auth.py              # Authentication tests
+├── test_api/                     # API endpoint tests
+│   ├── test_v1/                  # Version 1 API tests
+│   │   ├── test_auth.py          # Auth endpoints
+│   │   ├── test_chat.py          # Chat endpoints
+│   │   ├── test_preferences.py   # User preferences
+│   │   ├── test_upload.py        # File upload
+│   │   ├── test_agent_api.py     # Agent tooling workflows
+│   │   └── test_rag_api.py       # Document RAG endpoints
+│   └── test_v2/                  # Unified chat workflow (stream + send)
+└── regression/                   # Regression & end-to-end guards
 ```
 
 ## 🛠️ Available Commands

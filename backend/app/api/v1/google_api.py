@@ -105,15 +105,9 @@ async def handle_google_callback(
     """Handle Google OAuth callback."""
     try:
         # Debug logging
-        print(f"🔍 DEBUG - Callback received:")
-        print(
-            f"  - request.code: {request.code[:20]}..."
-            if request.code
-            else "  - request.code: None"
-        )
-        print(f"  - request.state: {request.state}")
-        print(f"  - current_user id: {current_user.get('id')}")
-        print(f"  - current_user: {current_user}")
+        code_preview = f"{request.code[:20]}..." if request.code else "None"
+        logger.debug(f"🔍 Callback received: code={code_preview}, state={request.state}, "
+                    f"user_id={current_user.get('id')}")
 
         # Parse state to get user_id and action
         try:
@@ -127,13 +121,13 @@ async def handle_google_callback(
         # Verify state matches current user
         current_user_id = str(current_user["id"])
         if state_user_id != current_user_id:
-            print(f"❌ State mismatch: '{state_user_id}' != '{current_user_id}'")
+            logger.error(f"❌ State mismatch: '{state_user_id}' != '{current_user_id}'")
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid state parameter. Expected: {current_user_id}, Got: {state_user_id}",
             )
 
-        print(f"✅ State validation passed: {state_user_id}, action: {action}")
+        logger.debug(f"✅ State validation passed: {state_user_id}, action: {action}")
 
         # Exchange code for tokens
         token_data = await google_oauth_service.exchange_code_for_tokens(
@@ -182,8 +176,8 @@ async def handle_google_callback(
             user_id_str
         )
 
-        print(f"✅ Stored Google account {user_email} for user {user_id_str}")
-        print(f"🔧 User now has {len(updated_accounts)} Google accounts")
+        logger.info(f"✅ Stored Google account {user_email} for user {user_id_str}")
+        logger.info(f"🔧 User now has {len(updated_accounts)} Google accounts")
 
         return GoogleAuthResponse(
             success=True,
@@ -240,7 +234,7 @@ async def get_google_auth_status(
 
 async def get_user_google_credentials(user_id: str, account_email: str = None):
     """Get Google credentials for a user, optionally for a specific account."""
-    print(f"🔍 Looking for tokens for user_id: '{user_id}', account: '{account_email}'")
+    logger.debug(f"🔍 Looking for tokens for user_id: '{user_id}', account: '{account_email}'")
 
     if account_email:
         # Specific account requested
@@ -255,13 +249,13 @@ async def get_user_google_credentials(user_id: str, account_email: str = None):
         # Use primary account
         primary_account = await google_accounts_db.get_primary_account(user_id)
         if not primary_account:
-            print(f"❌ No Google accounts found for user {user_id}")
+            logger.error(f"❌ No Google accounts found for user {user_id}")
             raise HTTPException(
                 status_code=401,
                 detail="Google authentication required. Please connect your Google account in Settings.",
             )
         tokens = primary_account.tokens
-        print(f"✅ Using primary account {primary_account.email}")
+        logger.info(f"✅ Using primary account {primary_account.email}")
 
     return google_oauth_service.get_credentials_from_token(
         access_token=tokens.access_token, refresh_token=tokens.refresh_token
@@ -371,29 +365,37 @@ async def get_calendar_events(
 async def refresh_google_tokens(
     current_user: Dict[str, Any] = Depends(get_current_user_supabase),
 ):
-    """Refresh Google access token."""
+    """Refresh Google access token using database-stored tokens."""
     try:
         user_id_str = str(current_user["id"])
-        tokens = user_google_tokens.get(user_id_str)
-        if not tokens or not tokens.refresh_token:
+
+        # Get primary account from database
+        account = await google_accounts_db.get_primary_account(user_id_str)
+        if not account or not account.tokens or not account.tokens.refresh_token:
             raise HTTPException(status_code=401, detail="No refresh token available")
 
-        new_tokens = google_oauth_service.refresh_access_token(tokens.refresh_token)
+        # Refresh the access token
+        new_tokens = google_oauth_service.refresh_access_token(account.tokens.refresh_token)
         if not new_tokens:
             raise HTTPException(status_code=401, detail="Failed to refresh tokens")
 
-        # Update stored tokens
-        user_google_tokens[user_id_str] = GoogleTokens(
+        # Update tokens in the account object
+        account.tokens = GoogleTokens(
             access_token=new_tokens["access_token"],
-            refresh_token=new_tokens["refresh_token"] or tokens.refresh_token,
+            refresh_token=new_tokens.get("refresh_token") or account.tokens.refresh_token,
             expires_at=new_tokens["expires_in"],
         )
 
+        # Save updated account back to database
+        await google_accounts_db.save_google_account(user_id_str, account)
+
+        logger.info(f"Refreshed tokens for user {user_id_str}, account {account.email}")
         return GoogleAuthResponse(success=True, message="Tokens refreshed successfully")
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Token refresh failed for user {current_user.get('id')}: {e}")
         raise HTTPException(status_code=500, detail=f"Token refresh failed: {str(e)}")
 
 

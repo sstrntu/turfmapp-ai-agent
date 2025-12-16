@@ -39,14 +39,14 @@ class GoogleAccountsDB:
             async with conn.transaction():
                 # Insert or update the Google account
                 account_id = await conn.fetchval("""
-                    INSERT INTO google_accounts (
+                    INSERT INTO turfmapp_agent.google_accounts (
                         user_id, email, name, picture, nickname, is_primary, connected_at
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    ON CONFLICT (user_id, email) 
-                    DO UPDATE SET 
+                    ON CONFLICT (user_id, email)
+                    DO UPDATE SET
                         name = EXCLUDED.name,
                         picture = EXCLUDED.picture,
-                        nickname = COALESCE(EXCLUDED.nickname, google_accounts.nickname),
+                        nickname = COALESCE(EXCLUDED.nickname, turfmapp_agent.google_accounts.nickname),
                         is_primary = EXCLUDED.is_primary,
                         updated_at = NOW()
                     RETURNING id
@@ -62,7 +62,7 @@ class GoogleAccountsDB:
                 
                 # Delete existing tokens for this account
                 await conn.execute("""
-                    DELETE FROM google_tokens WHERE account_id = $1
+                    DELETE FROM turfmapp_agent.google_tokens WHERE account_id = $1
                 """, account_id)
                 
                 # Encrypt tokens before storing
@@ -74,7 +74,7 @@ class GoogleAccountsDB:
                 
                 # Insert new encrypted tokens
                 await conn.execute("""
-                    INSERT INTO google_tokens (
+                    INSERT INTO turfmapp_agent.google_tokens (
                         account_id, access_token_encrypted, refresh_token_encrypted, expires_at, scope
                     ) VALUES ($1, $2, $3, $4, $5)
                 """,
@@ -104,8 +104,8 @@ class GoogleAccountsDB:
                     ga.is_primary, ga.connected_at,
                     gt.access_token_encrypted, gt.refresh_token_encrypted, gt.expires_at,
                     gt.access_token, gt.refresh_token
-                FROM google_accounts ga
-                LEFT JOIN google_tokens gt ON ga.id = gt.account_id
+                FROM turfmapp_agent.google_accounts ga
+                LEFT JOIN turfmapp_agent.google_tokens gt ON ga.id = gt.account_id
                 WHERE ga.user_id = $1
                 ORDER BY ga.is_primary DESC, ga.connected_at DESC
             """, user_id)
@@ -187,14 +187,14 @@ class GoogleAccountsDB:
             async with conn.transaction():
                 # First, unset all primary accounts for this user
                 await conn.execute("""
-                    UPDATE google_accounts 
+                    UPDATE turfmapp_agent.google_accounts 
                     SET is_primary = FALSE 
                     WHERE user_id = $1
                 """, user_id)
                 
                 # Then set the specified account as primary
                 result = await conn.execute("""
-                    UPDATE google_accounts 
+                    UPDATE turfmapp_agent.google_accounts 
                     SET is_primary = TRUE 
                     WHERE user_id = $1 AND email = $2
                 """, user_id, email)
@@ -215,7 +215,7 @@ class GoogleAccountsDB:
         conn = await self.get_connection()
         try:
             result = await conn.execute("""
-                UPDATE google_accounts 
+                UPDATE turfmapp_agent.google_accounts 
                 SET nickname = $1, updated_at = NOW()
                 WHERE user_id = $2 AND email = $3
             """, nickname, user_id, email)
@@ -238,7 +238,7 @@ class GoogleAccountsDB:
             async with conn.transaction():
                 # Get account ID first
                 account_id = await conn.fetchval("""
-                    SELECT id FROM google_accounts 
+                    SELECT id FROM turfmapp_agent.google_accounts 
                     WHERE user_id = $1 AND email = $2
                 """, user_id, email)
                 
@@ -247,12 +247,12 @@ class GoogleAccountsDB:
                 
                 # Delete tokens first (due to foreign key)
                 await conn.execute("""
-                    DELETE FROM google_tokens WHERE account_id = $1
+                    DELETE FROM turfmapp_agent.google_tokens WHERE account_id = $1
                 """, account_id)
                 
                 # Delete account
                 result = await conn.execute("""
-                    DELETE FROM google_accounts 
+                    DELETE FROM turfmapp_agent.google_accounts 
                     WHERE user_id = $1 AND email = $2
                 """, user_id, email)
                 
@@ -273,7 +273,7 @@ class GoogleAccountsDB:
         try:
             # Get account ID
             account_id = await conn.fetchval("""
-                SELECT id FROM google_accounts 
+                SELECT id FROM turfmapp_agent.google_accounts 
                 WHERE user_id = $1 AND email = $2
             """, user_id, email)
             
@@ -289,7 +289,7 @@ class GoogleAccountsDB:
             
             # Update encrypted tokens
             result = await conn.execute("""
-                UPDATE google_tokens 
+                UPDATE turfmapp_agent.google_tokens 
                 SET access_token_encrypted = $1, 
                     refresh_token_encrypted = $2, 
                     expires_at = $3,
@@ -323,7 +323,7 @@ class GoogleAccountsDB:
         conn = await self.get_connection()
         try:
             result = await conn.execute("""
-                DELETE FROM google_tokens 
+                DELETE FROM turfmapp_agent.google_tokens 
                 WHERE expires_at < NOW() - INTERVAL '1 day'
             """)
             

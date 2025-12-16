@@ -16,16 +16,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # New modular API structure
-from .api.v1.chat import router as chat_router_v1
+from .api.v1.chat import router as chat_router
 from .api.v1.auth import router as auth_router_v1
 from .api.v1.upload import router as upload_router
 from .api.v1.fal_tools import router as fal_tools_router
 from .api.v1.admin import router as admin_router_v1
 from .api.v1.settings import router as settings_router_v1
 from .api.v1.google_api import router as google_api_router_v1
+from .api.v1.agent import router as agent_router_v1
+from .api.v1.rag import router as rag_router_v1
+from .api.v1 import memory as memory_router
 
 from .database import get_supabase_config
 from .core.logging_config import setup_logging, get_logger
+from .core.rate_limit import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
 
 # Initialize logging
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"), enable_colors=True)
@@ -71,6 +78,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Initialize Rate Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_cors_origins(),
@@ -105,8 +117,15 @@ def get_frontend_config():
 
 
 # API v1 routes
-app.include_router(chat_router_v1, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(auth_router_v1, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(agent_router_v1, prefix="/api/v1", tags=["agent"])
+
+# API v2 routes (unified workflow with intelligent tool selection)
+
+# Include routers
+# Note: We keep the prefix as /api/v2/chat because the frontend expects V2 API structure
+# even though the file is now just chat.py (legacy chat.py was removed)
+app.include_router(chat_router, prefix="/api/v2/chat", tags=["chat-v2"])
 
 # Additional v1 routes
 app.include_router(upload_router, prefix="/api/v1/uploads", tags=["uploads"])
@@ -114,6 +133,8 @@ app.include_router(fal_tools_router, prefix="/api/v1/fal-tools", tags=["fal-tool
 app.include_router(admin_router_v1, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(settings_router_v1, prefix="/api/v1/settings", tags=["settings"])
 app.include_router(google_api_router_v1, prefix="/api/v1/google", tags=["google-api"])
+app.include_router(rag_router_v1, prefix="/api/v1", tags=["rag"])
+app.include_router(memory_router.router, prefix="/api/v1/memory", tags=["memory"])
 
 # Direct Google OAuth callback route for frontend redirect
 app.include_router(google_api_router_v1, prefix="/auth/google", tags=["google-oauth"])

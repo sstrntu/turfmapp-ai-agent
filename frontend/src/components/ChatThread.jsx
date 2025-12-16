@@ -34,22 +34,19 @@ export const ChatThread = () => {
   const listRef = React.useRef(null);
   const textareaRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
-  const [activeTool, setActiveTool] = React.useState(null);
-  const [placeholder, setPlaceholder] = React.useState('Type your message…');
   const [attachments, setAttachments] = React.useState([]);
   const [selectedModel, setSelectedModel] = React.useState(() => {
     return localStorage.getItem('tm_model') || 'gpt-4o';
   });
 
-  // Available models
+  // Available models (must match backend MODEL_REGISTRY)
   const models = [
     { id: 'gpt-4o', name: 'GPT-4O', provider: 'OpenAI' },
     { id: 'gpt-4o-mini', name: 'GPT-4O Mini', provider: 'OpenAI' },
-    { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', provider: 'Anthropic' },
-    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'Anthropic' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', provider: 'OpenAI' },
     { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'Anthropic' },
-    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', provider: 'Anthropic' },
+    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', provider: 'Anthropic' },
   ];
 
   React.useEffect(() => {
@@ -77,7 +74,6 @@ export const ChatThread = () => {
 
     // Store model selection globally so adapter can access it
     window.selectedModel = selectedModel;
-    console.log('🔍 Frontend: Selected model for this request:', selectedModel);
 
     // Store attachments globally so adapter can access them
     if (attachments.length > 0) {
@@ -99,7 +95,6 @@ export const ChatThread = () => {
     const newModel = event.target.value;
     setSelectedModel(newModel);
     localStorage.setItem('tm_model', newModel);
-    console.log('🔍 Frontend: Model changed to:', newModel);
 
     // Also save to database
     try {
@@ -113,7 +108,6 @@ export const ChatThread = () => {
           },
           body: JSON.stringify({ default_model: newModel })
         });
-        console.log('✅ Model preference saved to database');
       }
     } catch (error) {
       console.error('Failed to save model preference:', error);
@@ -126,7 +120,6 @@ export const ChatThread = () => {
       if (!composerIsEmpty) {
         // Store model selection globally so adapter can access it
         window.selectedModel = selectedModel;
-        console.log('🔍 Frontend (Enter key): Selected model for this request:', selectedModel);
 
         // Store attachments globally so adapter can access them
         if (attachments.length > 0) {
@@ -149,30 +142,9 @@ export const ChatThread = () => {
   const handleSuggestion = (suggestion) => {
     // Store model selection globally so adapter can access it
     window.selectedModel = selectedModel;
-    console.log('🔍 Frontend (Suggestion): Selected model for this request:', selectedModel);
 
     runtime.composer.setText(suggestion.text);
     runtime.composer.send();
-  };
-
-  const handleToolToggle = (toolId, placeholderText) => {
-    if (activeTool === toolId) {
-      // Deactivate current tool
-      setActiveTool(null);
-      setPlaceholder('Type your message…');
-      localStorage.removeItem(`tm_force_${toolId}_tool`);
-    } else {
-      // Activate new tool
-      setActiveTool(toolId);
-      setPlaceholder(placeholderText);
-      localStorage.setItem(`tm_force_${toolId}_tool`, 'true');
-      // Deactivate other tools
-      ['image', 'search', 'gmail', 'calendar', 'drive'].forEach(tool => {
-        if (tool !== toolId) {
-          localStorage.removeItem(`tm_force_${tool}_tool`);
-        }
-      });
-    }
   };
 
   const getFileType = (filename) => {
@@ -311,7 +283,7 @@ export const ChatThread = () => {
             <textarea
               ref={textareaRef}
               className="chat-input"
-              placeholder={placeholder}
+              placeholder="Type your message…"
               aria-label="Message"
               rows={1}
               value={composerText}
@@ -352,87 +324,6 @@ export const ChatThread = () => {
               disabled
             >
               +
-            </button>
-            <button
-              id="image-gen-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'image' ? ' active' : ''}`}
-              aria-label="Generate images"
-              aria-pressed={activeTool === 'image'}
-              onClick={() => handleToolToggle('image', 'Describe an image to generate...')}
-              disabled
-            >
-              <img
-                src="/icons/Picture.png"
-                alt="Image generation"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="web-search-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'search' ? ' active' : ''}`}
-              aria-label="Web search"
-              aria-pressed={activeTool === 'search'}
-              onClick={() => handleToolToggle('search', 'Search the web for...')}
-            >
-              <img
-                src="/icons/websearchicon.png"
-                alt="Web search"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="gmail-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'gmail' ? ' active' : ''}`}
-              aria-label="Gmail"
-              aria-pressed={activeTool === 'gmail'}
-              onClick={() => handleToolToggle('gmail', 'Ask about your emails...')}
-            >
-              <img
-                src="/icons/Gmail.png"
-                alt="Gmail"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="calendar-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'calendar' ? ' active' : ''}`}
-              aria-label="Google Calendar"
-              aria-pressed={activeTool === 'calendar'}
-              onClick={() => handleToolToggle('calendar', 'Ask about your calendar...')}
-            >
-              <img
-                src="/icons/Calendar.png"
-                alt="Google Calendar"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
-            </button>
-            <button
-              id="drive-btn"
-              type="button"
-              className={`tool-btn${activeTool === 'drive' ? ' active' : ''}`}
-              aria-label="Google Drive"
-              aria-pressed={activeTool === 'drive'}
-              onClick={() => handleToolToggle('drive', 'Ask about your files...')}
-            >
-              <img
-                src="/icons/Google Drive.png"
-                alt="Google Drive"
-                className="icon-img"
-                width="22"
-                height="22"
-              />
             </button>
           </div>
         </div>

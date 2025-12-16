@@ -17,32 +17,6 @@ logger = logging.getLogger(__name__)
 # Security scheme
 security = HTTPBearer()
 
-# Simple rate limiting for authentication attempts
-# _auth_attempts = defaultdict(list)
-# _MAX_AUTH_ATTEMPTS = 10  # Max attempts per IP
-# _AUTH_WINDOW_MINUTES = 15  # Time window in minutes
-
-
-# def _check_rate_limit(ip_address: str) -> bool:
-#     """Check if IP has exceeded authentication rate limit"""
-#     now = datetime.utcnow()
-#     cutoff_time = now - timedelta(minutes=_AUTH_WINDOW_MINUTES)
-
-#     # Clean old attempts
-#     _auth_attempts[ip_address] = [
-#         attempt_time
-#         for attempt_time in _auth_attempts[ip_address]
-#         if attempt_time > cutoff_time
-#     ]
-
-#     # Check if over limit
-#     if len(_auth_attempts[ip_address]) >= _MAX_AUTH_ATTEMPTS:
-#         return False
-
-#     # Record this attempt
-#     _auth_attempts[ip_address].append(now)
-#     return True
-
 
 async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
     """Verify Supabase JWT token and return user info with enhanced validation"""
@@ -58,7 +32,7 @@ async def verify_supabase_token(token: str) -> Optional[Dict[str, Any]]:
 
     # Check for suspicious token patterns
     if token.startswith("fake_") or "test" in token.lower() or len(token) > 2000:
-        print("❌ [AUTH] Suspicious token pattern detected")
+        logger.warning("❌ [AUTH] Suspicious token pattern detected")
         return None
 
     headers = {
@@ -127,16 +101,6 @@ async def get_current_user_supabase(
     request: Request = None,
 ) -> Dict[str, Any]:
     """Get current authenticated user using Supabase directly"""
-    # Check rate limit if request is available
-    # if request:
-    #     client_ip = request.client.host if request.client else "unknown"
-    #     if not _check_rate_limit(client_ip):
-    #         print(f"❌ [AUTH] Rate limit exceeded for IP: {client_ip}")
-    #         raise HTTPException(
-    #             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-    #             detail="Too many authentication attempts. Please try again later."
-    #         )
-
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

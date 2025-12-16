@@ -1,0 +1,41 @@
+TurfMapp AI Agent Documentation
+
+TurfMapp is an intelligent AI assistant designed to help users manage their turf and landscaping projects. The platform combines advanced artificial intelligence with practical turf management tools.
+
+Key Features:
+1. AI-Powered Chat: Users can interact with an intelligent chatbot that understands natural language queries about turf management, landscaping, and project planning.
+
+2. Document-Based Answers: The RAG (Retrieval-Augmented Generation) system allows users to upload documents and ask questions based on their content.
+
+3. Memory Management: The system maintains both conversation-level and account-level memory. Account-level memory stores user facts like name, profession, location, and preferences across all conversations.
+
+4. Tool Integration: The platform integrates with various external tools including Google APIs and image generation services.
+
+Technical Architecture:
+- Backend: FastAPI with Python 3.13
+- Frontend: React-based web interface
+- Database: PostgreSQL with pgvector extension for vector similarity search
+- AI Framework: LlamaIndex for memory management and RAG
+- LLM Provider: OpenAI GPT-4 and Claude models
+- Authentication: Supabase for user authentication
+
+Database Schema:
+The system uses a PostgreSQL database with the following key tables:
+- users: User account information
+- conversations: Chat conversation metadata
+- messages: Individual chat messages
+- user_memory: Account-level user facts and preferences
+- documents: Uploaded document metadata
+- document_nodes: Chunked document content with embeddings
+
+RAG Implementation:
+Documents are processed through the following pipeline:
+1. Upload: Files are validated (PDF, TXT, MD, DOCX supported, max 50MB)
+2. Text Extraction: Content is extracted using appropriate parsers
+3. Chunking: Text is split into 512-character chunks with 50-character overlap
+4. Embedding: Chunks are converted to vectors using OpenAI text-embedding-3-small
+5. Storage: Vectors are stored in PostgreSQL using pgvector extension
+6. Retrieval: Queries use cosine similarity search to find relevant chunks
+7. Generation: LLM generates answers using retrieved chunks as context
+
+The system ensures high-quality answers by enforcing strict rules that the AI should only use information from the provided context.

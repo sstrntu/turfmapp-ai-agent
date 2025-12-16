@@ -1,53 +1,42 @@
-# TURFMAPP-AGENT Database Schema
+# Database Schema Documentation
 
-## Schema Organization
+The application uses a PostgreSQL database (hosted on Supabase) with a dedicated schema `turfmapp_agent` to isolate agent data.
 
-This application uses the `turfmapp_agent` schema in your Supabase PostgreSQL database to ensure proper isolation when multiple applications share the same Supabase project.
+## Schema: `turfmapp_agent`
 
-## Schema Structure
+### 1. Users Table (`users`)
+Stores user profiles and links to Supabase Auth.
+- `id` (UUID, PK): Matches `auth.users.id`.
+- `email` (Text): User email.
+- `name` (Text): Display name.
+- `created_at` (Timestamptz)
+- `updated_at` (Timestamptz)
 
-```
-Database: postgres
-├── auth (Supabase managed)
-│   └── users (Supabase auth users)
-│
-├── public (default schema)
-│   └── (available for other apps)
-│
-└── turfmapp_agent (our application schema)
-    ├── users (application user profiles)
-    ├── user_preferences (system prompts, settings)
-    ├── admin_permissions (admin privileges)
-    ├── conversations (chat conversations)
-    ├── messages (chat messages with ratings)
-    ├── uploads (file uploads)
-    ├── document_collections (RAG collections)
-    ├── documents (RAG documents with vectors)
-    └── announcements (system announcements)
-```
+### 2. Conversations Table (`conversations`)
+Stores chat threads.
+- `id` (UUID, PK)
+- `user_id` (UUID, FK -> `users.id`)
+- `title` (Text): Auto-generated title (e.g., "J1 League Analysis").
+- `model` (Text): Model used (e.g., `gpt-4o`, `claude-3-5-sonnet`).
+- `system_prompt` (Text, Nullable)
+- `created_at` (Timestamptz)
+- `updated_at` (Timestamptz)
 
-## Benefits
+### 3. Messages Table (`messages`)
+Stores individual chat messages.
+- `id` (UUID, PK)
+- `conversation_id` (UUID, FK -> `conversations.id`)
+- `role` (Text): `user` or `assistant`.
+- `content` (Text): The message body.
+- `metadata` (JSONB): structured data (citations, sources, tool calls).
+    - `sources`: Array of citation objects `{title, url, snippet}`.
+    - `tool_calls`: Array of executed tools.
+- `created_at` (Timestamptz)
 
-1. **Multi-App Support**: You can deploy multiple applications to the same Supabase project
-2. **Clean Separation**: Each app's data is isolated in its own schema
-3. **Manageable Permissions**: Fine-grained access control per schema
-4. **Easy Maintenance**: Clear organization for database administration
+## Indexes
+- `idx_conversations_user_id`: Optimize fetching user history.
+- `idx_messages_conversation_id`: Optimize fetching chat threads.
 
-## Usage
-
-All application tables are prefixed with the `turfmapp_agent` schema. When working with the database:
-
-- **SQL Queries**: Use `turfmapp_agent.table_name`
-- **SQLAlchemy Models**: Schema is defined in `__table_args__`
-- **Supabase Dashboard**: Navigate to the `turfmapp_agent` schema to view tables
-
-## Adding Other Apps
-
-To add another app to the same Supabase project:
-
-1. Create a new schema: `CREATE SCHEMA IF NOT EXISTS your_app_name;`
-2. Deploy your app's tables to that schema
-3. Set up appropriate RLS policies
-4. Configure your app's search path
-
-This keeps all applications organized and prevents conflicts.
+## Security (RLS)
+Row Level Security is enabled.
+- Users can only view/edit their own data (`user_id = auth.uid()`).

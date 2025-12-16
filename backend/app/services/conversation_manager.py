@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 import uuid
 
 from ..database import ConversationService
-from ..api.v1.preferences import user_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -241,21 +240,3 @@ class ConversationManager:
                 return True
         
         return False
-    
-    def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
-        """
-        Get user preferences for chat configuration.
-        
-        Args:
-            user_id: User ID
-            
-        Returns:
-            User preferences dict with defaults
-        """
-        return user_preferences.get(user_id, {
-            "model": "gpt-4o",
-            "include_reasoning": False,
-            "text_format": "text",
-            "text_verbosity": "medium",
-            "reasoning_effort": "medium"
-        })

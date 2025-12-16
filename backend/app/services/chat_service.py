@@ -61,6 +61,7 @@ from .chat_response_parser import (
     summarize_tool_results_with_ai,
     extract_sources_from_annotations,
 )
+from .conversation_manager import ConversationManager
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -70,7 +71,10 @@ class EnhancedChatService:
     """Enhanced chat service with comprehensive API integration."""
 
     def __init__(self):
-        # Fallback storage for when database fails
+        # Initialize conversation manager
+        self.conversation_manager = ConversationManager()
+
+        # Fallback storage for when database fails (kept for backward compatibility)
         self.fallback_conversations: Dict[str, List[Dict[str, Any]]] = {}
         self.fallback_conversation_metadata: Dict[str, Dict[str, Any]] = {}
 
@@ -326,13 +330,15 @@ class EnhancedChatService:
         for tool in raw_tools:
             if isinstance(tool, dict) and tool.get("type") == "google_mcp":
                 enabled = tool.get("enabled_tools") or {}
-                expanded_tools.extend(
-                    self.tool_handler.build_google_function_tools(enabled)
-                )
+                logger.warning(f"🔍 Google MCP enabled_tools: {enabled}")
+                google_tools = self.tool_handler.build_google_function_tools(enabled)
+                logger.warning(f"🔍 Built {len(google_tools)} Google tools: {[t['function']['name'] if 'function' in t else t.get('type') for t in google_tools]}")
+                expanded_tools.extend(google_tools)
             else:
                 expanded_tools.append(tool)
 
         tools_to_include = expanded_tools
+        logger.warning(f"🔍 Total tools to include: {len(tools_to_include)}")
 
         logger.info(
             "🚀 🚀 🚀 ROUTING CHAT REQUEST via %s model: %s 🚀 🚀 🚀",
@@ -634,7 +640,14 @@ class EnhancedChatService:
                         # Extract raw MCP data for AI summarization
                         for result in executed_results:
                             result_data = result.get("result", {})
-                            # Get the raw response from MCP (this is pre-formatted by MCP)
+                            if tool_name == "generate_image":
+                                tool_call_inputs[tool_id] = {
+                                    "name": tool_name,
+                                    "args": tool_input,
+                                    "args_text": serialise_args(tool_input),
+                                }
+                                tool_results.append(result)
+                                continue
                             raw_data = (
                                 result_data.get("response")
                                 or result_data.get("content")
@@ -790,6 +803,14 @@ Respond as if you're having a natural conversation with the user."""
                     tool_name = func_call["tool_name"]
                     for result in func_call["results"]:
                         result_data = result.get("result", {})
+                        if tool_name == "generate_image":
+                            tool_call_inputs[result.get("tool_call_id")] = {
+                                "name": tool_name,
+                                "args": result_data.get("arguments"),
+                                "args_text": serialise_args(result_data.get("arguments")),
+                            }
+                            tool_results.append(result)
+                            continue
                         raw_data = (
                             result_data.get("response")
                             or result_data.get("content")
@@ -933,6 +954,8 @@ Respond as if you're having a natural conversation with the user."""
                 # Extract text content from tool results (skip if already summarized by AI)
                 if not tools_already_summarized:
                     for tool_item in tool_results:
+                        if tool_item.get("tool_name") == "generate_image":
+                            continue
                         # Try to extract response text from tool result
                         if isinstance(tool_item, dict):
                             # Handle nested result structure from handle_tool_calls

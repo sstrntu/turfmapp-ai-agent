@@ -5,6 +5,7 @@ import { WeatherBlock } from "./blocks/WeatherBlock.jsx";
 import { TableBlock } from "./blocks/TableBlock.jsx";
 import { SearchResultsBlock } from "./blocks/SearchResultsBlock.jsx";
 import { KeyValueBlock } from "./blocks/KeyValueBlock.jsx";
+import { ImageBlock } from "./blocks/ImageBlock.jsx";
 
 const renderCode = (block) => (
   <CodeBlock code={block.code || ""} language={block.language || block.lang || "text"} />
@@ -57,6 +58,15 @@ export const BlockRenderer = ({ block }) => {
       );
     case "weather":
       return <WeatherBlock data={block.data || block} title={block.title} />;
+    case "image":
+      return (
+        <ImageBlock
+          title={block.title || block.toolName}
+          imageBase64={block.imageBase64}
+          imageUrl={block.imageUrl}
+          format={block.format}
+        />
+      );
     case "search-results":
     case "web-search":
       return (

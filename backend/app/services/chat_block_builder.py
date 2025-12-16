@@ -179,6 +179,20 @@ def build_blocks_from_tool_results(
         created_block = False
         for payload in payloads:
             if isinstance(payload, dict):
+                if payload.get("image_base64") or payload.get("image_url"):
+                    image_block = {
+                        "id": f"{block_id_prefix}-image-{index}",
+                        "type": "image",
+                        **base_common,
+                        "title": tool_name or "Generated Image",
+                        "imageBase64": payload.get("image_base64"),
+                        "imageUrl": payload.get("image_url"),
+                        "format": payload.get("output_format", "png"),
+                    }
+                    blocks.append(image_block)
+                    created_block = True
+                    continue
+
                 results = None
                 for key in ("results", "search_results", "items"):
                     candidate = payload.get(key)

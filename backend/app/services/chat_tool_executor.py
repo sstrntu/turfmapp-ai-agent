@@ -13,6 +13,8 @@ import json
 import logging
 from typing import List, Dict, Any
 
+from .image_generation import generate_image as generate_image_tool
+
 logger = logging.getLogger(__name__)
 
 
@@ -74,14 +76,94 @@ async def handle_tool_calls(user_id: str, tool_calls: List[Dict[str, Any]]) -> L
             if isinstance(tool_args, str):
                 tool_args = json.loads(tool_args)
 
+            # Check if this is the image generation tool
+            if tool_name == "generate_image":
+                logger.debug("🎨 Generating image via GPT-Image-1")
+                prompt = tool_args.get("prompt") or ""
+                result = await generate_image_tool(
+                    prompt=prompt,
+                    size=tool_args.get("size"),
+                    quality=tool_args.get("quality"),
+                    background=tool_args.get("background"),
+                    output_format=tool_args.get("output_format", "png"),
+                )
+
+            # Check if this is a RAG tool
+            elif tool_name in ["search_documents", "list_documents"]:
+                # Use RAG service for document search
+                logger.debug(f"🔧 Using RAG service for tool: {tool_name}")
+                try:
+                    from ..llamaindex.rag import RAGQueryService, DocumentIngestionService, PgVectorStore
+                    from ..database import get_db_pool
+                    from ..llamaindex.services.llm_factory import llm_factory
+
+                    db_pool = await get_db_pool()
+                    vector_store = PgVectorStore(db_pool=db_pool)
+                    llm = llm_factory.create_llm(model_id="gpt-4o-mini", temperature=0.3)
+
+                    if tool_name == "search_documents":
+                        rag_service = RAGQueryService(
+                            vector_store=vector_store,
+                            llm=llm,
+                            top_k=5,
+                            similarity_threshold=0.3,
+                        )
+
+                        rag_result = await rag_service.query(
+                            question=tool_args.get("query", ""),
+                            user_id=user_id,
+                            include_sources=True,
+                            include_organization_docs=True,
+                        )
+
+                        if rag_result['chunks_found'] == 0:
+                            response = "No relevant information found in the uploaded documents."
+                        else:
+                            response = f"{rag_result['answer']}\n\n"
+                            if rag_result.get('sources'):
+                                sources_list = [f"- {s['filename']}" for s in rag_result['sources']]
+                                response += f"Sources:\n" + "\n".join(sources_list)
+
+                        result = {"success": True, "response": response}
+
+                    elif tool_name == "list_documents":
+                        ingestion_service = DocumentIngestionService(db_pool=db_pool)
+                        documents = await ingestion_service.get_user_documents(
+                            user_id=user_id,
+                            limit=50,
+                            include_organization=True,
+                        )
+
+                        if not documents:
+                            response = "No documents have been uploaded yet."
+                        else:
+                            doc_list = []
+                            for doc in documents:
+                                filename = doc.get('filename', 'unknown')
+                                status = doc.get('status', 'unknown')
+                                chunks = doc.get('chunk_count', 0)
+                                scope = doc.get('document_scope', 'personal')
+                                doc_list.append(f"- {filename} ({scope}, {chunks} chunks, status: {status})")
+
+                            response = f"Available documents ({len(documents)}):\n" + "\n".join(doc_list)
+
+                        result = {"success": True, "response": response}
+
+                except Exception as e:
+                    logger.error(f"❌ RAG tool execution failed for {tool_name}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    result = {
+                        "success": False,
+                        "error": f"RAG tool execution failed: {str(e)}"
+                    }
+
             # Check if this is a Google MCP tool
-            google_tools = [
+            elif tool_name in [
                 "gmail_search", "gmail_get_message", "gmail_recent", "gmail_important",
                 "drive_list_files", "drive_create_folder", "drive_list_folder_files", "drive_shared_drives", "drive_search", "drive_search_folders",
                 "calendar_list_events", "calendar_upcoming_events"
-            ]
-
-            if tool_name in google_tools:
+            ]:
                 # Use MCP client for Google services
                 logger.debug(f"🔧 Using MCP client for tool: {tool_name}")
                 logger.debug(f"🔧 Tool arguments: {tool_args}")

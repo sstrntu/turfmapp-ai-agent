@@ -5,7 +5,7 @@
  * that are stored in localStorage by the rest of the dashboard.
  */
 
-const CHAT_ENDPOINT = "/api/v1/chat/send";
+const CHAT_ENDPOINT = "/api/v2/chat/stream";
 
 const DEFAULT_STATUS = {
   type: "complete",
@@ -72,13 +72,42 @@ const buildToolsArray = (
 
   if (settings.toolImageGen || forceFlags.image) {
     tools.push({
-      type: "image_generation",
-      size: "auto",
-      quality: settings.imageQuality || "auto",
-      output_format: "png",
-      background: "auto",
-      moderation: "auto",
-      partial_images: 3,
+      type: "function",
+      function: {
+        name: "generate_image",
+        description:
+          "Create a new image using OpenAI GPT-Image-1. Provide a detailed natural language prompt describing the desired picture.",
+        parameters: {
+          type: "object",
+          properties: {
+            prompt: {
+              type: "string",
+              description: "Required text description of the image to generate",
+            },
+            size: {
+              type: "string",
+              enum: ["1024x1024", "512x512", "256x256", "auto"],
+              description: "Optional output size. Defaults to 1024x1024 when omitted.",
+            },
+            quality: {
+              type: "string",
+              enum: ["standard", "high", "auto"],
+              description: "Optional quality flag. Accepts standard or high.",
+            },
+            background: {
+              type: "string",
+              enum: ["transparent", "white", "auto"],
+              description: "Optional background configuration.",
+            },
+            output_format: {
+              type: "string",
+              enum: ["png", "jpeg"],
+              description: "Optional output format. Defaults to png.",
+            },
+          },
+          required: ["prompt"],
+        },
+      },
     });
   }
 
@@ -218,7 +247,7 @@ export class TurfmappChatAdapter {
       throw new Error("Authentication required");
     }
 
-    const response = await fetch(`/api/v1/chat/conversations/${conversationId}`, {
+    const response = await fetch(`/api/v2/chat/conversations/${conversationId}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json'
@@ -275,37 +304,50 @@ export class TurfmappChatAdapter {
       throw new Error("Unable to locate user message to send");
     }
 
+    // Get runtime for live updates
+    const runtime = window.chatRuntime;
+
     const settings = loadSettings();
-    const forceFlags = {
-      image: localStorage.getItem("tm_force_image_tool") === "true",
-      search: localStorage.getItem("tm_force_search_tool") === "true",
-      gmail: localStorage.getItem("tm_force_gmail_tool") === "true",
-      calendar: localStorage.getItem("tm_force_calendar_tool") === "true",
-      drive: localStorage.getItem("tm_force_drive_tool") === "true",
+
+    // Check if user has Google credentials
+    let hasGoogleAuth = false;
+    try {
+      const authCheck = await fetch('/api/v1/google/auth/status', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      const authData = await authCheck.json();
+      hasGoogleAuth = authData?.data?.has_tokens || false;
+    } catch (e) {
+      console.warn('Failed to check Google auth status:', e);
+    }
+
+    // Auto-enable Google tools if user has OAuth credentials
+    const autoFlags = {
+      image: false,  // Disabled by default
+      search: false,  // Disabled - rely on settings.toolWebSearch instead
+      gmail: hasGoogleAuth,
+      calendar: hasGoogleAuth,
+      drive: hasGoogleAuth,
     };
-    const tools = buildToolsArray(settings, forceFlags);
-    const systemInstructions = buildSystemInstructions(settings, forceFlags.search);
+    const tools = buildToolsArray(settings, autoFlags);
+    const systemInstructions = buildSystemInstructions(settings, settings.toolWebSearch);
 
     // Get attachments from global window object if available
     const attachments = window.pendingAttachments || null;
 
     // Use the selected model from the dropdown if available
     const selectedModel = window.selectedModel || settings.model || "gpt-4o";
-    console.log('🔍 Adapter: Using model:', selectedModel);
-    console.log('🔍 Adapter: window.selectedModel =', window.selectedModel);
-    console.log('🔍 Adapter: settings.model =', settings.model);
 
     const payload = {
       message: userText,
       conversation_id: this.conversationId,
       model: selectedModel,
       tools: tools.length > 0 ? tools : null,
-      tool_choice: forceFlags.search ? "required" : "auto",
+      tool_choice: "auto",  // Always let AI decide when to use tools
       assistant_context: systemInstructions || settings.assistantContext || null,
       attachments: attachments,
+      include_memory: true,  // Enable LlamaIndex conversation memory
     };
-
-    console.log('🔍 Adapter: Full payload:', JSON.stringify(payload, null, 2));
 
     const response = await fetch(CHAT_ENDPOINT, {
       method: "POST",
@@ -322,8 +364,59 @@ export class TurfmappChatAdapter {
       throw new Error(`Chat request failed (${response.status}): ${errorBody}`);
     }
 
-    const data = await response.json();
-    console.log("🔍 Backend response:", data);
+    // Handle streaming response
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let data = null;
+    let accumulatedContent = '';
+    let thoughts = [];
+    let toolCalls = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            // Handle different event types
+            if (event.type === 'thought') {
+              thoughts.push(event.content);
+
+              // Update custom progress overlay
+              this._updateProgressOverlay(event.content);
+
+            } else if (event.type === 'tool_call') {
+              const toolName = event.tool || 'unknown';
+              toolCalls.push(toolName);
+
+              // Update progress overlay
+              this._updateProgressOverlay(`🔧 Using tool: ${toolName}`)
+
+            } else if (event.type === 'content') {
+              if (event.delta) {
+                accumulatedContent += event.delta;
+              }
+            } else if (event.type === 'done') {
+              data = event;
+            }
+          } catch (e) {
+            console.error('Failed to parse streaming event:', e, line);
+          }
+        }
+      }
+    }
+
+    if (!data) {
+      throw new Error('No completion event received from stream');
+    }
 
     if (data?.conversation_id) {
       this.conversationId = data.conversation_id;
@@ -333,7 +426,6 @@ export class TurfmappChatAdapter {
     const metadataFromBackend = data?.metadata ?? {};
 
     const rawContent = assistantMessage?.content ?? "";
-    console.log("📝 Raw content from backend:", rawContent);
     const textParts = ensureArray(
       typeof rawContent === "string"
         ? [{ type: "text", text: rawContent }]
@@ -357,10 +449,13 @@ export class TurfmappChatAdapter {
       textParts.push({ type: "text", text: rawContent });
     }
 
-    const sources =
-      normaliseSources(data?.sources) ||
-      normaliseSources(metadataFromBackend?.sources) ||
-      normaliseSources(assistantMessage?.sources);
+    const normalizedSourcesList = [
+      data?.sources,
+      metadataFromBackend?.sources,
+      assistantMessage?.sources
+    ].map(s => normaliseSources(s));
+
+    const sources = normalizedSourcesList.find(s => s.length > 0) || [];
 
     const reasoning =
       ensureArray(data?.reasoning)
@@ -368,7 +463,8 @@ export class TurfmappChatAdapter {
         .filter(Boolean) ||
       ensureArray(metadataFromBackend?.reasoning)
         .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
-        .filter(Boolean);
+        .filter(Boolean) ||
+      thoughts.filter(Boolean);
 
     const blocksFromBackend =
       normaliseBlocks(metadataFromBackend?.blocks) ||
@@ -380,6 +476,8 @@ export class TurfmappChatAdapter {
       sources,
       reasoning,
       blocks: blocksFromBackend,
+      tools_used: toolCalls.length > 0 ? toolCalls : (data?.assistant_message?.metadata?.tools_used || []),
+      memory_request: data?.memory_request || metadataFromBackend?.memory_request,  // HITL consent prompt data
       raw_response: data,
     };
 
@@ -389,11 +487,22 @@ export class TurfmappChatAdapter {
       metadata: {
         ...EMPTY_METADATA,
         ...metadataFromBackend,
+        conversation_id: data?.conversation_id || this.conversationId,  // For memory consent prompt
         custom: customMetadata,
       },
     };
 
-    console.log("✅ Returning to assistant-ui:", result);
     return result;
   }
 }
+
+export {
+  getDefaultSettings,
+  loadSettings,
+  buildToolsArray,
+  buildSystemInstructions,
+  normaliseSources,
+  normaliseBlocks,
+  ensureArray,
+  extractUserInput,
+};

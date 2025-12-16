@@ -387,6 +387,7 @@
                     <div class="settings-tabs">
                         <button class="tab-button active" data-tab="settings">Settings</button>
                         <button class="tab-button" data-tab="integrations">Integrations</button>
+                        <button class="tab-button" data-tab="documents">Documents</button>
                         <button class="tab-button" data-tab="admin" id="admin-tab" style="display: none;">
                             Admin
                             <span class="admin-only-badge">Admin</span>
@@ -411,14 +412,14 @@
                             <!-- Model Selection -->
                             <div class="form-row">
                                 <div class="label">Preferred Model</div>
+                                <!-- Must match backend MODEL_REGISTRY -->
                                 <select id="user-model" class="select-input">
                                     <option value="gpt-4o">gpt-4o (Default, Fast & Reliable)</option>
                                     <option value="gpt-4o-mini">gpt-4o-mini (Lightweight, cost efficient)</option>
-                                    <option value="gpt-5-mini">gpt-5-mini (Latest OpenAI experimental)</option>
-                                    <option value="claude-3-haiku-20240307">claude-3-haiku (Fast Claude)</option>
-                                    <option value="claude-sonnet-4-20250514">claude-sonnet-4 (Balanced Claude)</option>
-                                    <option value="claude-sonnet-4-5-20250929">claude-sonnet-4.5 (Enhanced Claude)</option>
-                                    <option value="claude-opus-4-1-20250805">claude-opus-4.1 (Premium Claude)</option>
+                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo (Budget option)</option>
+                                    <option value="claude-sonnet-4-5-20250929">Claude Sonnet 4.5 (Enhanced reasoning)</option>
+                                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Balanced)</option>
+                                    <option value="claude-3-haiku-20240307">Claude 3 Haiku (Fast)</option>
                                 </select>
                             </div>
 
@@ -468,54 +469,6 @@
                                 </div>
                             </div>
 
-                            <!-- Gmail Integration -->
-                            <div class="form-row">
-                                <div class="label">Gmail Features</div>
-                                <div class="admin-note">AI can read and analyze your emails</div>
-                            </div>
-
-                            <div style="grid-column: 1 / -1;">
-                                <div class="tool-checkbox">
-                                    <input type="checkbox" id="gmail-enabled" onchange="toggleGmailFeatures()">
-                                    <label for="gmail-enabled">Enable Gmail integration in chat</label>
-                                </div>
-                                <div class="admin-note" style="margin-left: 24px; font-size: 0.8rem; opacity: 0.7;">
-                                    Ask AI: "What are my latest emails?" or "Summarize my inbox"
-                                </div>
-                            </div>
-
-                            <!-- Google Drive Integration -->
-                            <div class="form-row">
-                                <div class="label">Google Drive Features</div>
-                                <div class="admin-note">AI can access and manage your files</div>
-                            </div>
-
-                            <div style="grid-column: 1 / -1;">
-                                <div class="tool-checkbox">
-                                    <input type="checkbox" id="drive-enabled" onchange="toggleDriveFeatures()">
-                                    <label for="drive-enabled">Enable Google Drive integration in chat</label>
-                                </div>
-                                <div class="admin-note" style="margin-left: 24px; font-size: 0.8rem; opacity: 0.7;">
-                                    Ask AI: "Upload this to my Drive" or "Find files about project X"
-                                </div>
-                            </div>
-
-                            <!-- Google Calendar Integration -->
-                            <div class="form-row">
-                                <div class="label">Calendar Features</div>
-                                <div class="admin-note">AI can read your calendar events</div>
-                            </div>
-
-                            <div style="grid-column: 1 / -1;">
-                                <div class="tool-checkbox">
-                                    <input type="checkbox" id="calendar-enabled" onchange="toggleCalendarFeatures()">
-                                    <label for="calendar-enabled">Enable Google Calendar integration in chat</label>
-                                </div>
-                                <div class="admin-note" style="margin-left: 24px; font-size: 0.8rem; opacity: 0.7;">
-                                    Ask AI: "What's on my calendar today?" or "Schedule a meeting"
-                                </div>
-                            </div>
-
                             <!-- Test Google Services -->
                             <div class="form-row">
                                 <div class="label">Test Connection</div>
@@ -527,6 +480,75 @@
                                     🧪 Test Google Integrations
                                 </button>
                                 <div id="google-test-results" style="margin-top: 10px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Documents Tab Content -->
+                    <div id="documents-tab" class="tab-content">
+                        <div class="profile-grid" style="row-gap: 18px;">
+
+                            <!-- RAG Documents Section -->
+                            <div class="form-row">
+                                <div class="label">RAG Documents</div>
+                                <div class="admin-note">Upload documents for AI-powered question answering</div>
+                            </div>
+
+                            <!-- Upload Document Section -->
+                            <div style="grid-column: 1 / -1; background: rgba(0,0,0,0.2); border-radius: 10px; padding: 20px; margin-bottom: 15px;">
+                                <div class="form-row" style="align-items: start;">
+                                    <div class="label">Upload Document</div>
+                                    <div class="admin-note">Supported formats: PDF, TXT, MD, DOCX (Max 50MB)</div>
+                                </div>
+
+                                <div style="margin: 15px 0;">
+                                    <input type="file" id="rag-file-input" accept=".pdf,.txt,.md,.docx" style="display: none;">
+                                    <button class="save-btn" onclick="document.getElementById('rag-file-input').click()">
+                                        📄 Choose File
+                                    </button>
+                                    <span id="selected-file-name" style="margin-left: 15px; color: rgba(255,255,255,0.7);"></span>
+                                </div>
+
+                                <div class="form-row" style="align-items: center;">
+                                    <div class="label">Document Scope</div>
+                                    <select id="document-scope" class="select-input" style="max-width: 300px;">
+                                        <option value="personal">Personal (Only you can see)</option>
+                                        <option value="organization">Organization (Everyone can see)</option>
+                                    </select>
+                                </div>
+
+                                <div style="margin-top: 15px;">
+                                    <button class="save-btn" id="upload-document-btn" disabled style="background: rgba(40,167,69,0.3);">
+                                        ⬆️ Upload Document
+                                    </button>
+                                </div>
+
+                                <div id="upload-status" style="margin-top: 10px;"></div>
+                            </div>
+
+                            <!-- Document List Section -->
+                            <div class="form-row">
+                                <div class="label">Your Documents</div>
+                                <div class="admin-note">Manage your uploaded documents</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <button class="save-btn" onclick="loadDocumentsList()" style="background: rgba(100,100,100,0.3); margin-bottom: 15px;">
+                                    🔄 Refresh List
+                                </button>
+                                <div id="documents-list" class="admin-note">Loading documents...</div>
+                            </div>
+
+                            <!-- RAG Statistics -->
+                            <div class="form-row">
+                                <div class="label">Statistics</div>
+                                <div class="admin-note">View your document statistics</div>
+                            </div>
+
+                            <div style="grid-column: 1 / -1;">
+                                <div id="rag-stats" style="background: rgba(0,0,0,0.2); border-radius: 10px; padding: 15px;">
+                                    <div class="admin-note">Loading statistics...</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -562,47 +584,6 @@
                                 </div>
                             </div>
 
-                            <!-- Tools Configuration Section -->
-                            <div class="form-row" style="align-items: start;">
-                                <div class="label">Tools Configuration</div>
-                                <div style="display: flex; flex-direction: column; gap: 12px;">
-                                    <!-- Web Search Tool -->
-                                    <div class="tool-section">
-                                        <label class="tool-checkbox">
-                                            <input type="checkbox" id="tool-web-search" checked>
-                                            <span>Web Search Preview</span>
-                                        </label>
-                                        <div class="tool-config" style="margin-left: 24px; margin-top: 4px;">
-                                            <label style="font-size: 0.8rem; color: var(--color-tertiary);">
-                                                Search Context:
-                                                <select id="web-search-context" class="select-input" style="font-size: 0.8rem; margin-left: 8px;">
-                                                    <option value="small">Small</option>
-                                                    <option value="medium">Medium</option>
-                                                    <option value="large">Large</option>
-                                                </select>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <!-- Placeholder tools -->
-                                    <div class="tool-section">
-                                        <label class="tool-checkbox">
-                                            <input type="checkbox" id="tool-image-generation" disabled>
-                                            <span>Image Generation</span>
-                                            <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
-                                        </label>
-                                    </div>
-
-                                    <div class="tool-section">
-                                        <label class="tool-checkbox">
-                                            <input type="checkbox" id="tool-mcp" disabled>
-                                            <span>MCP Integration</span>
-                                            <span style="font-size: 0.75rem; color: var(--color-tertiary); margin-left: 8px;">(Coming Soon)</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Admin Actions -->
                             <div class="form-row">
                                 <div class="label">Admin Actions</div>
@@ -627,7 +608,7 @@
     <script src="scripts/supabase-client.js"></script>
     <script src="scripts/google-auth.js"></script>
     <script src="scripts/ui.js"></script>
-    <script src="scripts/chat.js"></script>
+    <script src="scripts/chat.js?v=5"></script>
 
     <!-- Settings JavaScript -->
     <script>
@@ -777,8 +758,28 @@
         // Load admin settings (announcements, etc.)
         async function loadAdminSettings() {
             try {
-                const announcement = localStorage.getItem('announcement') || '';
-                document.getElementById('announcement-text').value = announcement;
+                // Fetch active announcements from backend API
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/admin/announcements/active', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const announcements = await response.json();
+                    if (announcements && announcements.length > 0) {
+                        const announcement = announcements[0];
+                        document.getElementById('announcement-text').value = announcement.content || '';
+                        // Store current announcement ID for updates
+                        document.getElementById('announcement-text').dataset.announcementId = announcement.id;
+                    } else {
+                        document.getElementById('announcement-text').value = '';
+                    }
+                } else {
+                    console.warn('Could not fetch announcements from API');
+                }
             } catch (error) {
                 console.error('Error loading admin settings:', error);
             }
@@ -970,21 +971,9 @@
             }
         };
 
-        // Load local settings (legacy tool configs)
+        // Load local settings (deprecated - no longer used with LlamaIndex routing)
         function loadLocalSettings() {
-            try {
-                const toolWebSearch = localStorage.getItem('tm_tool_web_search') || 'true';
-                const webSearchContext = localStorage.getItem('tm_web_search_context') || 'medium';
-
-                if (document.getElementById('tool-web-search')) {
-                    document.getElementById('tool-web-search').checked = toolWebSearch === 'true';
-                }
-                if (document.getElementById('web-search-context')) {
-                    document.getElementById('web-search-context').value = webSearchContext;
-                }
-            } catch (e) {
-                console.error('Error loading local settings:', e);
-            }
+            // No longer needed - LlamaIndex handles all tool routing automatically
         }
 
         // Setup event listeners
@@ -1117,65 +1106,145 @@
 
         // Save admin settings
         function saveAdminSettings() {
-            try {
-                // Save tool settings to localStorage
-                const toolWebSearch = document.getElementById('tool-web-search')?.checked || false;
-                const webSearchContext = document.getElementById('web-search-context')?.value || 'medium';
-
-                localStorage.setItem('tm_tool_web_search', toolWebSearch.toString());
-                localStorage.setItem('tm_web_search_context', webSearchContext);
-
-                showMessage('Admin settings saved successfully!', 'success');
-            } catch (e) {
-                console.error('Error saving admin settings:', e);
-                showMessage('Error saving admin settings', 'error');
-            }
+            // Deprecated - no longer saves tool settings (LlamaIndex handles routing)
+            showMessage('Admin settings saved successfully!', 'success');
         }
 
         // Reset admin form
         function resetAdminForm() {
             if (confirm('Are you sure you want to reset all admin settings to defaults?')) {
-                // Clear localStorage
+                // Clear deprecated localStorage (no longer used with LlamaIndex)
                 const keys = Object.keys(localStorage).filter(key => key.startsWith('tm_'));
                 keys.forEach(key => localStorage.removeItem(key));
-
-                // Reset form values to defaults
-                if (document.getElementById('tool-web-search')) {
-                    document.getElementById('tool-web-search').checked = true;
-                }
-                if (document.getElementById('web-search-context')) {
-                    document.getElementById('web-search-context').value = 'medium';
-                }
 
                 showMessage('Admin settings reset to defaults.', 'success');
             }
         }
 
         // Announcement functions (from original admin page)
-        function saveAnnouncement() {
+        async function saveAnnouncement() {
             const announcementText = document.getElementById('announcement-text').value.trim();
-            localStorage.setItem('announcement', announcementText);
 
-            // Trigger storage event for other pages to update
-            window.dispatchEvent(new StorageEvent('storage', {
-                key: 'announcement',
-                newValue: announcementText
-            }));
+            if (!announcementText) {
+                showMessage('Please enter announcement text', 'error');
+                return;
+            }
 
-            showMessage('Announcement saved successfully!', 'success');
+            try {
+                const token = GoogleAuth.getToken();
+
+                // First, deactivate all existing announcements
+                const existingResponse = await fetch('/api/v1/admin/announcements?include_inactive=true', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (existingResponse.ok) {
+                    const existingAnnouncements = await existingResponse.json();
+                    // Deactivate all existing announcements
+                    for (const announcement of existingAnnouncements) {
+                        if (announcement.is_active) {
+                            await fetch(`/api/v1/admin/announcements/${announcement.id}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ is_active: false })
+                            });
+                        }
+                    }
+                }
+
+                // Create new announcement
+                const response = await fetch('/api/v1/admin/announcements', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content: announcementText,
+                        expires_at: null  // No expiration
+                    })
+                });
+
+                if (response.ok) {
+                    // Update cache
+                    localStorage.setItem('announcement', announcementText);
+
+                    // Trigger storage event for other pages to update
+                    window.dispatchEvent(new StorageEvent('storage', {
+                        key: 'announcement',
+                        newValue: announcementText
+                    }));
+
+                    // Refresh announcement display
+                    if (Announcement.refresh) {
+                        Announcement.refresh();
+                    }
+
+                    showMessage('Announcement saved successfully!', 'success');
+                } else {
+                    throw new Error('Failed to save announcement');
+                }
+            } catch (error) {
+                console.error('Error saving announcement:', error);
+                showMessage('Failed to save announcement', 'error');
+            }
         }
 
-        function clearAnnouncement() {
-            document.getElementById('announcement-text').value = '';
-            localStorage.removeItem('announcement');
+        async function clearAnnouncement() {
+            try {
+                const token = GoogleAuth.getToken();
 
-            // Trigger storage event for other pages to update
-            window.dispatchEvent(new StorageEvent('storage', {
-                key: 'announcement',
-                newValue: ''
-            }));
+                // Fetch and deactivate all active announcements
+                const response = await fetch('/api/v1/admin/announcements', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
-            showMessage('Announcement cleared successfully!', 'success');
+                if (response.ok) {
+                    const announcements = await response.json();
+                    // Deactivate all active announcements
+                    for (const announcement of announcements) {
+                        if (announcement.is_active) {
+                            await fetch(`/api/v1/admin/announcements/${announcement.id}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ is_active: false })
+                            });
+                        }
+                    }
+                }
+
+                // Clear UI and cache
+                document.getElementById('announcement-text').value = '';
+                localStorage.removeItem('announcement');
+
+                // Trigger storage event for other pages to update
+                window.dispatchEvent(new StorageEvent('storage', {
+                    key: 'announcement',
+                    newValue: ''
+                }));
+
+                // Refresh announcement display
+                if (Announcement.refresh) {
+                    Announcement.refresh();
+                }
+
+                showMessage('Announcement cleared successfully!', 'success');
+            } catch (error) {
+                console.error('Error clearing announcement:', error);
+                showMessage('Failed to clear announcement', 'error');
+            }
         }
 
         // Show message function
@@ -1432,25 +1501,6 @@
             await loadGoogleStatus();
         }
 
-        function toggleGmailFeatures() {
-            const enabled = document.getElementById('gmail-enabled').checked;
-            // Save preference to localStorage or backend
-            localStorage.setItem('gmail-features-enabled', enabled);
-            showMessage(`Gmail features ${enabled ? 'enabled' : 'disabled'}`, 'success');
-        }
-
-        function toggleDriveFeatures() {
-            const enabled = document.getElementById('drive-enabled').checked;
-            localStorage.setItem('drive-features-enabled', enabled);
-            showMessage(`Google Drive features ${enabled ? 'enabled' : 'disabled'}`, 'success');
-        }
-
-        function toggleCalendarFeatures() {
-            const enabled = document.getElementById('calendar-enabled').checked;
-            localStorage.setItem('calendar-features-enabled', enabled);
-            showMessage(`Google Calendar features ${enabled ? 'enabled' : 'disabled'}`, 'success');
-        }
-
         async function testGoogleIntegrations() {
             const resultsDiv = document.getElementById('google-test-results');
             const testBtn = document.getElementById('test-google-btn');
@@ -1539,7 +1589,249 @@
                     setTimeout(loadGoogleStatus, 100); // Small delay to ensure tab is active
                 });
             }
+
+            // Load documents when documents tab is first opened
+            const documentsTab = document.querySelector('[data-tab="documents"]');
+            if (documentsTab) {
+                documentsTab.addEventListener('click', function() {
+                    setTimeout(() => {
+                        loadDocumentsList();
+                        loadRagStats();
+                    }, 100);
+                });
+            }
+
+            // File input handler
+            const fileInput = document.getElementById('rag-file-input');
+            const uploadBtn = document.getElementById('upload-document-btn');
+            const fileNameSpan = document.getElementById('selected-file-name');
+
+            if (fileInput) {
+                fileInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        fileNameSpan.textContent = file.name;
+                        uploadBtn.disabled = false;
+                    } else {
+                        fileNameSpan.textContent = '';
+                        uploadBtn.disabled = true;
+                    }
+                });
+            }
+
+            if (uploadBtn) {
+                uploadBtn.addEventListener('click', uploadDocument);
+            }
         });
+
+        // RAG Document Management Functions
+        async function uploadDocument() {
+            const fileInput = document.getElementById('rag-file-input');
+            const scopeSelect = document.getElementById('document-scope');
+            const statusDiv = document.getElementById('upload-status');
+            const uploadBtn = document.getElementById('upload-document-btn');
+
+            const file = fileInput.files[0];
+            if (!file) {
+                statusDiv.innerHTML = '<span style="color: #ff6b6b;">Please select a file</span>';
+                return;
+            }
+
+            // Validate file size (50MB)
+            if (file.size > 50 * 1024 * 1024) {
+                statusDiv.innerHTML = '<span style="color: #ff6b6b;">File too large. Max size is 50MB</span>';
+                return;
+            }
+
+            try {
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = '⏳ Uploading...';
+                statusDiv.innerHTML = '<span style="color: #4CAF50;">Uploading and processing document...</span>';
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('document_scope', scopeSelect.value);
+
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/rag/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+
+                const result = await response.json();
+                statusDiv.innerHTML = `
+                    <span style="color: #4CAF50;">
+                        ✅ Document uploaded successfully!<br>
+                        Filename: ${result.filename}<br>
+                        Chunks: ${result.chunk_count}<br>
+                        Status: ${result.status}
+                    </span>
+                `;
+
+                // Reset form
+                fileInput.value = '';
+                document.getElementById('selected-file-name').textContent = '';
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = '⬆️ Upload Document';
+
+                // Reload documents list
+                setTimeout(() => {
+                    loadDocumentsList();
+                    loadRagStats();
+                }, 2000);
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                statusDiv.innerHTML = `<span style="color: #ff6b6b;">Error: ${error.message}</span>`;
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '⬆️ Upload Document';
+            }
+        }
+
+        async function loadDocumentsList() {
+            const listDiv = document.getElementById('documents-list');
+            listDiv.innerHTML = '<div class="admin-note">Loading documents...</div>';
+
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/rag/documents', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load documents');
+                }
+
+                const data = await response.json();
+                const documents = data.documents || [];
+
+                if (documents.length === 0) {
+                    listDiv.innerHTML = '<div class="admin-note" style="opacity: 0.6;">No documents uploaded yet</div>';
+                    return;
+                }
+
+                let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+                documents.forEach(doc => {
+                    const scopeBadge = doc.document_scope === 'organization'
+                        ? '<span style="background: rgba(40,167,69,0.3); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">🌐 Organization</span>'
+                        : '<span style="background: rgba(66,135,245,0.3); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">👤 Personal</span>';
+
+                    html += `
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #fff; font-weight: 500;">
+                                    📄 ${doc.filename} ${scopeBadge}
+                                </div>
+                                <div style="color: rgba(255,255,255,0.6); font-size: 0.8rem; margin-top: 4px;">
+                                    Type: ${doc.file_type} | Chunks: ${doc.chunk_count || 0} | Status: ${doc.status}
+                                </div>
+                                <div style="color: rgba(255,255,255,0.5); font-size: 0.75rem; margin-top: 2px;">
+                                    Uploaded: ${new Date(doc.created_at).toLocaleString()}
+                                </div>
+                            </div>
+                            <button class="save-btn danger" onclick="deleteDocument('${doc.id}', '${doc.filename}')"
+                                style="background: rgba(245,101,101,0.2); border-color: rgba(245,101,101,0.3); padding: 6px 12px;">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+
+                listDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('Error loading documents:', error);
+                listDiv.innerHTML = '<span style="color: #ff6b6b;">Error loading documents</span>';
+            }
+        }
+
+        async function deleteDocument(documentId, filename) {
+            if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch(`/api/v1/rag/documents/${documentId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete document');
+                }
+
+                // Reload documents list
+                loadDocumentsList();
+                loadRagStats();
+
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Error deleting document: ' + error.message);
+            }
+        }
+
+        async function loadRagStats() {
+            const statsDiv = document.getElementById('rag-stats');
+            statsDiv.innerHTML = '<div class="admin-note">Loading statistics...</div>';
+
+            try {
+                const token = GoogleAuth.getToken();
+                const response = await fetch('/api/v1/rag/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load statistics');
+                }
+
+                const stats = await response.json();
+
+                statsDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">Total Documents</div>
+                            <div style="color: #fff; font-size: 1.5rem; font-weight: 600;">${stats.total_documents || 0}</div>
+                        </div>
+                        <div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">Total Chunks</div>
+                            <div style="color: #fff; font-size: 1.5rem; font-weight: 600;">${stats.total_chunks || 0}</div>
+                        </div>
+                        <div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">With Embeddings</div>
+                            <div style="color: #fff; font-size: 1.5rem; font-weight: 600;">${stats.chunks_with_embeddings || 0}</div>
+                        </div>
+                        <div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">Avg Chunk Length</div>
+                            <div style="color: #fff; font-size: 1.5rem; font-weight: 600;">${Math.round(stats.avg_chunk_length || 0)}</div>
+                        </div>
+                        <div>
+                            <div style="color: rgba(255,255,255,0.6); font-size: 0.75rem;">Coverage</div>
+                            <div style="color: #fff; font-size: 1.5rem; font-weight: 600;">${Math.round((stats.embedding_coverage || 0) * 100)}%</div>
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                statsDiv.innerHTML = '<span style="color: #ff6b6b;">Error loading statistics</span>';
+            }
+        }
     </script>
 
     </div> <!-- End settings-content -->

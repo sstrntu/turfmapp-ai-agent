@@ -93,7 +93,7 @@ class ChatApiClient:
                 else:
                     # Convert from Chat Completions format to Responses API format
                     responses_api_tools = []
-                    for tool in tools[:5]:  # Limit to 5 tools
+                    for tool in tools:  # Process all tools
                         if tool.get("type") == "function":
                             func = tool.get("function", {})
                             responses_tool = {

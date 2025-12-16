@@ -17,19 +17,19 @@ class TestSimpleChatIntegration:
     
     def test_health_endpoint_returns_correct_data(self, client):
         """Test that health endpoint returns actual service data"""
-        response = client.get("/api/v1/chat/health")
+        response = client.get("/api/v2/chat/health")
         
         assert response.status_code == 200
         data = response.json()
         
         # Verify actual content (not just that it exists)
         assert data["status"] == "healthy"
-        assert data["service"] == "chat"
+        assert data["service"] == "chat-v2"
         assert "timestamp" in data
     
     def test_models_endpoint_returns_actual_models(self, client):
         """Test that models endpoint returns expected model list"""
-        response = client.get("/api/v1/chat/models")
+        response = client.get("/api/v2/chat/models")
         
         assert response.status_code == 200
         data = response.json()
@@ -42,13 +42,8 @@ class TestSimpleChatIntegration:
         expected_models = [
             "gpt-4o",
             "gpt-4o-mini",
-            "o1",
-            "o1-mini",
-            "o1-preview",
-            "claude-3-haiku-20240307",
-            "claude-sonnet-4-20250514",
             "claude-sonnet-4-5-20250929",
-            "claude-opus-4-1-20250805",
+            "claude-3-haiku-20240307",
         ]
         for expected in expected_models:
             assert expected in model_ids, f"Expected model {expected} not found"
@@ -57,7 +52,7 @@ class TestSimpleChatIntegration:
     def test_send_message_requires_authentication(self, mock_auth, client):
         """Test that send message properly validates authentication"""
         # Test without auth header
-        response = client.post("/api/v1/chat/send", json={"message": "test"})
+        response = client.post("/api/v2/chat/send", json={"message": "test"})
         assert response.status_code == 401
         
         # Test with mock auth
@@ -72,7 +67,7 @@ class TestSimpleChatIntegration:
             }
             
             response = client.post(
-                "/api/v1/chat/send",
+                "/api/v2/chat/send",
                 headers={"Authorization": "Bearer valid-token"},
                 json={"message": "test message"}
             )
@@ -125,7 +120,7 @@ class TestSimpleChatIntegration:
             mock_list.return_value = [{"id": "conv123", "title": "Test Conversation"}]
             
             response = client.get(
-                "/api/v1/chat/conversations/conv123",
+                "/api/v2/chat/conversations/conv123",
                 headers={"Authorization": "Bearer valid-token"}
             )
             

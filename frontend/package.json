@@ -8,19 +8,26 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "echo 'No linting configured yet'",
-    "test": "echo 'No tests configured yet'"
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@assistant-ui/react": "^0.11.28",
     "@assistant-ui/react-markdown": "^0.11.1",
-    "react-markdown": "^9.0.3",
-    "react-syntax-highlighter": "^15.5.0",
-    "remark-gfm": "^4.0.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.3",
+    "react-syntax-highlighter": "^16.0.0",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.10"
+    "@vitest/coverage-v8": "^4.0.2",
+    "jsdom": "^25.0.1",
+    "vite": "^7.1.12",
+    "vitest": "^4.0.2"
   }
 }
