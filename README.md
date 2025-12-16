@@ -1,159 +1,115 @@
-# TURFMAPP AI Agent
+# 🤖 TurfMapp AI Agent
 
-Modern AI assistant that combines a FastAPI backend, a streaming chat workflow, and a React/Vite frontend.  
-This repository contains everything needed to run the unified chat agent locally, in Docker, or in CI.
+**A Production-Ready Agentic RAG System**
+
+This repository houses a sophisticated AI agent built with **LlamaIndex Workflows**, **FastAPI**, and **React**. It features a "Unified Workflow" that intelligently routes user queries between RAG (Document Search), External Tools (Google Workspace), and Direct Conversation, all underpinned by a human-in-the-loop (HITL) memory system.
 
 ---
 
-## 1. Quick Start
+## ✨ Key Features
 
+### 🧠 **Agentic RAG & Unified Workflow**
+The system doesn't just "chat." It thinks.
+- **Smart Routing**: The `UnifiedWorkflow` analyzes your intent.
+    - *Asking about a meeting?* → Routes to **Google Calendar Tool**.
+    - *Asking about a PDF?* → Routes to **RAG (Vector Store)**.
+    - *Just saying hi?* → Responds directly (Zero latency).
+- **Multi-Step Reasoning**: Can perform complex tasks like "Find the email from John and summarize the attached PDF."
+
+### 💾 **One-Click Memory System**
+- **Personalized Context**: Remembers your role, preferences, and facts across conversations.
+- **Privacy-First**: The agent *proposes* facts to remember (e.g., "User lives in Bangkok"). You must explicitly click **"Yes, remember this"** in the UI to save them to the database.
+- **Strict Filtering**: Automatically ignores transactional data (emails, search results) to keep memory clean.
+
+### 🔌 **Google Workspace Integration**
+- **Gmail**: Read, search, and draft emails.
+- **Calendar**: List events, check availability.
+- **Drive**: Search and read files directly.
+- *Note: Uses a simplified OAuth client (`SimplifiedGoogleMCPClient`) for reliability.*
+
+### 🛠 **Modern Tech Stack**
+- **Backend**: Python 3.13, FastAPI, LlamaIndex (Workflows), Supabase (Postgres + pgvector).
+- **Frontend**: React 18, Vite, TailwindCSS (via plain CSS utility classes), Streaming UI (Server-Sent Events).
+- **LLMs**: Multi-model support (OpenAI GPT-4o, Anthropic Claude 3.5 Sonnet).
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Docker & Docker Compose**
+- **API Keys**: OpenAI, Supabase, Google OAuth (optional).
+
+### 1. Configure Environment
+Copy the example environment file:
 ```bash
-git clone https://github.com/turfmapp/turfmapp-ai-agent.git
-cd turfmapp-ai-agent
+cp .env.local.example .env.local
 ```
+Fill in your keys in `.env.local`:
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `GOOGLE_...` (Client ID/Secret for Tools)
 
-### Backend
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.local.example .env.local   # fill in Supabase, OpenAI, Anthropic, Google, etc.
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev -- --port 3005
-```
-The frontend proxies API calls to `http://localhost:8000`.
-
-### Full Stack with Docker
+### 2. Run with Docker (Recommended)
+This brings up the Backend, Frontend, and ensures all dependencies are linked.
 ```bash
 docker compose up --build
 ```
-The backend Dockerfile runs a critical pytest suite (regression, health, MCP integration, tool manager) and enforces a minimal coverage threshold during the build.
+- **Frontend**: `http://localhost:3005`
+- **Backend API**: `http://localhost:8000`
+- **API Docs**: `http://localhost:8000/docs`
 
 ---
 
-## 2. Repository Layout
+## 📂 Repository Structure
 
 ```
 .
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/        # FastAPI routers (chat, chat_v2, agent, rag, settings…)
-│   │   ├── core/          # Config, logging, auth helpers
-│   │   ├── services/      # Chat orchestration, tool handlers, MCP clients
-│   │   ├── models/        # Pydantic + SQL models
-│   │   └── main.py        # FastAPI entrypoint
-│   ├── tests/             # Unit, API, regression, integration suites
-│   ├── Dockerfile*        # Dev, prod, and CI builds
-│   ├── requirements.txt
-│   └── README_TESTING.md  # Detailed backend testing doc
+│   │   ├── api/v1/             # Endpoints (Chat V2, Memory, Tools)
+│   │   ├── llamaindex/         # Core AI Logic
+│   │   │   ├── workflows/      # UnifiedWorkflow engine
+│   │   │   ├── memory/         # User & Conversation Memory
+│   │   │   └── tools/          # RAG & Google Client tools
+│   │   ├── services/           # ChatService, GoogleOAuth
+│   │   └── main.py             # App Entrypoint
+│   └── tests/                  # Pytest Suite (Unit + Integration)
 ├── frontend/
-│   ├── src/components/    # React assistant UI (ChatThread, message bubbles, etc.)
-│   ├── src/runtime/       # TurfmappChatAdapter + helpers
-│   ├── public/            # HTML entrypoints & static assets
-│   ├── package.json / vite.config.js
-│   └── tests via Vitest   # Lives alongside src files
-├── docker-compose.yml
-├── code.md                # Project standards & conventions
-└── TASK.md                # Current backlog
+│   ├── src/
+│   │   ├── components/         # React Components (MemoryConsent, ChatThread)
+│   │   └── runtime/            # Chat Adapter & Streaming Logic
+│   └── vite.config.js
+└── docker-compose.yml
 ```
-
-Historical milestone documents were removed; remaining `.md` files describe living architecture or workflow guides.
 
 ---
 
-## 3. Backend Highlights
+## 🧪 Testing
 
-- **Enhanced chat service (`app/services/chat_service.py`)**  
-  Streams responses, saves conversation history, orchestrates tool calls, falls back to in-memory storage if Supabase is unavailable.
+We value reliability. The repository includes a comprehensive test suite.
 
-- **Chat v2 API (`app/api/v1/chat_v2.py`)**  
-  Unified workflow with LlamaIndex integration, Google MCP tooling, and SSE streaming.
-
-- **Agent automation (`app/api/v1/agent.py`)**  
-  ReAct agent that uses Gmail/Drive/Calendar tools through LlamaIndex.
-- **Image generation tool (`generate_image`)**  
-  Always calls OpenAI GPT-Image-1 regardless of the selected chat model. Exposed to models via function calling and returns markdown with the generated image.
-- **Memory consent workflow**  
-  The agent proposes new user facts but only stores them in Supabase after the user approves the detailed “Do you want me to remember…” prompt.
-
-- **RAG endpoints (`app/api/v1/rag.py`)**  
-  Document upload + query pipeline backed by PostgreSQL/pgvector.
-
-- **Tool handlers**  
-  - `chat_tool_handler.py` / `chat_tool_executor.py` – manage function-call routing  
-  - `google_mcp_handler.py` – Gmail/Drive/Calendar logic with AI summarisation  
-  - `chat_api_client.py` – OpenAI Responses API wrapper (web search, image gen, tool calls)  
-  - `supabase_auth.py` – fetch Supabase user profiles with access tokens  
-
-### Running Tests
-
+**Run Backend Tests:**
 ```bash
-# Unit / service coverage
-python -m pytest tests/unit
-
-# API behaviour (v1/v2/agent/rag)
-python -m pytest tests/test_api
-
-# Regression guardrails
-python -m pytest tests/regression
-
-# Coverage snapshot (resolves SQLAlchemy Base import first)
-python -m pytest tests/unit tests/test_api --cov=app --cov-report=term-missing
+cd backend
+./run_tests.sh
 ```
+*Includes: Unit tests, Integration tests (V2 API), and Tool Execution tests.*
 
-Pytest runs in strict asyncio mode. The Docker build executes a reduced suite with `--cov-fail-under=12`.
-
----
-
-## 4. Frontend Highlights
-
-- React + Vite + Assistant UI, with tests written in Vitest / React Testing Library.
-- Streaming adapter: `src/runtime/TurfmappChatAdapter.js` bridges the UI to `/api/v2/chat/stream`.
-- Core chat UI: `src/components/ChatThread.jsx` (attachments, model selector, suggestions).
-- Rendering helpers: `AssistantMessage`, `SourcesPanel`, `BlockRenderer` display metadata, reasoning, and tool blocks.
-
-### Frontend Tests
+**Frontend Tests:**
 ```bash
-npm run test        # vitest run --coverage
-npm run test:watch
+cd frontend
+npm run test
 ```
-Coverage includes adapter helpers (`TurfmappChatAdapter.test.js`, `.run.test.js`) and UI behaviour (`ChatThread.test.jsx`, `AssistantMessage.test.jsx`, etc.).
 
 ---
 
-## 5. Configuration & Environment
-
-- **Backend `.env.local`**: Supabase credentials, OpenAI/Anthropic keys, Google OAuth, secret key.
-- **Frontend proxy**: configure Vite proxy in `vite.config.js` or set `VITE_BACKEND_URL`.
-- **Supabase schema**: see `backend/SCHEMA_INFO.md` for table overview and `supabase_schema.sql` for reference data.
-
----
-
-## 6. Development Workflow
-
-1. Follow coding standards in `code.md` (type hints, logging, error handling, consistent structure).
-2. Update docs (`README_TESTING.md`, `API_DOCUMENTATION.md`, etc.) when workflows change.
-3. Before pushing / opening a PR:
-   ```bash
-   python -m pytest tests/unit tests/test_api
-   npm run test
-   docker compose build
-   ```
-4. Keep historical or redundant files trimmed to avoid confusion (the repo has been cleaned accordingly).
+## 📚 Documentation
+- **[Memory System Explained](backend/MEMORY_SYSTEM_EXPLAINED.md)**: Deep dive into how user facts are extracted and stored.
+- **[Database Schema](backend/SCHEMA_INFO.md)**: Overview of `turfmapp_agent` schema (users, conversations, memory).
+- **[Setup Guide](SETUP.md)**: Detailed local development setup (non-Docker).
 
 ---
 
-## 7. Support / Questions
-
-- Architecture overviews: `backend/README_TESTING.md`, `backend/UNIFIED_WORKFLOW_GUIDE.md`, `frontend/USER_GUIDE.md`
-- Project standards: `code.md`
-- Issue tracking / next steps: `TASK.md`
-
-Happy shipping! 🚀
+## 🛡️ License
+Proprietary / Internal Use Only.

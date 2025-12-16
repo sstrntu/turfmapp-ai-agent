@@ -146,36 +146,31 @@ class UserMemory:
 
 You should extract TWO types of information:
 
-1. PERSONAL FACTS (name, profession, location, etc.)
+1. PERSONAL FACTS (name, profession, location, specific interests, etc.)
 2. EXPLICIT INSTRUCTIONS/PREFERENCES (when user says "remember:", "keep in mind:", etc.)
 
 CRITICAL RULES:
-- ONLY extract information from USER messages (not assistant responses)
-- Focus on NEW information just shared
+- ONLY extract information from USER messages (ignore assistant responses/tool outputs)
+- Focus strictly on the USER's own attributes, relationships, or preferences
+- Do NOT extract transactional data (e.g., "User received an email from X", "User has a meeting at Y")
+- Do NOT extract content of emails, documents, or search results found by the system
+- Do NOT extract ephemeral states (e.g., "User is asking about X")
 - For explicit instructions, preserve the full context
 - Extract a MAXIMUM of 3 most important items
 
-PERSONAL FACTS (use these key formats):
-- "name": user's name
-- "profession": job title or role
-- "location": city or country
-- "company": company name
-- "interests": hobbies or interests
+PERSONAL FACTS (examples):
+- "name": user's name ("I'm Sira")
+- "profession": job title ("I work as a dev")
+- "location": city/country ("I live in Bangkok")
+- "interests": hobbies ("I love playing tennis")
+- "relationships": key people ("My sister is Sarah")
 
-EXPLICIT INSTRUCTIONS/PREFERENCES (use descriptive keys):
-- "data_analysis_approach": for data analysis instructions
-- "communication_style": for how they want you to communicate
-- "work_preferences": for workflow or process preferences
-- "[topic]_instructions": for any specific domain instructions
+EXPLICIT INSTRUCTIONS (examples):
+- "data_analysis_approach": "When analyzing data, always check outliers"
+- "communication_style": "Be concise and don't use emojis"
+- "project_context": "Remember that Project X is due next week"
 
-DETECTION PATTERNS for explicit instructions:
-- "Remember: [instruction]"
-- "Here are the points I want you to remember: [instruction]"
-- "Keep in mind that [instruction]"
-- "When [doing X], [instruction]"
-- "Please remember [instruction]"
-
-Return ONLY a JSON object. If NO NEW information is found, return {{}}.
+Return ONLY a JSON object. If NO NEW information is found (or only transactional info), return {{}}.
 
 Examples:
 Input: "My name is Alex"

@@ -38,6 +38,8 @@ from ...core.jwt_auth import get_current_user_from_token
 from ...llamaindex.services.llm_factory import llm_factory, TaskType
 from ...llamaindex.memory.conversation_memory import MemoryManager
 from ...llamaindex.memory.user_memory import UserMemory
+from ...llamaindex.workflows.unified_workflow import UnifiedWorkflowInput, UnifiedWorkflow
+from .google_api import get_user_google_credentials
 from llama_index.core.llms import ChatMessage, MessageRole
 from ...database import get_db_pool, ConversationService
 from ...services.conversation_manager import ConversationManager
@@ -123,7 +125,7 @@ async def get_memory_manager() -> MemoryManager:
     return memory_manager
 
 
-@router.post("/send", response_model=ChatResponse)
+
 async def generate_title_background(conversation_id: str, user_message: str):
     """Generate and update conversation title based on first message"""
     try:
@@ -202,7 +204,16 @@ async def send_chat_message(
 
         logger.info(f"🧠 Chat request (unified): user={user_id}, conversation={conversation_id}")
         
-        # ...
+        is_new_conversation = chat_request.conversation_id is None
+
+        # Get Google credentials if available
+        google_credentials = None
+        try:
+            google_credentials = await get_user_google_credentials(user_id)
+        except Exception:
+            pass  # Ignore if no credentials
+
+        custom_system_prompt = chat_request.system_prompt
         
         # Create workflow input
         workflow_input = UnifiedWorkflowInput(
@@ -216,7 +227,9 @@ async def send_chat_message(
             custom_system_prompt=custom_system_prompt,
         )
 
-        # ...
+        # Run workflow
+        workflow = UnifiedWorkflow(timeout=60, verbose=True)
+        output = await workflow.run(workflow_input)
         
         # Update conversation title if this was a new conversation
         if is_new_conversation:

@@ -57,7 +57,7 @@ class TestChatIntegration:
         
         # Send chat message
         response = client.post(
-            "/api/v1/chat/send",
+            "/api/v2/chat/send",
             headers={"Authorization": "Bearer test-token"},
             json={"message": "Show me J1 League standings"}
         )
@@ -140,7 +140,7 @@ class TestChatIntegration:
         
         # Get conversation
         response = client.get(
-            "/api/v1/chat/conversations/test-conv-123",
+            "/api/v2/chat/conversations/test-conv-123",
             headers={"Authorization": "Bearer test-token"}
         )
         
@@ -181,7 +181,7 @@ class TestChatIntegration:
         # Mock empty conversation history (conversation doesn't exist)
         with patch('app.services.chat_service.EnhancedChatService.get_conversation_history', return_value=[]):
             response = client.get(
-                "/api/v1/chat/conversations/nonexistent-id",
+                "/api/v2/chat/conversations/nonexistent-id",
                 headers={"Authorization": "Bearer test-token"}
             )
             
@@ -208,7 +208,7 @@ class TestChatIntegration:
              patch('app.services.chat_service.EnhancedChatService.save_message_to_conversation', return_value=True):
             
             response = client.post(
-                "/api/v1/chat/send",
+                "/api/v2/chat/send",
                 headers={"Authorization": "Bearer test-token"},
                 json={"message": "Test message"}
             )
@@ -238,7 +238,7 @@ class TestChatIntegration:
         
         # Test empty message
         response = client.post(
-            "/api/v1/chat/send",
+            "/api/v2/chat/send",
             headers={"Authorization": "Bearer test-token"},
             json={"message": ""}
         )
@@ -259,10 +259,10 @@ class TestChatIntegration:
     def test_unauthorized_requests_rejected(self, client):
         """Test that endpoints properly reject unauthorized requests"""
         endpoints_to_test = [
-            ("POST", "/api/v1/chat/send", {"message": "test"}),
-            ("GET", "/api/v1/chat/conversations", None),
-            ("GET", "/api/v1/chat/conversations/test-id", None),
-            ("DELETE", "/api/v1/chat/conversations/test-id", None)
+            ("POST", "/api/v2/chat/send", {"message": "test"}),
+            ("GET", "/api/v2/chat/conversations", None),
+            ("GET", "/api/v2/chat/conversations/test-id", None),
+            ("DELETE", "/api/v2/chat/conversations/test-id", None)
         ]
         
         for method, endpoint, json_data in endpoints_to_test:
@@ -334,7 +334,7 @@ class TestChatDataFlow:
             
             # Send message that should trigger sources extraction
             response = client.post(
-                "/api/v1/chat/send",
+                "/api/v2/chat/send",
                 headers={"Authorization": "Bearer test-token"},
                 json={"message": "Show me J1 League info"}
             )
@@ -415,7 +415,7 @@ class TestChatDataFlow:
             
             # 1. Send initial message (creates conversation)
             send_response = client.post(
-                "/api/v1/chat/send",
+                "/api/v2/chat/send",
                 headers={"Authorization": "Bearer test-token"},
                 json={"message": "Hello, start a new conversation"}
             )
@@ -426,7 +426,7 @@ class TestChatDataFlow:
             
             # 2. Verify conversation appears in list
             list_response = client.get(
-                "/api/v1/chat/conversations",
+                "/api/v2/chat/conversations",
                 headers={"Authorization": "Bearer test-token"}
             )
             
@@ -437,7 +437,7 @@ class TestChatDataFlow:
             
             # 3. Retrieve conversation history
             history_response = client.get(
-                f"/api/v1/chat/conversations/{conv_id}",
+                f"/api/v2/chat/conversations/{conv_id}",
                 headers={"Authorization": "Bearer test-token"}
             )
             
