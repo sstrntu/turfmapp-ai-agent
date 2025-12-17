@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="styles/home.css">
     <link rel="stylesheet" href="styles/sphere.css">
 </head>
+
 <body data-page="home">
     <!-- Sphere background -->
     <div class="app-background">
@@ -22,95 +24,186 @@
     <!-- Main application container -->
     <div class="app-container">
 
-            <!-- Application Header -->
-            <header class="app-header" role="banner">
-                <div class="header-container">
-                    <div class="brand-section">
-                        <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar" aria-expanded="false" aria-controls="left-panel">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                        <h1 class="app-title">TURFMAPP</h1>
-                    </div>
+        <!-- Application Header -->
+        <header class="app-header" role="banner">
+            <div class="header-container">
+                <div class="brand-section">
+                    <button id="left-panel-toggle" class="left-toggle-btn" aria-label="Open sidebar"
+                        aria-expanded="false" aria-controls="left-panel">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                            aria-hidden="true">
+                            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                    <h1 class="app-title">TURFMAPP</h1>
+                </div>
 
-                    <!-- Announcement area -->
-                    <div class="top-actions">
-                        <div class="announcement-display" id="announcement-display" style="display: none;">
-                            <span class="announcement-label">Announcement:</span>
-                            <span class="announcement-text" id="announcement-text"></span>
-                        </div>
+                <!-- Announcement area -->
+                <div class="top-actions">
+                    <div class="announcement-display" id="announcement-display" style="display: none;">
+                        <span class="announcement-label">Announcement:</span>
+                        <span class="announcement-text" id="announcement-text"></span>
                     </div>
                 </div>
-            </header>
+            </div>
+        </header>
 
-            <!-- Main Content Area -->
-            <main class="main-content" role="main">
-                <div class="content-container">
+        <!-- Main Content Area -->
+        <main class="main-content" role="main">
+            <div class="content-container dashboard-layout">
 
-                    <!-- Minimal Chat Section -->
-                    <section class="chat-section" aria-label="Messages">
-                        <div class="chat-card">
-                            <div id="react-chat-root" class="chat-react-root">
-                                <noscript>
-                                    Enable JavaScript to use the TURFMAPP assistant experience.
-                                </noscript>
+                <!-- LEFT WIDGETS -->
+                <aside class="widget-column left-widgets">
+                    <div class="widget-card glass-panel">
+                        <div class="widget-header">
+                            <h3>🚀 Top Priorities</h3>
+                            <button class="widget-action-btn">＋</button>
+                        </div>
+                        <ul class="widget-list">
+                            <li class="priority-high">Review Q4 Strategy</li>
+                            <li class="priority-medium">Email Trisikh back</li>
+                            <li class="priority-low">Update J1 League Data</li>
+                        </ul>
+                    </div>
+
+                    <div class="widget-card glass-panel">
+                        <div class="widget-header">
+                            <h3>✓ Todo List</h3>
+                        </div>
+                        <ul class="todo-list">
+                            <li>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" checked>
+                                    <span class="checkmark"></span>
+                                    <span class="text">Morning Sync</span>
+                                </label>
+                            </li>
+                            <li>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="text">Approve Invoices</span>
+                                </label>
+                            </li>
+                            <li>
+                                <label class="custom-checkbox">
+                                    <input type="checkbox">
+                                    <span class="checkmark"></span>
+                                    <span class="text">Schedule Team Lunch</span>
+                                </label>
+                            </li>
+                        </ul>
+                    </div>
+                </aside>
+
+                <!-- CENTER CHAT -->
+                <section class="chat-section" aria-label="Messages">
+                    <div class="chat-card">
+                        <div id="react-chat-root" class="chat-react-root">
+                            <noscript>
+                                Enable JavaScript to use the TURFMAPP assistant experience.
+                            </noscript>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- RIGHT WIDGETS -->
+                <aside class="widget-column right-widgets">
+                    <div class="widget-card glass-panel agent-comm-widget">
+                        <div class="widget-header">
+                            <h3>📡 Agent Comms</h3>
+                            <span class="status-indicator online"></span>
+                        </div>
+                        <div class="agent-comm-content">
+                            <p class="helper-text">Direct command line to other agents.</p>
+                            <div class="mini-chat-history">
+                                <div class="mini-msg out">@TrisikhAgent: Update meeting time?</div>
+                                <div class="mini-msg in">Confirmed for 2 PM.</div>
+                            </div>
+                            <div class="agent-input-area">
+                                <input type="text" placeholder="Message an agent..." class="agent-input">
+                                <button class="agent-send-btn">➤</button>
                             </div>
                         </div>
-                    </section>
-                </div>
-            </main>
-
-            <!-- ChatGPT-style left sidebar -->
-            <aside id="left-panel" class="left-panel" aria-hidden="true">
-                <div class="left-panel-inner">
-                    <div class="left-panel-header">
-                        <button id="btn-new-chat" class="new-chat-btn" type="button">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            New chat
-                        </button>
-                        <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
                     </div>
+                </aside>
 
-                    <div class="left-panel-content">
-                        <!-- History Section -->
-                        <div class="panel-group">
-                            <div class="panel-subtitle">Recent</div>
-                            <ul id="history-list" class="chat-history" aria-live="polite"></ul>
-                        </div>
+            </div>
+        </main>
 
-                        <!-- Bottom Menu Section -->
-                        <div class="panel-bottom-menu">
-                            <a href="/profile.html" class="menu-item profile-item">
-                                <span class="profile-thumb" aria-hidden="true"></span>
-                                <span>Profile</span>
-                            </a>
-                            <a href="settings.html" class="menu-item">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/>
-                                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                                <span>Settings</span>
-                            </a>
-                            <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                                <span>Log out</span>
-                            </button>
+        <!-- ChatGPT-style left sidebar -->
+        <aside id="left-panel" class="left-panel" aria-hidden="true">
+            <div class="left-panel-inner">
+                <div class="left-panel-header" style="justify-content: flex-end;">
+                    <button id="left-panel-close" class="close-panel-btn" aria-label="Close sidebar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="left-panel-content">
+                    <!-- Apps Placeholder -->
+                    <div class="panel-apps">
+                        <div class="panel-subtitle">Apps</div>
+                        <div class="app-grid">
+                            <button class="app-btn" title="App 1">App 1</button>
+                            <button class="app-btn" title="App 2">App 2</button>
+                            <button class="app-btn" title="App 3">App 3</button>
+                            <button class="app-btn" title="App 4">App 4</button>
                         </div>
                     </div>
+
+                    <!-- Chat Section Header -->
+                    <div class="panel-subtitle">Chat</div>
+
+                    <button id="btn-new-chat" class="new-chat-btn" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 5v14m7-7H5" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                        New chat
+                    </button>
+
+                    <!-- History Section -->
+                    <div class="panel-group">
+                        <!-- "Recent" header removed, ui.js handles grouping headers -->
+                        <ul id="history-list" class="chat-history" aria-live="polite"></ul>
+                    </div>
+
+                </div> <!-- Close left-panel-content -->
+
+                <!-- Bottom Menu Section -->
+                <div class="panel-bottom-menu">
+                    <a href="/profile.html" class="menu-item profile-item">
+                        <span class="profile-thumb" aria-hidden="true"></span>
+                        <span>Profile</span>
+                    </a>
+                    <a href="settings.html" class="menu-item">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+                                stroke="currentColor" stroke-width="2" />
+                        </svg>
+                        <span>Settings</span>
+                    </a>
+                    <button class="menu-item danger logout-btn" onclick="GoogleAuth.signOut()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Log out</span>
+                    </button>
                 </div>
-            </aside>
+            </div>
+    </div>
+    </aside>
 
 
-        </div>
+    </div>
     </div>
 
     <!-- JavaScript modules -->
@@ -141,4 +234,5 @@
         Announcement.initHeader('announcement-display', 'announcement-text');
     </script>
 </body>
+
 </html>

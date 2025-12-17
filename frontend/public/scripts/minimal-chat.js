@@ -155,6 +155,10 @@ class MinimalChat {
 
             if (event.type === 'start') {
               this.conversationId = event.conversation_id;
+              // Refresh history sidebar to show new conversation immediately
+              if (window.UI?.loadConversationHistory) {
+                window.UI.loadConversationHistory();
+              }
             }
             else if (event.type === 'thought') {
               // Show progress in real-time!

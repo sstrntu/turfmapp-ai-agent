@@ -169,6 +169,12 @@ window.UI.loadConversationHistory = async function loadConversationHistory(retry
                 button.textContent = conv.title || 'Untitled conversation';
                 button.setAttribute('data-conversation-id', conv.id);
 
+                // Highlight active conversation
+                const currentId = window.minimalChat?.conversationId;
+                if (currentId === conv.id) {
+                    li.classList.add('active');
+                }
+
                 button.addEventListener('click', async function () {
                     // Remove focus from button before closing sidebar to avoid aria-hidden accessibility warning
                     this.blur();

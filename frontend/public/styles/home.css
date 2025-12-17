@@ -1,5 +1,12 @@
-.structured-answer a { text-decoration: none; color: inherit; }
-.structured-answer a:hover { text-decoration: underline; }
+.structured-answer a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.structured-answer a:hover {
+    text-decoration: underline;
+}
+
 /**
  * TURFMAPP Dashboard/Home Page Styles
  *
@@ -49,23 +56,25 @@
 @font-face {
     font-family: 'JUST Sans';
     src: url('../fonts/Text/JUST Sans Regular.woff2') format('woff2'),
-         url('../fonts/Text/JUST Sans Regular.woff') format('woff');
+        url('../fonts/Text/JUST Sans Regular.woff') format('woff');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
+
 @font-face {
     font-family: 'JUST Sans';
     src: url('../fonts/Text/JUST Sans Medium.woff2') format('woff2'),
-         url('../fonts/Text/JUST Sans Medium.woff') format('woff');
+        url('../fonts/Text/JUST Sans Medium.woff') format('woff');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
 }
+
 @font-face {
     font-family: 'JUST Sans';
     src: url('../fonts/Text/JUST Sans SemiBold.woff2') format('woff2'),
-         url('../fonts/Text/JUST Sans SemiBold.woff') format('woff');
+        url('../fonts/Text/JUST Sans SemiBold.woff') format('woff');
     font-weight: 600;
     font-style: normal;
     font-display: swap;
@@ -188,7 +197,12 @@ body {
 }
 
 /* Enhanced typography */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     font-family: var(--font-family-primary);
     font-weight: 600;
     letter-spacing: -0.025em;
@@ -333,13 +347,15 @@ p {
     align-items: center;
     justify-content: space-between;
     position: relative;
-    z-index: 2;         /* Above glass layers */
+    z-index: 2;
+    /* Above glass layers */
 }
 
 .brand-section {
     display: flex;
     align-items: center;
-    gap: 20px; /* tighten space between icon, title, and AI */
+    gap: 20px;
+    /* tighten space between icon, title, and AI */
 }
 
 /* Left panel toggle icon button */
@@ -351,13 +367,26 @@ p {
     justify-content: center;
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    background: rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.06);
     color: var(--color-primary);
     cursor: pointer;
 }
-.left-toggle-btn svg { width: 16px; height: 16px; }
-.left-toggle-btn.small { width: 28px; height: 28px; font-size: 14px; }
-.left-toggle-btn:hover { background: var(--color-accent); border-color: var(--color-border-hover); }
+
+.left-toggle-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.left-toggle-btn.small {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+}
+
+.left-toggle-btn:hover {
+    background: var(--color-accent);
+    border-color: var(--color-border-hover);
+}
 
 /* Liquid glass left panel */
 .left-panel {
@@ -369,7 +398,8 @@ p {
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: var(--z-nav);
-    pointer-events: none; /* hidden by default */
+    pointer-events: none;
+    /* hidden by default */
 }
 
 /* Liquid glass bend layer - backdrop blur effect */
@@ -412,7 +442,30 @@ p {
         inset 1px 1px 2px 0 rgba(255, 255, 255, 0.15),
         inset -1px -1px 2px 0 rgba(255, 255, 255, 0.15);
 }
-.left-panel.open { transform: translateX(0); pointer-events: auto; }
+
+.left-panel.open {
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+/* Sidebar Push Effect - Adjust layout when sidebar is open */
+.panel-open .dashboard-layout {
+    padding-left: 280px;
+    /* sidebar width + padding */
+    gap: 80px;
+    /* reduced gap to give more room for chat */
+}
+
+.panel-open .chat-section {
+    max-width: 2000px;
+    /* allow chat to be wider when sidebar is open */
+}
+
+/* Keep header static by removing the margin shift for it */
+.app-header {
+    transition: none;
+    /* header stays fixed */
+}
 
 /* Remove duplicate - already defined above with liquid glass edge layer styles */
 
@@ -425,12 +478,13 @@ p {
 }
 
 .new-chat-btn {
-    flex: 1;
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 32px;
+    height: 36px;
     padding: 0 12px;
+    margin-bottom: 8px;
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 8px;
@@ -462,7 +516,10 @@ p {
     color: var(--color-primary);
 }
 
-.panel-note { color: var(--color-secondary); font-size: 0.9rem; }
+.panel-note {
+    color: var(--color-secondary);
+    font-size: 0.9rem;
+}
 
 /* Left panel content styles */
 .left-panel-content {
@@ -477,6 +534,43 @@ p {
     flex-direction: column;
     gap: 4px;
     margin-bottom: 16px;
+    flex: 1;
+    /* Allow history to grow/scroll */
+    min-height: 0;
+    /* Fix flex scrolling */
+    overflow-y: auto;
+}
+
+.panel-apps {
+    margin-bottom: 12px;
+    /* Reduced from 24px */
+    padding-bottom: 12px;
+    /* Reduced from 16px */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.app-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--color-primary);
+    padding: 12px 0;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.app-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .panel-subtitle {
@@ -485,7 +579,8 @@ p {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+    /* Reduced from 8px */
     padding-left: 8px;
 }
 
@@ -569,6 +664,16 @@ p {
 
 .conversation-btn:hover {
     color: rgba(255, 255, 255, 0.9);
+}
+
+.conversation-item.active {
+    background: rgba(255, 255, 255, 0.1);
+    border-left-color: var(--accent-primary);
+}
+
+.conversation-item.active .conversation-btn {
+    color: #fff;
+    font-weight: 500;
 }
 
 .conversation-delete-btn {
@@ -689,22 +794,84 @@ p {
 }
 
 /* Legacy panel styles for compatibility */
-.panel-divider { height: 1px; background: var(--color-border); margin: 10px 0; opacity: 0.6; }
+.panel-divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 10px 0;
+    opacity: 0.6;
+}
+
 .panel-btn {
-    background: rgba(255,255,255,0.12);
+    background: rgba(255, 255, 255, 0.12);
     border: 1px solid var(--color-border);
     color: var(--color-primary);
-    border-radius: 8px; padding: 8px 10px; cursor: pointer; text-align: left;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    text-align: left;
 }
-.panel-btn.small { padding: 6px 8px; font-size: 0.85rem; }
-.panel-btn:hover { background: rgba(255,255,255,0.18); border-color: var(--color-border-hover); }
-.panel-link { color: var(--color-primary); text-decoration: none; padding: 6px 2px; }
-.panel-link:hover { text-decoration: underline; }
-.panel-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
-.panel-list li { background: rgba(255,255,255,0.06); border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 8px; display:flex; justify-content: space-between; align-items:center; gap:8px; }
-.panel-input { flex: 1; background: rgba(0,0,0,0.35); color: var(--color-primary); border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 8px; }
-.panel-row { display: flex; gap: 8px; align-items: center; }
-.panel-remove { background: transparent; border: none; color: #ff9aa2; cursor: pointer; }
+
+.panel-btn.small {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+}
+
+.panel-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: var(--color-border-hover);
+}
+
+.panel-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    padding: 6px 2px;
+}
+
+.panel-link:hover {
+    text-decoration: underline;
+}
+
+.panel-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.panel-list li {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--color-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+
+.panel-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.panel-remove {
+    background: transparent;
+    border: none;
+    color: #ff9aa2;
+    cursor: pointer;
+}
 
 .app-title {
     font-family: var(--font-family-primary);
@@ -721,7 +888,8 @@ p {
     color: var(--color-secondary);
     letter-spacing: 0;
     text-transform: uppercase;
-    margin-left: 0; /* bring AI closer to title */
+    margin-left: 0;
+    /* bring AI closer to title */
 }
 
 .user-section {
@@ -752,9 +920,368 @@ p {
 }
 
 .content-container {
-    max-width: 1200px;
+    max-width: 100%;
+    /* Expand to full width for dashboard */
     margin: 0 auto;
     padding: 0 var(--spacing-md);
+    height: 100%;
+}
+
+/* Dashboard 3-Column Layout */
+.dashboard-layout {
+    display: flex;
+    gap: 150px;
+    /* Increased for more balanced spacing */
+    padding: 0 40px;
+    /* padding from screen edges */
+    height: calc(100vh - var(--header-height) - 40px);
+    align-items: flex-start;
+    justify-content: center;
+    transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-section {
+    flex: 1;
+    /* Fill available space */
+    min-width: 600px;
+    /* Minimum width */
+    max-width: 1600px;
+    /* Increased to fill more space */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Removed chat-card override to preserve original styling */
+
+/* Widget Columns */
+.widget-column {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+/* Glass Widget Styles */
+/* Base styles match chat-card (removed heavy dark bg) */
+.glass-panel {
+    background: transparent;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* For pseudo-elements */
+}
+
+/* Liquid glass bend layer for widgets (matches chat-card) */
+.glass-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: inherit;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* Liquid glass face layer for widgets (matches chat-card) */
+.glass-panel::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow:
+        0 4px 4px rgba(0, 0, 0, 0.15),
+        0 0 12px rgba(0, 0, 0, 0.08),
+        inset 1px 1px 2px 0 rgba(255, 255, 255, 0.12),
+        inset -1px -1px 2px 0 rgba(255, 255, 255, 0.12);
+    border-radius: inherit;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Ensure content is above glass layers */
+.widget-header,
+.widget-list,
+.todo-list,
+.agent-comm-content {
+    position: relative;
+    z-index: 2;
+}
+
+.widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.widget-header h3 {
+    font-family: var(--font-family-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+.widget-action-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.widget-action-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Priority List */
+.widget-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.widget-list li {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+}
+
+.priority-high {
+    border-left-color: #ff6b6b !important;
+}
+
+.priority-medium {
+    border-left-color: #feca57 !important;
+}
+
+.priority-low {
+    border-left-color: #54a0ff !important;
+}
+
+/* Todo List */
+.todo-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.custom-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+}
+
+.custom-checkbox input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    height: 18px;
+    width: 18px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin-right: 10px;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.2s;
+}
+
+.custom-checkbox:hover input~.checkmark {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.custom-checkbox input:checked~.checkmark {
+    background-color: var(--success);
+    border-color: var(--success);
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+}
+
+.custom-checkbox input:checked~.checkmark:after {
+    display: block;
+}
+
+.custom-checkbox .checkmark:after {
+    left: 6px;
+    top: 2px;
+    width: 4px;
+    height: 9px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.custom-checkbox .text {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.2s;
+}
+
+.custom-checkbox input:checked~.text {
+    text-decoration: line-through;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Agent Comm Widget */
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #333;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+.status-indicator.online {
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+.helper-text {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 12px;
+}
+
+.mini-chat-history {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    height: 100px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mini-msg {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    border-radius: 8px;
+    max-width: 90%;
+    line-height: 1.4;
+}
+
+.mini-msg.out {
+    background: rgba(59, 130, 246, 0.2);
+    color: #e0e7ff;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+}
+
+.mini-msg.in {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+}
+
+.agent-input-area {
+    display: flex;
+    gap: 8px;
+}
+
+.agent-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 0.85rem;
+    outline: none;
+}
+
+.agent-input:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.agent-send-btn {
+    background: var(--accent-primary);
+    border: none;
+    color: white;
+    border-radius: 6px;
+    width: 32px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.agent-send-btn:hover {
+    filter: brightness(1.1);
+}
+
+/* Responsive Hide */
+/* Responsive Layout */
+@media (max-width: 1200px) {
+    .dashboard-layout {
+        flex-direction: column;
+        height: auto;
+        gap: 32px;
+        padding-bottom: 40px;
+    }
+
+    .chat-section {
+        min-height: 80vh;
+        /* Ensure chat takes up primary view */
+        width: 100%;
+    }
+
+    .widget-column {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        width: 100%;
+        gap: 16px;
+        order: 2;
+        /* Move below chat */
+    }
+
+    .content-container {
+        padding: 0 var(--spacing-sm);
+    }
 }
 
 /* ========================================================================
@@ -844,15 +1371,23 @@ p {
 .chat-card {
     border-radius: 14px;
     padding: 0 var(--spacing-md) var(--spacing-md);
-    max-width: 960px;
+    width: 100%;
+    /* Force full width */
+    max-width: 100%;
+    /* Fill parent container */
     margin: 0 auto;
     transition: var(--transition-medium), box-shadow var(--transition-medium), transform var(--transition-medium), border-color var(--transition-medium);
-    display: flex;            /* Ensure internal scroll works */
-    flex-direction: column;   /* Stack list above form */
-    max-height: 78vh;         /* Prevent card from growing beyond viewport */
-    overflow: hidden;         /* Contain internal scrolling to the list */
+    display: flex;
+    /* Ensure internal scroll works */
+    flex-direction: column;
+    /* Stack list above form */
+    max-height: 78vh;
+    /* Prevent card from growing beyond viewport */
+    overflow: hidden;
+    /* Contain internal scrolling to the list */
     position: relative;
-    background: transparent;                /* match profile/admin panels */
+    background: transparent;
+    /* match profile/admin panels */
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--color-border);
@@ -866,7 +1401,8 @@ p {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.06);        /* match profile/admin bend layer */
+    background: rgba(0, 0, 0, 0.06);
+    /* match profile/admin bend layer */
     border-radius: inherit;
     z-index: 0;
     pointer-events: none;
@@ -911,12 +1447,16 @@ p {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    overflow-y: auto;         /* internal scroll */
+    overflow-y: auto;
+    /* internal scroll */
     padding-right: 4px;
-    flex: 1;            /* fill remaining height */
-    min-height: 0;      /* allow child to shrink for overflow */
+    flex: 1;
+    /* fill remaining height */
+    min-height: 0;
+    /* allow child to shrink for overflow */
     position: relative;
-    z-index: 2;         /* Above glass layers */
+    z-index: 2;
+    /* Above glass layers */
 }
 
 .chat-card:hover {
@@ -968,12 +1508,25 @@ p {
 .assistant-message .assistant-content li {
     color: var(--text-primary);
 }
-.assistant-message .assistant-content a { text-decoration: none; color: inherit; }
-.assistant-message .assistant-content a:hover { text-decoration: underline; }
+
+.assistant-message .assistant-content a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.assistant-message .assistant-content a:hover {
+    text-decoration: underline;
+}
 
 /* Keep typing indicator small inside assistant full-width panel */
-.assistant-message .typing-indicator { gap: 4px; }
-.assistant-message .typing-dot { width: 6px; height: 6px; }
+.assistant-message .typing-indicator {
+    gap: 4px;
+}
+
+.assistant-message .typing-dot {
+    width: 6px;
+    height: 6px;
+}
 
 /* Hover effects for chat bubbles */
 .chat-bubble:hover {
@@ -1034,10 +1587,14 @@ p {
 }
 
 @keyframes typing-bounce {
-    0%, 60%, 100% {
+
+    0%,
+    60%,
+    100% {
         transform: translateY(0);
         opacity: 0.4;
     }
+
     30% {
         transform: translateY(-8px);
         opacity: 1;
@@ -1052,10 +1609,14 @@ p {
 }
 
 @keyframes cursor-blink {
-    0%, 50% {
+
+    0%,
+    50% {
         opacity: 1;
     }
-    51%, 100% {
+
+    51%,
+    100% {
         opacity: 0;
     }
 }
@@ -1069,7 +1630,7 @@ p {
 
 .reason-chip {
     grid-column: 2 / 3;
-    background: rgba(255,255,255,0.10);
+    background: rgba(255, 255, 255, 0.10);
     color: var(--color-primary);
     border: 1px solid var(--color-border);
     border-radius: 14px;
@@ -1082,7 +1643,7 @@ p {
 }
 
 .reason-chip:hover {
-    background: rgba(255,255,255,0.16);
+    background: rgba(255, 255, 255, 0.16);
     border-color: var(--color-border-hover);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
@@ -1095,7 +1656,7 @@ p {
 
 .reason-panel {
     grid-column: 1 / -1;
-    background: rgba(0,0,0,0.25);
+    background: rgba(0, 0, 0, 0.25);
     border: 1px dashed var(--color-border);
     border-radius: 12px;
     padding: 10px 12px;
@@ -1106,14 +1667,15 @@ p {
 }
 
 .reason-panel:hover {
-    background: rgba(0,0,0,0.35);
+    background: rgba(0, 0, 0, 0.35);
     border-color: rgba(255, 255, 255, 0.3);
 }
 
 .chat-form {
     margin-top: var(--spacing-md);
     position: relative;
-    z-index: 2;         /* Above glass layers */
+    z-index: 2;
+    /* Above glass layers */
 }
 
 .input-container {
@@ -1163,7 +1725,8 @@ p {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 8px;
-    color: #ffffff; /* white instead of gray */
+    color: #ffffff;
+    /* white instead of gray */
     cursor: pointer;
     transition: all var(--transition-medium);
     display: flex;
@@ -1178,7 +1741,9 @@ p {
     border-color: var(--color-border);
 }
 
-.tool-btn:active { transform: translateY(0); }
+.tool-btn:active {
+    transform: translateY(0);
+}
 
 .tool-btn.active {
     color: #ffffff;
@@ -1187,20 +1752,24 @@ p {
 }
 
 .tool-btn:disabled {
-  pointer-events: none;
-  cursor: not-allowed;
-  opacity: 0.6;
+    pointer-events: none;
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 .icon-img {
     display: block;
-    width: 24px;   /* unify icon size with sound effect */
+    width: 24px;
+    /* unify icon size with sound effect */
     height: 24px;
-    filter: brightness(0) invert(1);  /* Make icons white */
+    filter: brightness(0) invert(1);
+    /* Make icons white */
 }
+
 .tool-btn:hover .icon-img,
 .tool-btn.active .icon-img {
-    filter: brightness(0) invert(1);  /* Keep icons white on hover/active */
+    filter: brightness(0) invert(1);
+    /* Keep icons white on hover/active */
 }
 
 /* Globe icon (svg-like via css) */
@@ -1212,6 +1781,7 @@ p {
     border-radius: 50%;
     position: relative;
 }
+
 .icon-globe::before,
 .icon-globe::after {
     content: "";
@@ -1221,11 +1791,13 @@ p {
     transform: translate(-50%, -50%);
     background: currentColor;
 }
+
 .icon-globe::before {
     width: 2px;
     height: 12px;
     border-radius: 1px;
 }
+
 .icon-globe::after {
     width: 12px;
     height: 2px;
@@ -1246,14 +1818,20 @@ p {
     resize: none;
     min-height: 20px;
     max-height: 120px;
-    overflow-y: hidden;               /* hide scrollbar */
+    overflow-y: hidden;
+    /* hide scrollbar */
     transition: all var(--transition-medium);
     backdrop-filter: blur(12px);
 }
 
 /* Hide scrollbars across browsers for chat input */
-.chat-input::-webkit-scrollbar { display: none; }
-.chat-input { scrollbar-width: none; }
+.chat-input::-webkit-scrollbar {
+    display: none;
+}
+
+.chat-input {
+    scrollbar-width: none;
+}
 
 .chat-input:focus {
     border-color: var(--color-border-hover);
@@ -1270,7 +1848,8 @@ p {
 }
 
 .chat-input::placeholder {
-    color: rgba(255, 255, 255, 0.88); /* brighter for better readability */
+    color: rgba(255, 255, 255, 0.88);
+    /* brighter for better readability */
     opacity: 1;
 }
 
@@ -1415,10 +1994,15 @@ p {
 }
 
 /* Sources toggle + popover */
-.sources-toggle-wrap { margin-top: 10px; position: relative; display: inline-block; }
+.sources-toggle-wrap {
+    margin-top: 10px;
+    position: relative;
+    display: inline-block;
+}
+
 .sources-toggle {
-    border: 1px solid rgba(255,255,255,0.25);
-    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
     color: var(--color-primary);
     border-radius: 999px;
     padding: 6px 10px;
@@ -1428,16 +2012,33 @@ p {
     gap: 6px;
     cursor: pointer;
 }
-.favicon-stack { position: relative; display: inline-flex; }
-.favicon-stack img {
-    width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6);
-    background: #fff; margin-left: -6px;
+
+.favicon-stack {
+    position: relative;
+    display: inline-flex;
 }
-.favicon-stack img:first-child { margin-left: 0; }
-.sources-toggle:hover { background: rgba(255,255,255,0.14); }
+
+.favicon-stack img {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background: #fff;
+    margin-left: -6px;
+}
+
+.favicon-stack img:first-child {
+    margin-left: 0;
+}
+
+.sources-toggle:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
 .sources-popover {
     position: fixed;
-    background: transparent;               /* allow liquid glass layers to show */
+    background: transparent;
+    /* allow liquid glass layers to show */
     color: var(--text-primary);
     border: 1px solid var(--color-border);
     border-radius: 12px;
@@ -1451,7 +2052,8 @@ p {
     -webkit-backdrop-filter: blur(20px);
     /* Ensure backdrop-filter works */
     isolation: isolate;
-    overflow: hidden;                      /* clip glass layers to rounded corners */
+    overflow: hidden;
+    /* clip glass layers to rounded corners */
 }
 
 /* Liquid glass layers for sources popup */
@@ -1484,11 +2086,41 @@ p {
     z-index: -1;
     pointer-events: none;
 }
-.sources-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
-.sources-list li { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 10px; border-radius: 10px; }
-.sources-list li:hover { background: rgba(255,255,255,0.06); }
-.sources-list a { color: var(--text-primary); text-decoration: none; font-weight: 600; line-height: 1.35; }
-.source-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: 0.9; }
+
+.sources-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.sources-list li {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.sources-list li:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sources-list a {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.source-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    opacity: 0.9;
+}
 
 /* ========================================================================
    PROFILE PLACEHOLDER STYLES
@@ -1498,29 +2130,36 @@ p {
     margin-top: var(--spacing-xxl);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-lg); /* consistent space between profile cards */
+    gap: var(--spacing-lg);
+    /* consistent space between profile cards */
 }
 
 .profile-card {
-    background: transparent;               /* allow liquid glass layers to show */
+    background: transparent;
+    /* allow liquid glass layers to show */
     border: 1px solid var(--color-border);
     border-radius: 16px;
     padding: var(--spacing-xl);
     backdrop-filter: blur(20px);
     box-shadow: var(--shadow-card);
     width: 100%;
-    max-width: 960px;            /* match chat-card width */
-    margin: 0 auto; /* centered; vertical spacing handled by section gap */
+    max-width: 960px;
+    /* match chat-card width */
+    margin: 0 auto;
+    /* centered; vertical spacing handled by section gap */
     position: relative;
-    overflow: hidden;                      /* clip glass layers to rounded corners */
-    z-index: 0;                            /* create stacking context for layers */
+    overflow: hidden;
+    /* clip glass layers to rounded corners */
+    z-index: 0;
+    /* create stacking context for layers */
 }
 
 .profile-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    margin-bottom: var(--spacing-md); /* slightly tighter header spacing */
+    margin-bottom: var(--spacing-md);
+    /* slightly tighter header spacing */
 }
 
 .profile-avatar-lg {
@@ -1553,7 +2192,7 @@ p {
 }
 
 /* Ensure nested form rows span the full grid width and manage their own 2-col layout */
-.profile-grid > .form-row {
+.profile-grid>.form-row {
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: 200px minmax(300px, 1fr);
@@ -1624,7 +2263,10 @@ p {
 }
 
 /* Ensure content appears above glass layers */
-.profile-card > * { position: relative; z-index: 2; }
+.profile-card>* {
+    position: relative;
+    z-index: 2;
+}
 
 /* TODO: Widget styles for future dashboard components */
 /*
@@ -1769,6 +2411,7 @@ p {
     align-items: center;
     gap: 10px;
 }
+
 .profile-thumb {
     width: 24px;
     height: 24px;
@@ -1944,7 +2587,8 @@ body.panel-open .app-header {
 
     body.panel-open .main-content,
     body.panel-open .app-header {
-        margin-left: 0; /* No shift on mobile, panel overlays */
+        margin-left: 0;
+        /* No shift on mobile, panel overlays */
     }
 }
 
@@ -1957,7 +2601,7 @@ body.panel-open .app-header {
     left: 0;
     right: 0;
     height: 10px;
-    background: linear-gradient(to bottom, rgba(255,255,255,0.02), transparent);
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
     pointer-events: none;
 }
 
@@ -1968,24 +2612,29 @@ body.panel-open .app-header {
     right: -8px;
     bottom: 0;
     width: 8px;
-    background: linear-gradient(to right, rgba(255,255,255,0.02), transparent);
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.02), transparent);
     pointer-events: none;
 }
 
 
 /* FAL Tools Button Styles */
 .tool-btn.fal-tool {
-    width: 40px;   /* larger footprint */
+    width: 40px;
+    /* larger footprint */
     height: 40px;
     font-size: 16px;
     font-weight: 500;
-    background: transparent;       /* match default (not highlighted) */
-    border-color: transparent;      /* match default */
-    color: #ffffff;                 /* white like other tool icons */
+    background: transparent;
+    /* match default (not highlighted) */
+    border-color: transparent;
+    /* match default */
+    color: #ffffff;
+    /* white like other tool icons */
 }
 
 .tool-btn.fal-tool:hover {
-    color: #ffffff;                      /* white hover color */
+    color: #ffffff;
+    /* white hover color */
     background: rgba(255, 255, 255, 0.15);
     border-color: var(--color-border);
     transform: translateY(-1px);
@@ -2094,17 +2743,22 @@ body.panel-open .app-header {
 /* Move sidebar menus up for admin/profile pages (no chat history needed) */
 body[data-page="admin"] .panel-bottom-menu,
 body[data-page="profile"] .panel-bottom-menu {
-    margin-top: 0;  /* Remove auto margin that pushes to bottom */
-    padding-top: 8px;  /* Reduce top padding */
+    margin-top: 0;
+    /* Remove auto margin that pushes to bottom */
+    padding-top: 8px;
+    /* Reduce top padding */
 }
 
 body[data-page="admin"] .left-panel-content,
 body[data-page="profile"] .left-panel-content {
-    justify-content: flex-start;  /* Align content to top instead of space-between */
-    padding-top: 16px;  /* Add some top padding */
+    justify-content: flex-start;
+    /* Align content to top instead of space-between */
+    padding-top: 16px;
+    /* Add some top padding */
 }
 
 /* Keep home page sidebar menus at bottom (for chat history) */
 body:not([data-page="admin"]):not([data-page="profile"]) .panel-bottom-menu {
-    margin-top: auto;  /* Ensure home page keeps auto margin */
+    margin-top: auto;
+    /* Ensure home page keeps auto margin */
 }
